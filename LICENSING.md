@@ -1,3 +1,13 @@
+# zfront fork notice
+
+zfront forked OpenFront at upstream commit `817c12927c4ec34ec68c74c780a74a14fb776d09` (2026-10-23).
+
+- zfront modifications are © 2026 zfront contributors and are licensed under AGPL v3.0, with the same Section 7 additional terms as the original work.
+- zfront does not include OpenFront's proprietary assets: the `/proprietary` directory was removed at the fork point.
+- zfront is not affiliated with or endorsed by OpenFront Inc.
+
+The original OpenFront licensing history follows.
+
 # License for OpenFront.io Project
 
 ## Overview

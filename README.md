@@ -1,163 +1,51 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="proprietary/images/OpenFrontLogoDark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="proprietary/images/OpenFrontLogo.svg">
-    <img src="proprietary/images/OpenFrontLogo.svg" alt="OpenFrontIO Logo" width="300">
-  </picture>
-</p>
+# zfront
 
-[OpenFront.io](https://openfront.io/) is an online real-time strategy game focused on territorial control and alliance building. Players compete to expand their territory, build structures, and form strategic alliances in various maps based on real-world geography.
+zfront is a browser game in the style of OpenFront, reworked into base building and tower defence against waves of zombie hordes. It plays on real-world maps, starting with England. Terrain decides where the hordes can go, and the biggest weapons can change the terrain.
 
-This is a fork/rewrite of WarFront.io. Credit to https://github.com/WarFrontIO.
+Domain: [zfront.app](https://zfront.app) · **Status:** pre-alpha. The repo is a fresh fork of OpenFront, and the first technical spike is being planned.
 
-![CI](https://github.com/openfrontio/OpenFrontIO/actions/workflows/ci.yml/badge.svg)
-[![Crowdin](https://badges.crowdin.net/openfront-mls/localized.svg)](https://crowdin.com/project/openfront-mls)
-[![CLA assistant](https://cla-assistant.io/readme/badge/openfrontio/OpenFrontIO)](https://cla-assistant.io/openfrontio/OpenFrontIO)
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Assets: CC BY-SA 4.0](https://img.shields.io/badge/Assets-CC%20BY--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-sa/4.0/)
+> zfront is an independent fork of [OpenFront](https://github.com/openfrontio/OpenFrontIO), which is itself a fork and rewrite of [WarFront.io](https://github.com/WarFrontIO). It is **not** affiliated with or endorsed by OpenFront Inc.
 
-## License
+## Docs
 
-OpenFront source code is licensed under the **GNU Affero General Public License v3.0**
+- [Research findings](docs/zfront/research.md): an OpenFront teardown, licensing, Cloudflare hosting, and genre mechanics
+- [Draft requirements](docs/zfront/requirements-draft.md): the core loop, MVP scope, mechanics catalogue and open decisions
+- [Technical spike plan](docs/zfront/spike-plan.md): the go/no-go experiment for horde simulation on the OpenFront engine
+- Upstream engine docs: [Architecture](docs/Architecture.md), [Maps](docs/Maps.md)
 
-Current copyright notices appear in:
+## Licence
 
-- Footer: "© OpenFront and Contributors"
-- Loading screen: "© OpenFront and Contributors"
+- **Code:** [GNU AGPL v3.0](LICENSE), including OpenFront's Section 7 additional terms. Anyone who plays zfront over the network must be offered the source of the exact version they're playing.
+- **Required notice:** "© OpenFront and Contributors" must stay visible in the footer and on the loading screen.
+- **Assets** in `/resources`: [CC BY-SA 4.0](LICENSE-ASSETS), with attribution to "OpenFront". OpenFront's proprietary assets (`/proprietary`) have been removed from this fork and must not be re-added.
+- **History:** see [LICENSING.md](LICENSING.md).
 
-Modified versions must preserve these notices in reasonably visible locations.
+## Prerequisites
 
-See the [LICENSE](LICENSE) for complete requirements.
+- [Node.js](https://nodejs.org/) 24.15 or newer, in the 24.x line
+- npm 12.1 or newer, in the 12.x line. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`.
+- [Go](https://go.dev/doc/install), only needed to regenerate maps (`npm run gen-maps`)
 
-For asset licensing, see [LICENSE-ASSETS](LICENSE-ASSETS).  
-For license history, see [LICENSING.md](LICENSING.md).
-
-## 🌟 Features
-
-- **Real-time Strategy Gameplay**: Expand your territory and engage in strategic battles
-- **Alliance System**: Form alliances with other players for mutual defense
-- **Multiple Maps**: Play across various geographical regions including Europe, Asia, Africa, and more
-- **Resource Management**: Balance your expansion with defensive capabilities
-- **Cross-platform**: Play in any modern web browser
-
-## 📋 Prerequisites
-
-- [Node.js](https://nodejs.org/) v24.15.0 or newer in the Node 24 release line
-- [npm](https://www.npmjs.com/) v12.1.0 or newer in the npm 12 release line
-- A modern web browser (Chrome, Firefox, Edge, etc.)
-
-Node.js may bundle an older npm version. Upgrade it before installing project dependencies:
+## Develop
 
 ```bash
-npm install --global --ignore-scripts npm@12.1.0
+npm run inst   # npm ci --ignore-scripts. Don't use npm install.
+npm run dev    # client and server with hot reload
+npm test
+npm run typecheck
+npm run lint
+npm run format
 ```
 
-## 🚀 Installation
+## Upstream
 
-1. **Clone the repository**
+`upstream` points at `openfrontio/OpenFrontIO` and is fetch-only. zfront is a hard fork, so upstream fixes are cherry-picked selectively rather than merged. Never open pull requests against upstream from this repo.
 
-   ```bash
-   git clone https://github.com/openfrontio/OpenFrontIO.git
-   cd OpenFrontIO
-   ```
+## Project structure
 
-2. **Install dependencies**
-
-   ```bash
-   npm run inst
-   ```
-
-   Do NOT use `npm install` nor `npm i` for project dependencies. Use `npm run inst`; it runs the safer `npm ci --ignore-scripts` to install exactly the versions in `package-lock.json` without running lifecycle scripts.
-
-   The repository also rejects dependency releases less than seven days old and dependencies sourced from Git, remote URLs, local tarballs, or directories. Wait until a new release passes the seven-day window before updating it; security exceptions require explicit maintainer review.
-
-## 🎮 Running the Game
-
-### Development Mode
-
-Run both the client and server in development mode with live reloading:
-
-```bash
-npm run dev
-```
-
-This will:
-
-- Start the webpack dev server for the client
-- Launch the game server with development settings
-- Open the game in your default browser (to disable this behavior, set `SKIP_BROWSER_OPEN=true` in your environment)
-
-### Client Only
-
-To run just the client with hot reloading:
-
-```bash
-npm run start:client
-```
-
-### Server Only
-
-To run just the server with development settings:
-
-```bash
-npm run start:server-dev
-```
-
-### Connecting to staging or production backends
-
-Sometimes it's useful to connect to production servers when replaying a game, testing user profiles, purchases, or login flow.
-
-> To replay a production game, make sure you're on the same commit that the game you want to replay was executed on, you can find the `gitCommit` value via `https://api.openfront.io/game/[gameId]`.
-> Unfinished games cannot be replayed on localhost.
-
-To connect to staging api servers:
-
-```bash
-npm run dev:staging
-```
-
-To connect to production api servers:
-
-```bash
-npm run dev:prod
-```
-
-## 🛠️ Development Tools
-
-- **Format code**:
-
-  ```bash
-  npm run format
-  ```
-
-- **Lint code with Oxlint**:
-
-  ```bash
-  npm run lint
-  ```
-
-- **Lint and fix code with Oxlint**:
-
-  ```bash
-  npm run lint:fix
-  ```
-
-- **Testing**
-  ```bash
-  npm test
-  ```
-
-## 🏗️ Project Structure
-
-- `/src/client` - Frontend game client
-- `/src/server` - Backend game server
-- `/packages/engine` - Deterministic game simulation (`@openfront/engine`)
-- `/packages/engine-api` - The engine's contract: types, schemas, game updates and the worker protocol (`@openfront/engine-api`)
-- `/packages/engine-lib` - Engine code also used outside the engine: map grid, rules, helpers (`@openfront/engine-lib`)
-- `/packages/shared` - Code shared by client and server: wire schemas, env, asset URLs (`@openfront/shared`)
-- `/packages/zbin` - Compact binary wire format for zod schemas (self-contained, zod-only)
-- `/resources` - Static assets (images, maps, etc.)
-
-## 🤝 Contributing
-
-Contributions and translations are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow, the approved-issue process, project governance, and translation info.
+- `/packages/engine`: the deterministic simulation (runs in a Web Worker)
+- `/packages/engine-api`, `/packages/engine-lib`, `/packages/shared`, `/packages/zbin`: engine contract, map grid and rules, shared client/server code, wire format
+- `/src/client`: WebGL renderer and Lit UI
+- `/src/server`: lobby and intent relay (Node)
+- `/map-generator`: converts PNG to map binaries (Go)
+- `/resources`: static assets and generated maps

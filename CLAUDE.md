@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## zfront fork
+
+This repo is **zfront**, a hard fork of OpenFront that turns it into a base-builder and tower-defence game against zombie hordes (domain zfront.app, hosted on Cloudflare). Read `docs/zfront/` first: `research.md`, `requirements-draft.md` and `spike-plan.md`. The OpenFront notes below still describe the engine we build on.
+
+- Licence: AGPL-3.0 with OpenFront's Section 7 terms. Keep "© OpenFront and Contributors" visible in-game. Never add OpenFront proprietary assets (the old `/proprietary` dir) or OpenFront branding.
+- `origin` is `sycus1/zfront`. `upstream` (`openfrontio/OpenFrontIO`) is fetch-only. Never open PRs or issues against upstream; `gh` defaults to `sycus1/zfront`.
+- New zfront gameplay code goes in clearly named modules (for example `packages/engine/src/horde/`) rather than being scattered through OpenFront files, so cherry-picking from upstream stays possible.
+
 ## Commands
 
 ```bash

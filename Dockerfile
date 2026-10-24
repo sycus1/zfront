@@ -23,7 +23,6 @@ COPY vite.config.ts ./
 COPY index.html ./
 COPY client-api.json ./
 COPY resources ./resources
-COPY proprietary ./proprietary
 COPY src ./src
 COPY packages ./packages
 # build-prod runs scripts/buildAssetHashes.ts after vite, to emit
