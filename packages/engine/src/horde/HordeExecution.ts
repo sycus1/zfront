@@ -9,7 +9,7 @@ import {
 } from "@openfront/engine-lib/snapshot/SnapshotType";
 import { simpleHash } from "@openfront/engine-lib/Util";
 import { z } from "zod";
-import { Execution, Game, Unit } from "../game/Game";
+import { Execution, Game, Player, Unit } from "../game/Game";
 import { execSnapshotType } from "../snapshot/ExecutionSnapshot";
 import type { ExecRecord, SnapshotReader } from "../snapshot/SnapshotContext";
 import { Elites } from "./Elites";
@@ -53,6 +53,8 @@ export interface HordeOptions {
   /** Structure damage per tick is pressure >> pressureShift. */
   pressureShift: number;
   structureHp: number;
+  /** HQ health. When it falls, the player loses. */
+  hqHp: number;
 }
 
 // Spike defaults, sized to show a big horde in a solo game within minutes:
@@ -76,6 +78,7 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   turretEliteDamage: 20,
   pressureShift: 6,
   structureHp: 3_000,
+  hqHp: 50_000,
 };
 
 const TARGET_TYPES: readonly UnitType[] = [
@@ -93,6 +96,9 @@ export interface HordeStats {
   elites: number;
   killed: number;
   structuresDestroyed: number;
+  /** The first human player's HQ health, or 0 when none is alive. */
+  hqHp: number;
+  hqsFallen: number;
   recomputes: number;
   lastRecomputeMs: number;
   maxRecomputeMs: number;
@@ -110,6 +116,8 @@ export class HordeExecution implements Execution {
   private elites!: Elites;
   private spawnCells!: Int32Array;
   private turretOffsets!: Int32Array;
+  /** Terrain movement cost; the live cost adds structure cells on top. */
+  private terrainCost!: Uint8Array;
 
   private wave = 0;
   private waveSize = 0;
@@ -120,7 +128,11 @@ export class HordeExecution implements Execution {
   private hordeStructureSig = -1;
   private hordeStructureAt = new Map<number, Unit>();
   private hordeTurrets: Unit[] = [];
+  private hordeHqAt = new Map<number, Player>();
   private structureHp = new Map<TileRef, number>();
+  /** HQ health by player smallID. */
+  private hqHp = new Map<number, number>();
+  private hqsFallen = 0;
 
   private killed = 0;
   private structuresDestroyed = 0;
@@ -142,19 +154,30 @@ export class HordeExecution implements Execution {
     const mini = mg.miniMap();
     this.width = mini.width();
     this.height = mini.height();
-    const cost = buildCostField(mini, opts.blockedMagnitude);
-    this.field = new HordeField(this.width, this.height, opts.cellCap);
+    this.terrainCost = buildCostField(mini, opts.blockedMagnitude);
+    // Shared by the field and the flow field; scanStructures() makes sure
+    // structure cells are enterable even on blocked terrain, so the horde
+    // can reach (and press on) a city or HQ in the mountains.
+    const cost = this.terrainCost.slice();
+    this.field = new HordeField(this.width, this.height, cost, opts.cellCap);
     this.hordeFlow = new FlowField(this.width, this.height, cost);
     this.elites = new Elites(
       opts.maxElites,
       opts.eliteSpeed,
       opts.elitePressure,
     );
-    this.spawnCells = coastalCells(mg, cost, this.width, this.height);
+    this.spawnCells = coastalCells(
+      mg,
+      this.terrainCost,
+      this.width,
+      this.height,
+    );
     this.turretOffsets = discOffsets(opts.turretRange, this.width);
     this.hordeStructureAt = new Map();
     this.hordeTurrets = [];
+    this.hordeHqAt = new Map();
     this.structureHp = new Map();
+    this.hqHp = new Map();
     this.emitterCells = [];
     this.emitterRemaining = [];
   }
@@ -191,6 +214,8 @@ export class HordeExecution implements Execution {
       elites: this.elites?.count ?? 0,
       killed: this.killed,
       structuresDestroyed: this.structuresDestroyed,
+      hqHp: this.firstHqHp(),
+      hqsFallen: this.hqsFallen,
       ...this.hordeProfile,
     };
   }
@@ -223,6 +248,8 @@ export class HordeExecution implements Execution {
       alive: this.field.total(),
       elites: this.elites.count,
       wave: this.wave,
+      hqHp: this.firstHqHp(),
+      hqMaxHp: this.opts.hqHp,
       encodeMs: 0,
       sentAt: 0,
     };
@@ -248,7 +275,18 @@ export class HordeExecution implements Execution {
     mix(this.wave);
     mix(this.killed);
     mix(this.structuresDestroyed);
+    for (const [id, hp] of this.hqHp) {
+      mix(id);
+      mix(hp);
+    }
     return h >>> 0;
+  }
+
+  private firstHqHp(): number {
+    for (const p of this.hordeHqAt.values()) {
+      return this.hqHp.get(p.smallID()) ?? this.opts.hqHp;
+    }
+    return 0;
   }
 
   private cellOf(tile: TileRef): number {
@@ -267,12 +305,14 @@ export class HordeExecution implements Execution {
   private scanStructures(): void {
     const units = this.mg!.units(TARGET_TYPES);
     // Each human player's spawn tile is their HQ: always a target, and an
-    // obstacle the horde presses on (indestructible in the spike).
+    // obstacle the horde presses on. When it falls the player loses.
     const hqs: TileRef[] = [];
+    const hqOwners: Player[] = [];
     for (const p of this.mg!.players()) {
       const spawn = p.spawnTile();
       if (p.type() === PlayerType.Human && p.isAlive() && spawn !== undefined) {
         hqs.push(spawn);
+        hqOwners.push(p);
       }
     }
     let sig = 0x811c9dc5;
@@ -300,12 +340,19 @@ export class HordeExecution implements Execution {
       }
       if (u.type() === UnitType.DefensePost) this.hordeTurrets.push(u);
     }
-    for (const t of hqs) {
+    this.hordeHqAt.clear();
+    hqs.forEach((t, k) => {
       const cell = this.cellOf(t);
       if (obstacle[cell] === 0) {
         obstacle[cell] = 1;
         cells.push(cell);
       }
+      if (!this.hordeHqAt.has(cell)) this.hordeHqAt.set(cell, hqOwners[k]);
+    });
+    const cost = this.hordeFlow.cost;
+    cost.set(this.terrainCost);
+    for (const c of cells) {
+      if (cost[c] === 0) cost[c] = 1;
     }
     const start = performance.now();
     this.hordeFlow.compute(cells);
@@ -400,7 +447,11 @@ export class HordeExecution implements Execution {
   private applyPressure(): void {
     this.field.drainPressure((cell, pressure) => {
       const u = this.hordeStructureAt.get(cell);
-      if (u === undefined || !u.isActive()) return;
+      if (u === undefined || !u.isActive()) {
+        const owner = this.hordeHqAt.get(cell);
+        if (owner !== undefined) this.damageHq(owner, pressure);
+        return;
+      }
       const key = u.tile();
       const hp =
         (this.structureHp.get(key) ?? this.opts.structureHp) -
@@ -413,6 +464,27 @@ export class HordeExecution implements Execution {
       u.delete(false);
       this.structuresDestroyed++;
     });
+  }
+
+  private damageHq(owner: Player, pressure: number): void {
+    const id = owner.smallID();
+    const hp =
+      (this.hqHp.get(id) ?? this.opts.hqHp) -
+      (pressure >> this.opts.pressureShift);
+    this.hqHp.set(id, Math.max(0, hp));
+    if (hp > 0 || !owner.isAlive()) return;
+
+    // The HQ has fallen: the player loses everything. The next scan drops
+    // the HQ as a target; once no human is left the game ends.
+    this.hqsFallen++;
+    for (const u of owner.units()) u.delete(false);
+    for (const t of [...owner.tiles()]) owner.relinquish(t);
+    const humansLeft = this.mg!.players().some(
+      (p) => p.type() === PlayerType.Human && p.isAlive(),
+    );
+    if (!humansLeft) {
+      this.mg!.setWinner(null, this.mg!.stats().stats());
+    }
   }
 
   snapshot(): ExecRecord {
@@ -433,6 +505,9 @@ export class HordeExecution implements Execution {
       eliteCooldown: e ? Array.from(e.cooldown.subarray(0, e.count)) : [],
       hpTiles: [...this.structureHp.keys()],
       hpValues: [...this.structureHp.values()],
+      hqIds: [...this.hqHp.keys()],
+      hqValues: [...this.hqHp.values()],
+      hqsFallen: this.hqsFallen,
       killed: this.killed,
       structuresDestroyed: this.structuresDestroyed,
     });
@@ -447,6 +522,7 @@ export class HordeExecution implements Execution {
     this.nextWaveTick = s.nextWaveTick;
     this.killed = s.killed;
     this.structuresDestroyed = s.structuresDestroyed;
+    this.hqsFallen = s.hqsFallen;
     this.hordeProfile = newProfile();
     this.hordeStructureSig = -1;
     if (!s.initialized) {
@@ -464,6 +540,7 @@ export class HordeExecution implements Execution {
     this.structureHp = new Map(
       s.hpTiles.map((t, i) => [t as TileRef, s.hpValues[i]]),
     );
+    this.hqHp = new Map(s.hqIds.map((id, i) => [id, s.hqValues[i]]));
     // hordeStructureSig is -1, so the next tick rescans and rebuilds the flow field.
   }
 }
@@ -544,6 +621,7 @@ const HordeOptionsSchema = z.object({
   turretEliteDamage: zInt(),
   pressureShift: zInt(),
   structureHp: zInt(),
+  hqHp: zInt(),
 });
 
 const HordeStateSchema = z.object({
@@ -561,6 +639,9 @@ const HordeStateSchema = z.object({
   eliteCooldown: z.array(zInt()),
   hpTiles: z.array(zInt()),
   hpValues: z.array(zInt()),
+  hqIds: z.array(zInt()),
+  hqValues: z.array(zInt()),
+  hqsFallen: zInt(),
   killed: zInt(),
   structuresDestroyed: zInt(),
 });

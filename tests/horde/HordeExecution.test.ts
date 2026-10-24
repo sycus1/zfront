@@ -87,8 +87,22 @@ describe("HordeExecution", () => {
     expect(a.horde.stats().wave).toBe(2);
   });
 
+  test("the HQ falls under pressure and the player loses", async () => {
+    const { game, horde } = await hordeGame({ ...SMALL_WAVES, hqHp: 2_000 });
+    const survivor = game.player("survivor");
+    survivor.setSpawnTile(game.ref(50, 48));
+    expect(survivor.isAlive()).toBe(true);
+    let t = 0;
+    for (; t < 400 && survivor.isAlive(); t++) game.executeNextTick();
+    expect(horde.stats().hqsFallen).toBe(1);
+    expect(horde.stats().hqHp).toBe(0);
+    expect(survivor.isAlive()).toBe(false);
+    expect(survivor.numTilesOwned()).toBe(0);
+  });
+
   test("a snapshot mid-wave restores and keeps ticking identically", async () => {
     const { game } = await hordeGame(SMALL_WAVES, [[50, 44]]);
+    game.player("survivor").setSpawnTile(game.ref(50, 52));
     run(game, 40);
     await expectSnapshotRoundTrip(game, "plains", 30);
   });

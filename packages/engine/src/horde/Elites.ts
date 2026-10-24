@@ -11,6 +11,7 @@ export class Elites {
   readonly hp: Int32Array;
   readonly cooldown: Uint8Array;
   count = 0;
+  private readonly hordeScratch = new Int32Array(8);
 
   constructor(
     readonly capacity: number,
@@ -42,7 +43,14 @@ export class Elites {
       this.cooldown[k] = this.speed;
       const at = this.cell[k];
       if (dist[at] === UNREACHABLE) continue;
-      const to = downhill(dist, field.width, field.height, at);
+      const to = downhill(
+        dist,
+        field.moveCost,
+        field.width,
+        field.height,
+        at,
+        this.hordeScratch,
+      );
       if (to < 0) continue;
       if (field.obstacle[to] !== 0) {
         field.addPressure(to, this.pressure);

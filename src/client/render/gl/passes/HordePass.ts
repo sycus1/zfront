@@ -36,6 +36,8 @@ export interface HordeRenderStats {
   alive: number;
   elites: number;
   wave: number;
+  hqHp: number;
+  hqMaxHp: number;
   reset(): void;
 }
 
@@ -53,6 +55,8 @@ function newStats(): HordeRenderStats {
     alive: 0,
     elites: 0,
     wave: 0,
+    hqHp: 0,
+    hqMaxHp: 0,
     reset() {
       s.frames = 0;
       s.latencyMs = s.encodeMs = s.uploadMs = 0;
@@ -145,6 +149,8 @@ export class HordePass {
     s.alive = frame.alive;
     s.elites = frame.elites;
     s.wave = frame.wave;
+    s.hqHp = frame.hqHp;
+    s.hqMaxHp = frame.hqMaxHp;
   }
 
   draw(cam: Float32Array, timeSec: number): void {

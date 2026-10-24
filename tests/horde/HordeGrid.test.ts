@@ -1,7 +1,9 @@
 import { Elites } from "@openfront/engine/horde/Elites";
 import {
+  DIAG_STEP,
   downhill,
   FlowField,
+  ORTHO_STEP,
   UNREACHABLE,
 } from "@openfront/engine/horde/FlowField";
 import { HordeField } from "@openfront/engine/horde/HordeField";
@@ -44,18 +46,36 @@ function flowFor(g: Grid): FlowField {
 }
 
 function fieldFor(g: Grid, cap = 60_000): HordeField {
-  const field = new HordeField(g.w, g.h, cap);
+  const field = new HordeField(g.w, g.h, g.cost, cap);
   for (const o of g.obstacles) field.obstacle[o] = 1;
   return field;
 }
 
+/** Cells visited following downhill from `from` until it stops. */
+function pathFrom(g: Grid, f: FlowField, from: number): number[] {
+  const scratch = new Int32Array(8);
+  const path = [from];
+  for (let at = from; ;) {
+    const next = downhill(f.dist, g.cost, g.w, g.h, at, scratch);
+    if (next < 0) return path;
+    path.push(next);
+    at = next;
+  }
+}
+
 describe("FlowField", () => {
-  test("open plains: distance is the Manhattan distance", () => {
+  test("open plains: octile distance (straight 5, diagonal 7 per step)", () => {
     const g = grid([".....", ".....", "..T..", ".....", "....."]);
     const f = flowFor(g);
     for (let y = 0; y < 5; y++) {
       for (let x = 0; x < 5; x++) {
-        expect(f.dist[y * 5 + x]).toBe(Math.abs(x - 2) + Math.abs(y - 2));
+        const dx = Math.abs(x - 2);
+        const dy = Math.abs(y - 2);
+        const diag = Math.min(dx, dy);
+        const straight = Math.max(dx, dy) - diag;
+        expect(f.dist[y * 5 + x]).toBe(
+          diag * DIAG_STEP + straight * ORTHO_STEP,
+        );
       }
     }
   });
@@ -69,38 +89,40 @@ describe("FlowField", () => {
       "...#..T",
     ]);
     const f = flowFor(g);
-    // (0, 0) must walk down to the gap row, through it, then on to (6, 4).
-    expect(f.dist[0]).toBe(2 + 3 + 3 + 2);
+    expect(f.dist[0]).not.toBe(UNREACHABLE);
+    expect(pathFrom(g, f, 0)).toContain(2 * 7 + 3);
     for (const ridge of [3, 10, 24, 31]) {
       expect(f.dist[ridge]).toBe(UNREACHABLE);
     }
+  });
+
+  test("diagonals never cut between two blocked cells", () => {
+    const g = grid(["Z#", "#T"]);
+    expect(flowFor(g).dist[0]).toBe(UNREACHABLE);
   });
 
   test("a sealed pocket is unreachable", () => {
     const g = grid(["..#..", "..#.T", "..#.."]);
     const f = flowFor(g);
     expect(f.dist[0]).toBe(UNREACHABLE);
-    expect(f.dist[8]).toBe(1);
+    expect(f.dist[8]).toBe(ORTHO_STEP);
   });
 
   test("a longer route over plains beats a short climb over highland", () => {
-    const g = grid([
-      ".....",
-      ".hhh.", // straight across costs 4 per cell
-      "Z...T",
-    ]);
-    // Bottom-row route: 4 plains steps. Through the highland would cost more.
-    const f = flowFor(g);
-    expect(f.dist[g.spawns[0]]).toBe(4);
+    const g = grid([".....", ".hhh.", "Z...T"]);
+    expect(flowFor(g).dist[g.spawns[0]]).toBe(4 * ORTHO_STEP);
+    // Forced through the highland: 5 + 3 x 20 + 5.
     const g2 = grid(["#####", "Zhhh.", "####T"]);
-    expect(flowFor(g2).dist[g2.spawns[0]]).toBe(4 + 4 + 4 + 1 + 1);
+    expect(flowFor(g2).dist[g2.spawns[0]]).toBe(5 + 3 * 4 * ORTHO_STEP + 5);
   });
 
   test("downhill breaks ties in N, E, S, W order", () => {
+    const cost = new Uint8Array(9).fill(1);
+    const scratch = new Int32Array(8);
     const dist = Uint32Array.from([5, 3, 5, 3, 4, 3, 5, 3, 5]);
-    expect(downhill(dist, 3, 3, 4)).toBe(1); // N wins over E, S, W at 3
+    expect(downhill(dist, cost, 3, 3, 4, scratch)).toBe(1);
     const noLower = Uint32Array.from([9, 9, 9, 9, 1, 9, 9, 9, 9]);
-    expect(downhill(noLower, 3, 3, 4)).toBe(-1);
+    expect(downhill(noLower, cost, 3, 3, 4, scratch)).toBe(-1);
   });
 });
 
@@ -129,7 +151,6 @@ describe("HordeField", () => {
       });
       expect(field.density[g.obstacles[0]]).toBe(0);
     }
-    // Everything has reached the cell next to the structure and leans on it.
     expect(field.density[4]).toBe(500);
     expect(pressure).toBe(500);
   });
@@ -146,7 +167,7 @@ describe("HordeField", () => {
     for (const s of g.spawns) field.add(s, 400);
     const f = flowFor(g);
     let throughGap = 0;
-    for (let t = 0; t < 60; t++) {
+    for (let t = 0; t < 80; t++) {
       field.step(f.dist);
       throughGap = Math.max(throughGap, field.density[2 * 9 + 3]);
       for (const ridge of [3, 12, 30, 39]) {
@@ -155,6 +176,33 @@ describe("HordeField", () => {
     }
     expect(throughGap).toBeGreaterThan(0);
     expect(field.total()).toBe(2000);
+  });
+
+  test("streams widen instead of marching single file", () => {
+    // One clump at the top centre; the whole bottom row is the target, so
+    // straight down, down-left and down-right are equally good.
+    const rows = ["....Z....", ...Array(10).fill("........."), "TTTTTTTTT"];
+    const g = grid(rows);
+    const field = fieldFor(g);
+    field.add(g.spawns[0], 5000);
+    const f = flowFor(g);
+    for (let t = 0; t < 6; t++) field.step(f.dist);
+    const columns = new Set<number>();
+    for (let i = 0; i < field.density.length; i++) {
+      if (field.density[i] > 0) columns.add(i % g.w);
+    }
+    expect(columns.size).toBeGreaterThanOrEqual(5);
+  });
+
+  test("a full cell ahead diverts the flow instead of stalling it", () => {
+    const g = grid(["Z.T", "..."]);
+    const field = fieldFor(g, 100);
+    field.add(0, 100);
+    field.add(1, 100); // straight ahead is full
+    const f = flowFor(g);
+    field.step(f.dist);
+    expect(field.density[4]).toBeGreaterThan(0); // around via (1, 1)
+    expect(field.density[0]).toBeLessThan(100);
   });
 
   test("cells never hold more than the cap", () => {

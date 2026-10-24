@@ -34,6 +34,9 @@ export interface HordeFrame {
   alive: number;
   elites: number;
   wave: number;
+  /** The first human player's HQ health (0 once it has fallen). */
+  hqHp: number;
+  hqMaxHp: number;
   /** Spike instrumentation: worker encode time and send time (epoch ms). */
   encodeMs: number;
   sentAt: number;

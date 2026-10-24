@@ -171,11 +171,17 @@ export const DERIVED_FIELDS = new Set<string>([
   "hordeFlow",
   "hordeStructureAt",
   "hordeTurrets",
+  "hordeHqAt",
+  "moveCost", // the live cost: terrain plus structure cells, rebuilt on scan
   "hordeStructureSig",
   "hordeProfile",
   "obstacle",
-  // zfront HordeField: double-buffer scratch
+  // zfront HordeField / Elites: double buffer and per-cell scratch
   "back",
+  "hordeNbr",
+  "hordeWeight",
+  "hordeShare",
+  "hordeScratch",
 ]);
 
 // Search engines whose fields are per-query scratch (stamps, scores, open

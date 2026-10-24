@@ -1,6 +1,6 @@
 # Technical spike: horde simulation on the OpenFront engine
 
-_Status: planned, 2026-10-24. Timebox: 3 days plus 1 day of buffer. Branch: `spike/horde`. Throwaway-quality code is fine. The output is the findings table below and a go/no-go decision._
+_Status: **done, 2026-10-24. Decision: GO** (see "Decision: GO" below). Timebox: 3 days plus 1 day of buffer. Branch: `spike/horde`. Throwaway-quality code is fine. The output is the findings table below and a go/no-go decision._
 
 ## The question
 
@@ -86,7 +86,7 @@ UI polish, the economy, wave director tuning, art, multiplayer, deploying to Clo
 
 ## Findings
 
-Days 0–2 were done on 2026-10-24 on branch `spike/horde`. Day 3 (elite tuning, flow shape and the go/no-go) is still to do.
+Days 0–3 were all done on 2026-10-24 on branch `spike/horde`. The table holds the Day 1 and Day 2 numbers; Day 3 re-measured with the wider flow (see below).
 
 | Metric                                                   | Target               | Result                                                                                                                                                                                                                                                                                                                                                                  |
 | -------------------------------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -126,6 +126,51 @@ Days 0–2 were done on 2026-10-24 on branch `spike/horde`. Day 3 (elite tuning,
   - **The HQ is a spawn-tile obstacle and is indestructible.** It needs real HP and a lose condition.
   - Elite markers are hard to see when zoomed out.
 - **Not done:** `HordePass` constants aren't in `render-settings.json` yet, and replays don't record horde frames (they're routed as dropped).
+
+### Day 3: wider streams, HQ health, lose condition
+
+- **8-connected flow field.** Straight steps cost 5× the cell's terrain cost and diagonal steps 7× (about 1 : √2). A diagonal step can't cut between two blocked cells, so the horde can't squeeze between mountain corners.
+- **Split outflow.** A cell's movers (half its zombies, rounded up) are shared across every downhill neighbour, weighted by how far downhill it is × how much room it has left. Room-weighting doubles as congestion control. When every downhill neighbour is full, a quarter spills sideways into neighbours at the same distance. Everything is still integer-deterministic: one IEEE division and a floor per share.
+- **The live cost field** is the terrain cost with structure and HQ cells forced to be enterable. Without that, a city or HQ standing on mountain terrain couldn't be reached or attacked.
+- **HQ health and the lose condition.**
+  - Each human player's HQ (their spawn tile) has `hqHp` (50,000 by default), and pressure damages it the same way it damages structures.
+  - At 0 HP the player loses all their units and tiles.
+  - Once no human is left, the game ends with `setWinner(null)`.
+  - HQ health is saved in snapshots and sent in `HordeFrame` (`hqHp` and `hqMaxHp`).
+
+| Metric (Britannia, 420 AI players, 100k waves, 500 elites) | Day 1      | Day 3                                    |
+| ---------------------------------------------------------- | ---------- | ---------------------------------------- |
+| p95 tick                                                   | 9.3–9.9 ms | **16.5–21.4 ms** (target ≤ 30 ms) ✅     |
+| Mean tick                                                  | 4.8–5.0 ms | 6.3–8.0 ms                               |
+| Horde cost per tick                                        | ~1.4 ms    | ~2.4–2.9 ms                              |
+| Flow-field recompute, mean / max                           | 5 / 10 ms  | **11–14 / 17–37 ms** (target ≤ 50 ms) ✅ |
+| Same-seed hashes                                           | match      | match ✅                                 |
+
+- **Play-test** (solo, no AI players, HQ in the Pennines):
+  - Streams are now several cells wide and turn smoothly, where Day 2 had single-file right angles.
+  - Waves 1–3 reached the HQ. It went from 50,000 to 0 in about 45 seconds of siege, roughly 1,000 HP per second, and the player was eliminated. The client then showed OpenFront's end screen ("Match cancelled — not all players spawned" plus a Steam promo).
+- **Tests:** 20 horde tests, covering diagonal corner-cutting, widening, congestion diversion and the HQ falling, plus the existing snapshot suites, all pass.
+
+## Decision: GO
+
+Build zfront on the forked OpenFront engine.
+
+| Hypothesis                | Verdict                                                                                                                                                                    |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H1 Simulation performance | ✅ p95 ≤ 21 ms even alongside 420 AI players. The solo MVP drops `AttackExecution`, nations and tribes, about 60% of baseline tick time, so it will be lighter still.      |
+| H2 Terrain steering       | ✅ Hordes follow real valleys (Lune, Solway, Mersey), and mountains and water block them.                                                                                  |
+| H3 Walls                  | ✅ for structures as obstacles: the flow re-routes on the next tick, and blocked zombies press on and destroy structures. A dedicated Wall unit type still needs building. |
+| H4 Rendering              | ✅ Transfer is under 1 ms and the horde draw costs 0.009 ms of GPU time. Real frame rate on integrated graphics in Chrome is still unmeasured but low risk.                |
+| H5 Determinism            | ✅ Two runs give identical hashes, and a snapshot restored mid-wave carries on identically.                                                                                |
+| H6 Integration cost       | ✅ about 15 lines in OpenFront engine files, plus about 40 lines of client wiring. Everything else lives in `packages/engine/src/horde/` and `HordePass`.                  |
+
+**Risks and follow-ups going into the MVP:**
+
+1. **Flow-field recompute** is now 11–37 ms per structure change. That's fine for occasional building, but fast wall placement needs a debounce, or an incremental or chunked recompute.
+2. **End-of-game UI.** Replace OpenFront's cancelled-match and Steam screen with a zfront result ("HQ overrun on wave N" or "Survived N waves"). Add a win condition after N waves.
+3. **An HQ health HUD**, more visible elites, and moving the `HordePass` constants into `render-settings.json`.
+4. **Game content:** Wall, Turret, Mine and Bait unit types, plus economy tuning (see the requirements).
+5. **A frame-rate check** in a normal Chrome window on integrated graphics.
 
 ### Code
 
