@@ -18,6 +18,27 @@ import {
   WarshipState,
 } from "./GameTypes";
 
+/**
+ * zfront: the horde as the renderer sees it. The worker attaches one to the
+ * last update of each batch, and its buffer is transferred, not copied.
+ */
+export interface HordeFrame {
+  /** Coarse (map4x) grid size; one cell is 2x2 tiles. */
+  width: number;
+  height: number;
+  /**
+   * One byte per cell: 0 empty, 1-254 horde density (zombies / 8, clamped),
+   * 255 an elite.
+   */
+  cells: Uint8Array;
+  alive: number;
+  elites: number;
+  wave: number;
+  /** Spike instrumentation: worker encode time and send time (epoch ms). */
+  encodeMs: number;
+  sentAt: number;
+}
+
 export interface GameUpdateViewData {
   tick: number;
   updates: GameUpdates;
@@ -35,6 +56,8 @@ export interface GameUpdateViewData {
    * (similar to `packedTileUpdates`) to avoid structured-clone copies.
    */
   packedMotionPlans?: Uint32Array;
+  /** zfront: horde density, on the last update of a worker batch only. */
+  hordeFrame?: HordeFrame;
   /**
    * Packed per-player numeric stats as
    * `[smallID, tilesOwned, gold, troops, goldEarned]`

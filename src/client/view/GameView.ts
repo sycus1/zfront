@@ -187,6 +187,7 @@ export class GameView implements GameLike {
       units: this._unitStates,
       players: this._playerStates,
       names: this._names,
+      hordeFrame: null,
       events: {
         deadUnits: [],
         conquestEvents: [],
@@ -511,6 +512,7 @@ export class GameView implements GameLike {
     };
     f.tick = gu.tick;
     f.inSpawnPhase = this.startTick === null;
+    f.hordeFrame = gu.hordeFrame ?? null;
     f.railroadDirty = this.railroadCache.railroadDirty;
     f.trailDirtyRowMin = this.trailManager.dirtyRowMin;
     f.trailDirtyRowMax = this.trailManager.dirtyRowMax;

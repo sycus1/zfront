@@ -1,3 +1,4 @@
+import type { HordeFrame } from "@openfront/engine-api/game/GameUpdates";
 import type { SpiralRibbon } from "../frame/SpiralTrails";
 import type { FrameEvents } from "./FrameEvents";
 import type {
@@ -28,6 +29,8 @@ export interface FrameData {
   readonly units: ReadonlyMap<number, UnitState>;
   readonly players: ReadonlyMap<number, PlayerState>;
   readonly names: ReadonlyMap<string, NameEntry>;
+  /** zfront: the latest horde frame, set only on ticks that carried one. */
+  readonly hordeFrame: HordeFrame | null;
 
   // ── Per-frame events ──────────────────────────────────────────────────
 

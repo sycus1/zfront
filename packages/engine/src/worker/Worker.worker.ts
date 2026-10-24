@@ -96,6 +96,17 @@ async function drain(): Promise<void> {
 
     tickUpdateSink = null;
 
+    // zfront: one horde frame per batch, on its last update.
+    if (batch.length > 0) {
+      const start = performance.now();
+      const frame = gr.hordeFrame();
+      if (frame) {
+        frame.encodeMs = performance.now() - start;
+        frame.sentAt = performance.timeOrigin + performance.now();
+        batch[batch.length - 1].hordeFrame = frame;
+      }
+    }
+
     sendGameUpdateBatch(batch);
 
     shouldContinue = gr.pendingTurns() > 0;
@@ -146,6 +157,9 @@ function transfersOf(gameUpdates: GameUpdateViewData[]): Transferable[] {
     }
     if (gu.packedNukeImpacts) {
       transfers.push(gu.packedNukeImpacts.buffer);
+    }
+    if (gu.hordeFrame) {
+      transfers.push(gu.hordeFrame.cells.buffer);
     }
   }
   return transfers;

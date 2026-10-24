@@ -106,6 +106,8 @@ export const VIEW_DATA_ROUTING: Record<
   playerNameViewData: "normalizer",
   packedNukeImpacts: "events",
   tickExecutionDuration: "dropped",
+  // zfront: horde frames aren't recorded in replays yet.
+  hordeFrame: "dropped",
   pendingTurns: "dropped",
 };
 

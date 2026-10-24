@@ -86,17 +86,17 @@ UI polish, the economy, wave director tuning, art, multiplayer, deploying to Clo
 
 ## Findings
 
-Day 0 and Day 1 were done on 2026-10-24 on branch `spike/horde`. Day 2 (client) and Day 3 (elite tuning and the go/no-go) are still to do.
+Days 0–2 were done on 2026-10-24 on branch `spike/horde`. Day 3 (elite tuning, flow shape and the go/no-go) is still to do.
 
-| Metric                                                   | Target               | Result                                                                                                                                                                                                     |
-| -------------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Baseline p95 tick, Britannia, no horde                   | n/a                  | **5.6 ms** (mean 3.2 ms), peak heap 135 MB                                                                                                                                                                 |
-| p95 tick with 100k density, 500 elites                   | ≤ 30 ms              | ✅ **9.3–9.9 ms** (mean 4.8–5.0 ms). The horde itself adds about 1.4 ms per tick.                                                                                                                          |
-| Full flow-field recompute                                | ≤ 50 ms              | ✅ mean **4.9–5.1 ms**, max **8.8–10.1 ms** (151 recomputes in 1,800 ticks)                                                                                                                                |
-| Density transfer per tick                                | ≤ 2 ms               | Not measured yet (Day 2)                                                                                                                                                                                   |
-| Frame rate on integrated graphics                        | ≥ 60 (45 acceptable) | Not measured yet (Day 2)                                                                                                                                                                                   |
-| Same-seed hash matches                                   | yes                  | ✅ Two perf runs gave the same game hash and the same horde hash. Unit tests confirm two-game determinism and a snapshot restore mid-wave.                                                                 |
-| Lines changed in OpenFront files (excluding new modules) | small                | ✅ **11 engine lines in 4 files** (`Schemas.ts`, `EngineConfig.ts`, `GameRunner.ts`, `ExecutionRegistry.ts`), plus test infrastructure: the perf flag, the snapshot cache list, and one coverage exemption |
+| Metric                                                   | Target               | Result                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Baseline p95 tick, Britannia, no horde                   | n/a                  | **5.6 ms** (mean 3.2 ms), peak heap 135 MB                                                                                                                                                                                                                                                                                                                              |
+| p95 tick with 100k density, 500 elites                   | ≤ 30 ms              | ✅ **9.3–9.9 ms** (mean 4.8–5.0 ms). The horde itself adds about 1.4 ms per tick.                                                                                                                                                                                                                                                                                       |
+| Full flow-field recompute                                | ≤ 50 ms              | ✅ mean **4.9–5.1 ms**, max **8.8–10.1 ms** (151 recomputes in 1,800 ticks)                                                                                                                                                                                                                                                                                             |
+| Density transfer per tick                                | ≤ 2 ms               | ✅ worker encode **0.4–0.56 ms**, worker→main latency **0.2 ms** mean (max 1.2 ms), texture upload **0.1 ms** mean (max 1 ms). These costs are the same at 17k and at 160k zombies.                                                                                                                                                                                     |
+| Frame rate on integrated graphics                        | ≥ 60 (45 acceptable) | ✅ in effect. The horde draw costs **0.009 ms of GPU time** per frame (timer query, RTX 3080). Frame rate in the app's browser pane was the same with the horde hidden as with it shown (about 15 fps either way), so the horde costs no measurable frame time. Not yet checked on integrated graphics, and the pane's own frame rate isn't representative (see below). |
+| Same-seed hash matches                                   | yes                  | ✅ Two perf runs gave the same game hash and the same horde hash. Unit tests confirm two-game determinism and a snapshot restore mid-wave.                                                                                                                                                                                                                              |
+| Lines changed in OpenFront files (excluding new modules) | small                | ✅ **11 engine lines in 4 files** (`Schemas.ts`, `EngineConfig.ts`, `GameRunner.ts`, `ExecutionRegistry.ts`), plus test infrastructure: the perf flag, the snapshot cache list, and one coverage exemption                                                                                                                                                              |
 
 ### Setup
 
@@ -113,6 +113,20 @@ Day 0 and Day 1 were done on 2026-10-24 on branch `spike/horde`. Day 2 (client) 
 - **Some zombies never left their emitters.** About 34k from the last wave were still waiting, because emitters stall when the cell they spawn into is full and the zombies there can't move (for example, coast with no reachable target). That's a gameplay tuning question, not a performance one.
 - **Design note.** Structures are re-scanned every tick, which is a cheap signature check, and the flow field is only rebuilt when the set of structures changes. Scanning every tick, rather than on an interval, is what keeps snapshot restore exact, because a restored game rebuilds these caches on its first tick.
 
+### Day 2: client
+
+- **Pipeline.**
+  - The worker attaches one `HordeFrame` to the last update of each batch: one byte per coarse cell (density / 8, with 255 marking an elite). Its buffer is transferred, not copied, as `packedTileUpdates` already is.
+  - It flows through `GameView` → `FrameData.hordeFrame` → `uploadFrameData` → `MapRenderer.updateHorde` → `HordePass`.
+  - `HordePass` draws an R8 texture on a map-sized quad. Linear filtering softens the density into blobs, and `texelFetch` picks out elites so they show as pulsing markers.
+- **Solo play-test.** Britannia, no bots and no nations, spawn in the Pennines. Waves came ashore and **funnelled along real valleys** toward the HQ: down from the Solway coast, through Morecambe Bay and the Lune valley, and up from the Mersey. Mountains kept them out.
+- **Frame-rate caveat.** The app's built-in browser pane draws no frames at all while it's hidden, and when shown it ran at 15–93 fps depending on zoom and focus, whether or not the horde was drawn. A real frame-rate check on integrated graphics should use a normal Chrome window. The GPU timer number above is the reliable measure.
+- **Design findings for Day 3:**
+  - **Single-file streams.** Every zombie steps to the same downhill neighbour on a 4-connected grid, so hordes form one-cell-wide lines with right-angled turns. Fixes: an 8-connected flow field with diagonal costs, splitting the outflow across neighbours with equal distance, and a congestion cost.
+  - **The HQ is a spawn-tile obstacle and is indestructible.** It needs real HP and a lose condition.
+  - Elite markers are hard to see when zoomed out.
+- **Not done:** `HordePass` constants aren't in `render-settings.json` yet, and replays don't record horde frames (they're routed as dropped).
+
 ### Code
 
 - **New code** is in `packages/engine/src/horde/`:
@@ -121,7 +135,9 @@ Day 0 and Day 1 were done on 2026-10-24 on branch `spike/horde`. Day 2 (client) 
   - `Elites.ts`: discrete elites as a struct of arrays
   - `HordeExecution.ts`: waves, coastal emitters, turrets, structure HP and snapshots
 - **Tests** are in `tests/horde/`: 16 of them, covering the valley funnel, mountains blocking the flow, the cell cap, pressure, determinism and snapshot round-trips.
-- **Mode flag:** `GameConfig.horde` turns the mode on through `GameRunner.init`.
+- **Mode flag:** `GameConfig.horde` turns the mode on through `GameRunner.init`. Every solo game sets it during the spike (`SinglePlayerModal`).
+- **Client** (Day 2): `src/client/render/gl/passes/HordePass.ts` and `shaders/horde/`, wired through `Renderer`, `MapRenderer`, `frame/Upload.ts`, `FrameData` and `GameView`. Replay codecs mark the new field as dropped.
+- **Spike instrumentation:** `globalThis.__zfrontHorde` (from the browser console) holds transfer, upload and GPU timings. Set `.hidden = true` to skip the draw and compare frame rates.
 
 ## After the spike: Phase 0 (strip and rebrand) checklist
 

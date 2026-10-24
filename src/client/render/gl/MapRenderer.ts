@@ -11,6 +11,7 @@
  * touch MapRenderer — they never import GPURenderer or Camera.
  */
 
+import type { HordeFrame } from "@openfront/engine-api/game/GameUpdates";
 import type { MapLayer } from "@openfront/engine-api/game/MapFiles";
 import type { Config } from "@openfront/engine-lib/configuration/Config";
 import type { SpiralRibbon } from "../frame/SpiralTrails";
@@ -178,6 +179,9 @@ export class MapRenderer {
     dirtyRowMax: number,
   ): void {
     this.renderer?.uploadLiveTrailDelta(trailState, dirtyRowMin, dirtyRowMax);
+  }
+  updateHorde(frame: HordeFrame): void {
+    this.renderer?.updateHorde(frame);
   }
   /** Upload full tile + trail state without resetting bloom (for live play). */
   uploadTileAndTrailState(

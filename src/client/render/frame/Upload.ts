@@ -1,3 +1,4 @@
+import type { HordeFrame } from "@openfront/engine-api/game/GameUpdates";
 import type {
   AttackRingInput,
   BonusEvent,
@@ -48,6 +49,7 @@ export interface FrameUploadTarget {
   ): void;
   updateRelations(data: Uint8Array, size: number): void;
   setSAMAllianceClusters(clusters: ReadonlyMap<number, number>): void;
+  updateHorde(frame: HordeFrame): void;
 }
 
 /**
@@ -83,6 +85,11 @@ export function uploadFrameData(
   view.updateSpiralRibbons(frame.spiralRibbons);
 
   // --- Railroads ---
+  // --- zfront horde ---
+  if (frame.hordeFrame) {
+    view.updateHorde(frame.hordeFrame);
+  }
+
   if (frame.railroadDirty) {
     view.uploadRailroadState(frame.railroadState);
     if (frame.revealedRailTiles.length > 0) {

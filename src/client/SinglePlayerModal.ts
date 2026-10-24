@@ -1156,6 +1156,8 @@ export class SinglePlayerModal extends BaseModal {
               ? { customAllianceDuration: this.customAllianceMinutes ?? 0 }
               : {}),
             ...(this.waterNukes ? { waterNukes: true } : {}),
+            // zfront spike: every solo game has zombie waves.
+            horde: true,
             ...(this.doomsdayClock
               ? {
                   doomsdayClock: {

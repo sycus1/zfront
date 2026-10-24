@@ -15,7 +15,7 @@ zfront plays on real maps, in the browser, like OpenFront. Instead of fighting o
 5. **Earn.** Kills, clearing the wave and calling a wave early all pay cash. Spend it to expand, upgrade and unlock higher tiers, then go back to step 2.
 6. **End.** You **win** by surviving N waves (default 15, configurable). You **lose** if your HQ is destroyed.
 
-## MVP scope ("Hold the Line"): single-player, browser, zfront.app
+## MVP scope ("Hold the Line"): single-player with no AI players, browser, zfront.app
 
 ### Must have
 
@@ -122,7 +122,7 @@ zfront plays on real maps, in the browser, like OpenFront. Instead of fighting o
 ## Open decisions
 
 1. **Base.** ✅ _Decided 2026-10-24:_ fork OpenFront, accepting AGPL. The repo is [sycus1/zfront](https://github.com/sycus1/zfront).
-2. **Multiplayer timing.** _Recommendation:_ single-player first. The deterministic engine keeps co-op cheap to add later.
+2. **Multiplayer timing.** ✅ _Decided 2026-10-24:_ the MVP is **single-player only, with no AI players**: no bots, no nations and no AI teammates. That keeps it close to classic tower defence. Co-op stays post-MVP, and the deterministic engine keeps it cheap to add.
 3. **England map.** Crop Britannia (quick, stylised) or generate from OS Terrain 50 (real elevation, better funnels). _Recommendation:_ crop Britannia for the spike, then OS Terrain 50 for the MVP.
 4. **Pacing.** Continuous real-time with countdowns, or separate build and wave phases. _Recommendation:_ real-time with countdowns, plus "call the next wave early".
 5. **Horde model.** Density field, discrete agents, or a hybrid. _Recommendation:_ hybrid, confirmed by the spike.

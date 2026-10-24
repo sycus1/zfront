@@ -19,6 +19,7 @@ import {
 import {
   ErrorUpdate,
   GameUpdateViewData,
+  HordeFrame,
 } from "@openfront/engine-api/game/GameUpdates";
 import { MapFiles } from "@openfront/engine-api/game/MapFiles";
 import { ClientID, GameStartInfo, Turn } from "@openfront/engine-api/Schemas";
@@ -150,6 +151,8 @@ export class GameRunner {
   private currTurn = 0;
   private isExecuting = false;
 
+  private horde: HordeExecution | null = null;
+
   private playerViewData: Record<PlayerID, NameViewData> = {};
   // Name placements are recomputed periodically; a runner that starts
   // mid-game (restored from a snapshot) computes them on its first tick.
@@ -195,13 +198,19 @@ export class GameRunner {
       this.game.addExecution(new DoomsdayClockExecution());
     }
     if (this.game.config().horde()) {
-      this.game.addExecution(new HordeExecution());
+      this.horde = new HordeExecution();
+      this.game.addExecution(this.horde);
     }
     if (!this.game.config().isUnitDisabled(UnitType.Factory)) {
       this.game.addExecution(
         new RecomputeRailClusterExecution(this.game.railNetwork()),
       );
     }
+  }
+
+  /** zfront: the horde's render frame, or null when the mode is off. */
+  public hordeFrame(): HordeFrame | null {
+    return this.horde?.encodeFrame() ?? null;
   }
 
   public addTurn(turn: Turn): void {

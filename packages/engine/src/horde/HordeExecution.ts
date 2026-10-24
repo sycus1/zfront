@@ -1,5 +1,6 @@
 import { TileRef } from "@openfront/engine-api/game/GameMap";
-import { UnitType } from "@openfront/engine-api/game/GameTypes";
+import { PlayerType, UnitType } from "@openfront/engine-api/game/GameTypes";
+import { HordeFrame } from "@openfront/engine-api/game/GameUpdates";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import {
   zInt,
@@ -54,14 +55,16 @@ export interface HordeOptions {
   structureHp: number;
 }
 
+// Spike defaults, sized to show a big horde in a solo game within minutes:
+// waves of 20k, 30k, 45k, 67k, 100k... every 30 seconds.
 export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
-  firstWaveDelay: 300,
-  waveInterval: 600,
-  firstWaveSize: 2_000,
-  waveGrowthPercent: 30,
-  emittersPerWave: 4,
-  emitRate: 50,
-  elitesPerWave: 10,
+  firstWaveDelay: 100,
+  waveInterval: 300,
+  firstWaveSize: 20_000,
+  waveGrowthPercent: 50,
+  emittersPerWave: 8,
+  emitRate: 200,
+  elitesPerWave: 50,
   maxElites: 500,
   eliteHp: 300,
   eliteSpeed: 1,
@@ -197,6 +200,34 @@ export class HordeExecution implements Execution {
     return this.field.density;
   }
 
+  /**
+   * The renderer's view of the horde, in a fresh buffer the worker can
+   * transfer. Timing fields are filled in by the worker. Null until init,
+   * which waits for the spawn phase to end.
+   */
+  encodeFrame(): HordeFrame | null {
+    if (this.mg === null) return null;
+    const d = this.field.density;
+    const cells = new Uint8Array(d.length);
+    for (let i = 0; i < d.length; i++) {
+      const v = d[i];
+      if (v !== 0) cells[i] = v >= 254 * 8 ? 254 : (v + 7) >> 3;
+    }
+    for (let k = 0; k < this.elites.count; k++) {
+      cells[this.elites.cell[k]] = 255;
+    }
+    return {
+      width: this.width,
+      height: this.height,
+      cells,
+      alive: this.field.total(),
+      elites: this.elites.count,
+      wave: this.wave,
+      encodeMs: 0,
+      sentAt: 0,
+    };
+  }
+
   /** FNV-1a over every piece of horde state that drives the simulation. */
   stateHash(): number {
     let h = 0x811c9dc5;
@@ -235,11 +266,23 @@ export class HordeExecution implements Execution {
    */
   private scanStructures(): void {
     const units = this.mg!.units(TARGET_TYPES);
+    // Each human player's spawn tile is their HQ: always a target, and an
+    // obstacle the horde presses on (indestructible in the spike).
+    const hqs: TileRef[] = [];
+    for (const p of this.mg!.players()) {
+      const spawn = p.spawnTile();
+      if (p.type() === PlayerType.Human && p.isAlive() && spawn !== undefined) {
+        hqs.push(spawn);
+      }
+    }
     let sig = 0x811c9dc5;
     for (const u of units) {
       sig = Math.imul(sig ^ u.tile(), 16777619);
     }
-    sig = Math.imul(sig ^ units.length, 16777619) >>> 0;
+    for (const t of hqs) {
+      sig = Math.imul(sig ^ t, 16777619);
+    }
+    sig = Math.imul(sig ^ (units.length + hqs.length), 16777619) >>> 0;
     if (sig === this.hordeStructureSig) return;
     this.hordeStructureSig = sig;
 
@@ -256,6 +299,13 @@ export class HordeExecution implements Execution {
         this.hordeStructureAt.set(cell, u);
       }
       if (u.type() === UnitType.DefensePost) this.hordeTurrets.push(u);
+    }
+    for (const t of hqs) {
+      const cell = this.cellOf(t);
+      if (obstacle[cell] === 0) {
+        obstacle[cell] = 1;
+        cells.push(cell);
+      }
     }
     const start = performance.now();
     this.hordeFlow.compute(cells);

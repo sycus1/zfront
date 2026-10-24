@@ -110,6 +110,8 @@ export class ReplayFrameBuilder {
       railroadState: this.railroads.railroadState,
       units: new Map(),
       players: new Map(),
+      // zfront: replays don't record the horde yet.
+      hordeFrame: null,
       names: this.names,
       events: { deadUnits: [], conquestEvents: [], bonusEvents: [] },
       changedTiles: null,

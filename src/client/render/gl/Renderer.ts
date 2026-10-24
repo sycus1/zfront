@@ -9,6 +9,7 @@
  *     structure levels → bars → bloom → trails → missiles → fx → conquest → names
  */
 
+import type { HordeFrame } from "@openfront/engine-api/game/GameUpdates";
 import type { MapLayer } from "@openfront/engine-api/game/MapFiles";
 import type { Config } from "@openfront/engine-lib/configuration/Config";
 import { translateText } from "../../Utils";
@@ -40,6 +41,7 @@ import { DefenseCoveragePass } from "./passes/DefenseCoveragePass";
 import { FalloutBloomPass } from "./passes/FalloutBloomPass";
 import { FalloutLightPass } from "./passes/FalloutLightPass";
 import { FxPass } from "./passes/fx-pass";
+import { HordePass } from "./passes/HordePass";
 import { LightmapPass } from "./passes/LightmapPass";
 import { MapLayerPass } from "./passes/MapLayerPass";
 import { MoveIndicatorPass } from "./passes/MoveIndicatorPass";
@@ -125,6 +127,7 @@ export class GPURenderer {
   private borderPass: BorderComputePass;
   private defenseCoveragePass: DefenseCoveragePass;
   private bloomPass: FalloutBloomPass;
+  private hordePass: HordePass;
   private pointLightPass: PointLightPass;
   private falloutLightPass: FalloutLightPass;
   private lightmapPass: LightmapPass;
@@ -507,6 +510,9 @@ export class GPURenderer {
       this.settings,
     );
 
+    // --- zfront horde overlay ---
+    this.hordePass = new HordePass(gl, mapW, mapH);
+
     // --- Point lights ---
     this.pointLightPass = new PointLightPass(
       gl,
@@ -703,6 +709,10 @@ export class GPURenderer {
     changedTiles: readonly number[],
   ): void {
     this.territoryPass.applyLiveDelta(tileState, changedTiles);
+  }
+
+  updateHorde(frame: HordeFrame): void {
+    this.hordePass.update(frame);
   }
 
   uploadLiveTrailDelta(
@@ -1367,6 +1377,7 @@ export class GPURenderer {
     if (pe.railroad) this.railroadPass.draw(cam, zoom);
     if (pe.unit) this.unitPass.drawGround(cam);
     if (pe.falloutBloom) this.bloomPass.draw(cam, this.frameTick);
+    this.hordePass.draw(cam, performance.now() / 1000);
     this.samRadiusPass.draw(cam);
     this.rangeCirclePass.draw(cam);
     this.nukeTrajectoryPass.draw(cam);
@@ -1495,6 +1506,7 @@ export class GPURenderer {
     this.borderPass.dispose();
     this.defenseCoveragePass.dispose();
     this.bloomPass.dispose();
+    this.hordePass.dispose();
     this.pointLightPass.dispose();
     this.falloutLightPass.dispose();
     this.lightmapPass.dispose();
