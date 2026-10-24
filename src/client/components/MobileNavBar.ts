@@ -1,4 +1,3 @@
-import { assetUrl } from "@openfront/shared/AssetUrls";
 import { html, LitElement, TemplateResult } from "lit";
 import { customElement } from "lit/decorators.js";
 import { NavNotificationsController } from "./NavNotificationsController";
@@ -85,11 +84,9 @@ export class MobileNavBar extends LitElement {
           class="flex flex-col text-malibu-blue mb-4 ml-[clamp(0.2rem,0.4vw,0.4vh)]"
         >
           <div class="flex flex-col items-center gap-1">
-            <img
-              src=${assetUrl("images/OpenFrontLogo.svg")}
-              alt="OpenFront"
-              class="w-auto h-auto max-w-[220px] max-h-[4.5rem]"
-            />
+            <span class="text-2xl font-bold tracking-wider text-white"
+              >zFront</span
+            >
             <div
               id="game-version"
               class="l-header__highlightText text-center"
@@ -101,35 +98,6 @@ export class MobileNavBar extends LitElement {
           class="${MOBILE_ITEM} ${currentPage === "page-play" ? "active" : ""}"
           data-page="page-play"
           data-i18n="main.play"
-        ></button>
-        <div
-          class="no-game-portal nav-menu-item flex items-center w-full cursor-pointer"
-          data-page="page-item-store"
-          @click=${this._notifications.onStoreClick}
-        >
-          <button class="${MOBILE_ITEM}" data-i18n="main.store"></button>
-          ${
-            this._notifications.showStoreDot()
-              ? this._renderDot("bg-red-500")
-              : ""
-          }
-        </div>
-        <button
-          class="${MOBILE_ITEM} ${
-            currentPage === "page-inventory" ? "active" : ""
-          }"
-          data-page="page-inventory"
-          data-i18n="main.inventory"
-        ></button>
-        <button
-          class="${MOBILE_ITEM}"
-          data-page="page-leaderboard"
-          data-i18n="main.leaderboard"
-        ></button>
-        <button
-          class="no-game-portal ${MOBILE_ITEM}"
-          data-page="page-clan"
-          data-i18n="main.clans"
         ></button>
         <div
           class="flex flex-col w-full mt-auto [.in-game_&]:hidden items-end justify-end pt-4 border-t border-white/10"

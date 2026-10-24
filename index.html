@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
-    <title data-i18n="main.title">OpenFront (ALPHA)</title>
+    <title data-i18n="main.title">zFront (ALPHA)</title>
     <link rel="manifest" href="<%- manifestHref %>" />
     <link rel="icon" type="image/svg+xml" href="<%- faviconHref %>" />
 
@@ -135,18 +135,21 @@
     </style>
 
     <!-- SEO -->
-    <link rel="canonical" href="https://openfront.io/" />
+    <link rel="canonical" href="https://zfront.app/" />
     <meta
       name="description"
-      content="Conquer the world in this multiplayer battle royale! Expand your nation, eliminate opponents, and dominate the map in this fast-paced IO game."
+      content="Build a base, hold the line and survive the zombie horde in this multiplayer tower-defence game."
     />
 
     <!-- Open Graph -->
-    <meta property="og:url" content="https://openfront.io/" />
-    <meta property="og:title" content="OpenFront - Battle Royale" />
+    <meta property="og:url" content="https://zfront.app/" />
+    <meta
+      property="og:title"
+      content="zFront - Base Builder vs Zombie Hordes"
+    />
     <meta
       property="og:description"
-      content="Conquer the world in this multiplayer battle royale! Expand your nation, eliminate opponents, and dominate the map in this fast-paced IO game."
+      content="Build a base, hold the line and survive the zombie horde in this multiplayer tower-defence game."
     />
     <meta property="og:image" content="<%- gameplayScreenshotUrl %>" />
     <meta property="og:type" content="game" />
@@ -156,22 +159,17 @@
       {
         "@context": "https://schema.org",
         "@type": "VideoGame",
-        "name": "OpenFront",
-        "alternateName": "OpenFront.io",
-        "url": "https://openfront.io/",
-        "description": "Conquer the world in this multiplayer battle royale! Expand your nation, eliminate opponents, and dominate the map in this fast-paced IO game.",
+        "name": "zFront",
+        "url": "https://zfront.app/",
+        "description": "Build a base, hold the line and survive the zombie horde in this multiplayer tower-defence game.",
         "applicationCategory": "Game",
         "operatingSystem": "Any",
         "gamePlatform": ["Web Browser", "PC", "Mobile"],
-        "genre": ["Strategy", "Multiplayer", "IO Game"],
+        "genre": ["Strategy", "Tower Defense", "Multiplayer"],
         "playMode": "MultiPlayer",
         "inLanguage": "en",
         "isAccessibleForFree": true,
-        "sameAs": [
-          "https://github.com/openfrontio/OpenFrontIO",
-          "https://discord.gg/openfront",
-          "https://www.reddit.com/r/OpenFront/"
-        ]
+        "sameAs": ["https://github.com/sycus1/zfront"]
       }
     </script>
 
@@ -247,13 +245,6 @@
         var hem = localStorage.getItem("ramp_hem_sha256");
         if (hem) window.ramp.up = { format: "UUP1", heid: { sha256: hem } };
       } catch (e) {}
-    </script>
-
-    <script>
-      window.googletag = window.googletag || { cmd: [] };
-      googletag.cmd.push(function () {
-        googletag.pubads().set("page_url", "http://openfront.io ");
-      });
     </script>
 
     <!-- Analytics -->

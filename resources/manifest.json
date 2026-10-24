@@ -18,8 +18,8 @@
   "display": "standalone",
   "dir": "auto",
   "lang": "en",
-  "name": "OpenFront.io",
-  "short_name": "OpenFront",
+  "name": "zFront",
+  "short_name": "zFront",
   "start_url": "/",
   "id": "/"
 }
