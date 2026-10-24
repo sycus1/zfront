@@ -147,7 +147,7 @@ export class SharedWaterCache {
 
     // Pass 2: ocean is treated as always shared (nation AI short-circuits on
     // ocean neighbors). Lake components are shared only if some *other* player
-    // on that component can trade with P (i.e. no mutual embargo).
+    // on that component can trade with P.
     const result = new Map<Player, Set<number> | null>();
     for (const [player, { hasOcean, lakes }] of playerToWater) {
       const shared = new Set<number>();

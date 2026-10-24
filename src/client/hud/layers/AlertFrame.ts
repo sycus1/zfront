@@ -1,8 +1,4 @@
 import { PlayerType } from "@openfront/engine-api/game/GameTypes";
-import {
-  BrokeAllianceUpdate,
-  GameUpdateType,
-} from "@openfront/engine-api/game/GameUpdates";
 import { LitElement, css, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { Controller } from "../../Controller";
@@ -22,8 +18,6 @@ export class AlertFrame extends LitElement implements Controller {
 
   @state()
   private isActive = false;
-  @state()
-  private alertType: "betrayal" | "land-attack" = "betrayal";
 
   private animationTimeout: number | null = null;
   private seenAttackIds: Set<string> = new Set();
@@ -43,10 +37,6 @@ export class AlertFrame extends LitElement implements Controller {
       box-sizing: border-box;
       z-index: 40;
       opacity: 0;
-    }
-
-    .alert-border.betrayal {
-      border-color: #ee0000;
     }
 
     .alert-border.land-attack {
@@ -84,10 +74,6 @@ export class AlertFrame extends LitElement implements Controller {
     return this;
   }
 
-  init() {
-    // Listen for BrokeAllianceUpdate events directly from game updates
-  }
-
   tick() {
     if (!this.game) {
       return; // Game not initialized yet
@@ -106,31 +92,11 @@ export class AlertFrame extends LitElement implements Controller {
     // Track outgoing attacks to detect retaliation
     this.trackOutgoingAttacks();
 
-    // Check for BrokeAllianceUpdate events
-    this.game
-      .updatesSinceLastTick()
-      ?.[GameUpdateType.BrokeAlliance]?.forEach((update) => {
-        this.onBrokeAllianceUpdate(update as BrokeAllianceUpdate);
-      });
-
     // Check for new incoming attacks
     this.checkForNewAttacks();
   }
 
   // The alert frame is not affected by the camera transform
-
-  private onBrokeAllianceUpdate(update: BrokeAllianceUpdate) {
-    const myPlayer = this.game.myPlayer();
-    if (!myPlayer) return;
-
-    const betrayed = this.game.playerBySmallID(update.betrayedID);
-
-    // Only trigger alert if the current player is the betrayed one
-    if (betrayed === myPlayer) {
-      this.alertType = "betrayal";
-      this.activateAlert();
-    }
-  }
 
   private activateAlert() {
     if (this.userSettings.alertFrame()) {
@@ -217,7 +183,6 @@ export class AlertFrame extends LitElement implements Controller {
         // 3. The attack is too small (less than 1/5 of our troops)
         if (!inCooldown && !isRetaliation && !isSmallAttack) {
           this.seenAttackIds.add(attack.id);
-          this.alertType = "land-attack";
           this.activateAlert();
         } else {
           // Still mark as seen so we don't alert later
@@ -253,7 +218,7 @@ export class AlertFrame extends LitElement implements Controller {
 
     return html`
       <div
-        class=${`alert-border animate ${this.alertType}`}
+        class="alert-border animate land-attack"
         @animationend=${() => this.dismissAlert()}
       ></div>
     `;

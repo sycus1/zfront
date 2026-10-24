@@ -49,16 +49,12 @@ describe("built-in graphics presets", () => {
     expect(settings.affiliation.enemyG).toBeCloseTo(0.369, 2);
     expect(settings.affiliation.enemyB).toBeCloseTo(0, 2);
 
-    // Normal-view relationship border tints: friendly blue, enemy orange,
+    // Normal-view relationship border tints: friendly blue,
     // applied strongly so the cue doesn't rely on subtle hue.
     expect(settings.mapOverlay.friendlyTintR).toBeCloseTo(0, 2);
     expect(settings.mapOverlay.friendlyTintG).toBeCloseTo(0.447, 2);
     expect(settings.mapOverlay.friendlyTintB).toBeCloseTo(0.698, 2);
-    expect(settings.mapOverlay.embargoTintR).toBeCloseTo(0.835, 2);
-    expect(settings.mapOverlay.embargoTintG).toBeCloseTo(0.369, 2);
-    expect(settings.mapOverlay.embargoTintB).toBeCloseTo(0, 2);
     expect(settings.mapOverlay.friendlyTintRatio).toBe(0.85);
-    expect(settings.mapOverlay.embargoTintRatio).toBe(0.85);
 
     // The palette swap rides on the palette enum.
     expect(settings.theme).toEqual(createThemeSettings("colorblind"));
@@ -131,9 +127,7 @@ describe("migrateLegacyGraphicsSettings", () => {
     });
     expect(overrides.mapOverlay).toEqual({
       friendlyTintColor: "#0072b2",
-      embargoTintColor: "#d55e00",
       friendlyTintRatio: 0.85,
-      embargoTintRatio: 0.85,
     });
     expect(Object.values(userSettings.graphicsPresets())).toEqual([overrides]);
   });

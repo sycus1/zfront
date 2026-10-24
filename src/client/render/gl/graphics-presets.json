@@ -53,9 +53,7 @@
       },
       "mapOverlay": {
         "friendlyTintColor": "#0072b2",
-        "embargoTintColor": "#d55e00",
-        "friendlyTintRatio": 0.85,
-        "embargoTintRatio": 0.85
+        "friendlyTintRatio": 0.85
       }
     }
   }

@@ -227,7 +227,7 @@ export class NationWarshipBehavior {
       }
 
       // Possible dock snipe counter? Too niche?
-      if (!transport.owner().isAlliedWith(this.player)) {
+      if (!transport.owner().isOnSameTeam(this.player)) {
         if (
           this.game.hasUnitNearby(
             target,

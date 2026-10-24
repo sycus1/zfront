@@ -64,23 +64,6 @@ describe("MIRVExecution", () => {
     expect(mirvExec.isActive()).toBe(true);
   });
 
-  test("MIRV should break alliances on launch", async () => {
-    const req = player.createAllianceRequest(otherPlayer);
-    req!.accept();
-
-    expect(player.isAlliedWith(otherPlayer)).toBe(true);
-
-    const targetTile = game.ref(50, 50);
-    const mirvExec = new MirvExecution(player, targetTile);
-    game.addExecution(mirvExec);
-
-    executeTicks(game, 2);
-
-    // Alliance should be broken
-    expect(player.isAlliedWith(otherPlayer)).toBe(false);
-    expect(player.isTraitor()).toBe(true);
-  });
-
   test("MIRV should separate into warheads", async () => {
     // Increase territory to allow for multiple warhead targets
     for (let x = 75; x < 200; x++) {
@@ -221,8 +204,6 @@ describe("MIRVExecution", () => {
   test("MIRV should use the current destination owner at launch", () => {
     const targetTile = game.ref(20, 20);
     expect(game.owner(targetTile).isPlayer()).toBe(false);
-    const allianceRequest = player.createAllianceRequest(otherPlayer);
-    allianceRequest!.accept();
     const playerRelationSpy = vi.spyOn(player, "updateRelation");
     const otherPlayerRelationSpy = vi.spyOn(otherPlayer, "updateRelation");
     const bombLaunchSpy = vi.spyOn(game.stats(), "bombLaunch");
@@ -243,8 +224,6 @@ describe("MIRVExecution", () => {
       otherPlayer,
       UnitType.MIRV,
     );
-    expect(player.isAlliedWith(otherPlayer)).toBe(false);
-    expect(player.isTraitor()).toBe(true);
     expect(playerRelationSpy).toHaveBeenCalledWith(otherPlayer, -100);
     expect(otherPlayerRelationSpy).toHaveBeenCalledWith(player, -100);
     expect(displaySpy).toHaveBeenCalledTimes(1);
@@ -296,8 +275,6 @@ describe("MIRVExecution", () => {
     // MIRV should NOT launch against terra nullius
     expect(player.units(UnitType.MIRV)).toHaveLength(0);
     expect(mirvExec.isActive()).toBe(false);
-    // Should not break any alliance or mark as traitor (since no player owns it)
-    expect(player.isTraitor()).toBe(false);
   });
 
   test("MIRV should not notify terra nullius after a successful build", () => {
@@ -312,15 +289,13 @@ describe("MIRVExecution", () => {
     expect(displaySpy).not.toHaveBeenCalled();
   });
 
-  test("MIRV should launch when targeting own territory without breaking alliances", async () => {
+  test("MIRV should launch when targeting own territory", async () => {
     const playerTile = Array.from(player.tiles())[0];
     const mirvExec = new MirvExecution(player, playerTile);
     game.addExecution(mirvExec);
 
     executeTicks(game, 2);
 
-    // Expect MIRV to launch successfully without marking player as traitor
     expect(player.units(UnitType.MIRV)).toHaveLength(1);
-    expect(player.isTraitor()).toBe(false);
   });
 });

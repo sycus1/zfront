@@ -134,15 +134,6 @@ describe("PlayerImpl", () => {
     });
   });
 
-  test("Can't send alliance requests when dead", () => {
-    // conquer other
-    const otherTiles = other.tiles();
-    for (const tile of otherTiles) {
-      player.conquer(tile);
-    }
-    expect(other.canSendAllianceRequest(player)).toBe(false);
-  });
-
   describe("tiles()", () => {
     test("returns a live view that reflects later ownership changes", () => {
       const tiles = player.tiles();

@@ -190,8 +190,8 @@ export class NationStructurePlacement {
    * Prefers high elevation, spacing from other factories, and distance from border.
    * Based on difficulty, scores connectivity by the number of distinct rail
    * clusters within train-station range, weighted by trade gold:
-   * ally (1.0) > team/neutral (~0.71) > self (~0.29).
-   * Embargoed and bot neighbors are excluded. Per cluster, the best reachable
+   * team/neutral (1.0) > self (0.4).
+   * Bot neighbors and players we can't trade with are excluded. Per cluster, the best reachable
    * trade relationship determines the weight.
    */
   private factoryValue(): (tile: TileRef) => number {
@@ -291,7 +291,7 @@ export class NationStructurePlacement {
   /**
    * Precomputes trade-weighted station entries for connectivity scoring.
    * Iterates all stations once (O(total_stations)) to build a unit→cluster map,
-   * then collects own and non-embargoed non-bot neighbor structures with a
+   * then collects own and tradeable non-bot neighbor structures with a
    * normalized weight derived from config.trainGold().
    */
   private buildReachableStations(): ReachableStation[] {
@@ -306,7 +306,7 @@ export class NationStructurePlacement {
     }
 
     const maxTradeGold = Math.max(
-      Number(game.config().trainGold("ally", 0, player)),
+      Number(game.config().trainGold("team", 0, player)),
       1,
     );
     const result: ReachableStation[] = [];
@@ -328,16 +328,12 @@ export class NationStructurePlacement {
       }
     }
 
-    // Neighbor structures — all non-embargoed non-bot neighbors.
+    // Neighbor structures — all non-bot neighbors.
     for (const neighbor of player.nearby()) {
       if (!neighbor.isPlayer()) continue;
       if (neighbor.type() === PlayerType.Bot) continue;
       if (!player.canTrade(neighbor)) continue;
-      const relType = player.isOnSameTeam(neighbor)
-        ? "team"
-        : player.isAlliedWith(neighbor)
-          ? "ally"
-          : "other";
+      const relType = player.isOnSameTeam(neighbor) ? "team" : "other";
       const weight =
         Number(game.config().trainGold(relType, 0, player)) / maxTradeGold;
       for (const unit of neighbor.units(

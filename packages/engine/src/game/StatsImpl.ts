@@ -2,12 +2,6 @@ import { TileRef } from "@openfront/engine-api/game/GameMap";
 import { PlayerType, TerraNullius } from "@openfront/engine-api/game/GameTypes";
 import { AllPlayersStats, ClientID } from "@openfront/engine-api/Schemas";
 import {
-  ALLIANCE_INDEX_BROKEN_BY_OTHER,
-  ALLIANCE_INDEX_EXPIRED,
-  ALLIANCE_INDEX_FORMED,
-  ALLIANCE_INDEX_HELD_TO_END,
-  ALLIANCE_INDEX_LONGEST_HELD,
-  ALLIANCE_INDEX_PEAK_CONCURRENT,
   ATTACK_INDEX_CANCEL,
   ATTACK_INDEX_MAX_RECV,
   ATTACK_INDEX_RECV,
@@ -121,13 +115,6 @@ export class StatsImpl implements Stats {
     if (v > p.attacks[index]) p.attacks[index] = v;
   }
 
-  private _addBetrayal(player: Player, value: BigIntLike) {
-    const data = this._makePlayerStats(player);
-    if (data === undefined) return;
-    data.betrayals ??= 0n;
-    data.betrayals += _bigint(value);
-  }
-
   private _addBoat(
     player: Player,
     type: BoatUnit,
@@ -202,36 +189,6 @@ export class StatsImpl implements Stats {
     p.killedAt = _bigint(tick);
   }
 
-  private _allianceArray(p: NonNullable<PlayerStats>, index: number) {
-    p.alliances ??= [0n];
-    while (p.alliances.length <= index) p.alliances.push(0n);
-    return p.alliances;
-  }
-
-  private _maxAlliance(player: Player, index: number, value: BigIntLike) {
-    const p = this._makePlayerStats(player);
-    if (p === undefined) return;
-    const arr = this._allianceArray(p, index);
-    const v = _bigint(value);
-    if (v > arr[index]) arr[index] = v;
-  }
-
-  private _addAlliance(player: Player, index: number, value: BigIntLike) {
-    const p = this._makePlayerStats(player);
-    if (p === undefined) return;
-    const arr = this._allianceArray(p, index);
-    arr[index] += _bigint(value);
-  }
-
-  /** For slots holding a snapshot of end-of-game state rather than a running
-   * total, so that writing one twice cannot silently double it. */
-  private _setAlliance(player: Player, index: number, value: BigIntLike) {
-    const p = this._makePlayerStats(player);
-    if (p === undefined) return;
-    const arr = this._allianceArray(p, index);
-    arr[index] = _bigint(value);
-  }
-
   attack(
     player: Player,
     target: Player | TerraNullius,
@@ -261,27 +218,6 @@ export class StatsImpl implements Stats {
     if (target.isPlayer()) {
       this._addAttack(target, ATTACK_INDEX_RECV, -troops);
     }
-  }
-
-  betray(player: Player): void {
-    this._addBetrayal(player, 1);
-  }
-
-  allianceFormed(player: Player): void {
-    this._addAlliance(player, ALLIANCE_INDEX_FORMED, 1);
-  }
-
-  allianceEnded(
-    player: Player,
-    durationTicks: BigIntLike,
-    counter: "brokenByOther" | "expired" | null,
-  ): void {
-    if (counter === "brokenByOther") {
-      this._addAlliance(player, ALLIANCE_INDEX_BROKEN_BY_OTHER, 1);
-    } else if (counter === "expired") {
-      this._addAlliance(player, ALLIANCE_INDEX_EXPIRED, 1);
-    }
-    this._maxAlliance(player, ALLIANCE_INDEX_LONGEST_HELD, durationTicks);
   }
 
   boatSendTrade(player: Player, target: Player): void {
@@ -411,28 +347,10 @@ export class StatsImpl implements Stats {
     p.spawnTile = tile;
   }
 
-  recordAlliancesAtEnd(
-    player: Player,
-    stillStanding: number,
-    longestStandingTicks: BigIntLike,
-  ): void {
-    // HELD_TO_END is a count of what was standing at the final tick, not a
-    // tally of events: it is written, not accumulated. Today setWinner runs
-    // once per game, but an additive write would double silently the day that
-    // stops being true, and no assertion anywhere would catch it.
-    this._setAlliance(player, ALLIANCE_INDEX_HELD_TO_END, stillStanding);
-    this._maxAlliance(
-      player,
-      ALLIANCE_INDEX_LONGEST_HELD,
-      longestStandingTicks,
-    );
-  }
-
   recordTickSample(
     player: Player,
     tiles: BigIntLike,
     troops: BigIntLike,
-    allianceCount: number,
   ): void {
     const p = this._makePlayerStats(player);
     if (p === undefined) return;
@@ -456,8 +374,6 @@ export class StatsImpl implements Stats {
 
     const tr = _bigint(troops);
     if (p.peakTroops === undefined || tr > p.peakTroops) p.peakTroops = tr;
-
-    this._maxAlliance(player, ALLIANCE_INDEX_PEAK_CONCURRENT, allianceCount);
   }
 
   recordKilledBy(victim: Player, killerClientID: ClientID | null): void {

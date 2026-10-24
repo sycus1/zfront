@@ -11,7 +11,6 @@ import {
   NukeMagnitude,
 } from "@openfront/engine-lib/configuration/Config";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
-import { NationAllianceBehavior } from "@openfront/engine/execution/nation/NationAllianceBehavior";
 import { NationAttackBehavior } from "@openfront/engine/execution/nation/NationAttackBehavior";
 import { NationEmojiBehavior } from "@openfront/engine/execution/nation/NationEmojiBehavior";
 import { NationNukeBehavior } from "@openfront/engine/execution/nation/NationNukeBehavior";
@@ -80,12 +79,6 @@ function nukeBehavior(game: Game, nation: Player): NationNukeBehavior {
     game,
     nation,
   );
-  const allianceBehavior = new NationAllianceBehavior(
-    new PseudoRandom(1),
-    game,
-    nation,
-    emojiBehavior,
-  );
   const attackBehavior = new NationAttackBehavior(
     new PseudoRandom(1),
     game,
@@ -93,7 +86,6 @@ function nukeBehavior(game: Game, nation: Player): NationNukeBehavior {
     0.5,
     0.3,
     0.2,
-    allianceBehavior,
     emojiBehavior,
     new NationWarshipBehavior(new PseudoRandom(1), game, nation, emojiBehavior),
   );
@@ -183,12 +175,9 @@ describe("Nation nuke targeting", () => {
     },
   );
 
-  it.each([
-    [false, 1],
-    [true, 0],
-  ])(
-    "hits a third player around the target unless allied with them (allied: %s)",
-    async (allied, expectedNukes) => {
+  it.each([[1]])(
+    "hits a third player around the target (%s nuke)",
+    async (expectedNukes) => {
       const { game, nation, human } = await setupDuel(true);
       const other = game.player("other_id");
       for (let x = 100; x < 200; x++) {
@@ -198,7 +187,6 @@ describe("Nation nuke targeting", () => {
         }
       }
       nation.updateRelation(human, -100);
-      if (allied) nation.createAllianceRequest(other)?.accept();
 
       const nukes = launchNukes(game, nation);
       expect(nukes).toHaveLength(expectedNukes);
@@ -208,14 +196,13 @@ describe("Nation nuke targeting", () => {
     },
   );
 
-  it.each(["own", "allied"])(
+  it.each(["own"])(
     "never nukes an %s enclave inside the target's land",
     async (enclave) => {
       const { game, nation, human } = await setupDuel(true);
       const other = game.player("other_id");
       conquerRect(game, other, 0, 185, 15, 200);
       nation.updateRelation(human, -100);
-      if (enclave === "allied") nation.createAllianceRequest(other)?.accept();
       const enclaveOwner = enclave === "own" ? nation : other;
       conquerRect(game, enclaveOwner, 149, 149, 151, 151);
 

@@ -96,15 +96,6 @@ describe("Stats", () => {
     expect(stats.stats()).toStrictEqual({});
   });
 
-  test("betray", () => {
-    stats.betray(player1);
-    expect(stats.stats()).toStrictEqual({
-      client1: {
-        betrayals: 1n,
-      },
-    });
-  });
-
   test("boatSendTrade", () => {
     stats.boatSendTrade(player1, player2);
     expect(stats.stats()).toStrictEqual({

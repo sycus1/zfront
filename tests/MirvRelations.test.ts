@@ -1,9 +1,9 @@
 import {
   PlayerInfo,
   PlayerType,
+  Relation,
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
-import { AllianceRequestExecution } from "@openfront/engine/execution/alliance/AllianceRequestExecution";
 import { MirvExecution } from "@openfront/engine/execution/MIRVExecution";
 import { Game, Player } from "@openfront/engine/game/Game";
 import { setup } from "./util/Setup";
@@ -13,7 +13,7 @@ let game: Game;
 let player1: Player;
 let player2: Player;
 
-describe("MIRV betrayal side effects", () => {
+describe("MIRV launch side effects", () => {
   beforeEach(async () => {
     game = await setup("plains", { instantBuild: true }, [
       new PlayerInfo("player1", PlayerType.Human, "c1", "p1"),
@@ -28,32 +28,24 @@ describe("MIRV betrayal side effects", () => {
 
     player1.addGold(1_000_000_000n);
     player2.addGold(1_000_000_000n);
-
-    game.addExecution(new AllianceRequestExecution(player1, player2.id()));
-    game.executeNextTick();
-    game.addExecution(new AllianceRequestExecution(player2, player1.id()));
-    game.executeNextTick();
-    expect(player1.isAlliedWith(player2)).toBe(true);
   });
 
-  test("a successful launch breaks the alliance and marks the launcher a traitor", () => {
+  test("a successful launch makes the target hostile to the launcher", () => {
     player1.buildUnit(UnitType.MissileSilo, game.ref(0, 0), {});
 
     game.addExecution(new MirvExecution(player1, game.ref(10, 10)));
     executeTicks(game, 2); // init + spawn
 
     expect(player1.units(UnitType.MIRV)).toHaveLength(1);
-    expect(player1.isAlliedWith(player2)).toBe(false);
-    expect(player1.isTraitor()).toBe(true);
+    expect(player2.relation(player1)).toBe(Relation.Hostile);
   });
 
-  test("a fizzled launch applies no betrayal side effects", () => {
+  test("a fizzled launch leaves relations alone", () => {
     // player1 has no silo, so canBuild fails and the execution fizzles.
     game.addExecution(new MirvExecution(player1, game.ref(10, 10)));
     executeTicks(game, 2);
 
     expect(player1.units(UnitType.MIRV)).toHaveLength(0);
-    expect(player1.isAlliedWith(player2)).toBe(true);
-    expect(player1.isTraitor()).toBe(false);
+    expect(player2.relation(player1)).toBe(Relation.Neutral);
   });
 });

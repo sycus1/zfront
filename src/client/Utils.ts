@@ -201,13 +201,6 @@ export function getActiveModifiers(
       formattedValue: `x${modifiers.goldMultiplier}`,
     });
   }
-  if (modifiers.isAlliancesDisabled) {
-    result.push({
-      labelKey: "public_game_modifier.disable_alliances_label",
-      badgeKey: "public_game_modifier.disable_alliances",
-      formattedValue: translateText("common.disabled"),
-    });
-  }
   if (modifiers.isPortsDisabled) {
     result.push({
       labelKey: "public_game_modifier.ports_disabled_label",
@@ -698,11 +691,8 @@ export function getMessageTypeClasses(type: MessageType): string {
     case MessageType.SAM_HIT:
     case MessageType.CAPTURED_ENEMY_UNIT:
     case MessageType.CONQUERED_PLAYER:
-    case MessageType.ALLIANCE_ACCEPTED:
       return severityColors["success"];
     case MessageType.ATTACK_FAILED:
-    case MessageType.ALLIANCE_REJECTED:
-    case MessageType.ALLIANCE_BROKEN:
     case MessageType.UNIT_DESTROYED:
     case MessageType.NUKE_DETONATED:
       return severityColors["fail"];
@@ -715,12 +705,9 @@ export function getMessageTypeClasses(type: MessageType): string {
     case MessageType.NUKE_INBOUND:
     case MessageType.HYDROGEN_BOMB_INBOUND:
     case MessageType.SAM_MISS:
-    case MessageType.ALLIANCE_EXPIRED:
     case MessageType.NAVAL_INVASION_INBOUND:
-    case MessageType.RENEW_ALLIANCE:
       return severityColors["warn"];
     case MessageType.CHAT:
-    case MessageType.ALLIANCE_REQUEST:
       return severityColors["info"];
     default:
       console.warn(`Message type ${type} has no explicit color`);

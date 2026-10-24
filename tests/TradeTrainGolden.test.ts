@@ -102,7 +102,7 @@ describe("trade ship golden values", () => {
 
 describe("train golden values", () => {
   test("trainGold: relationship × trade stops grid", () => {
-    const rels = ["self", "team", "ally", "other"] as const;
+    const rels = ["self", "team", "other"] as const;
     const stops = [0, 1, 5, 9, 10, 11, 12, 13, 14, 15, 20, 50];
     const table: Record<string, bigint> = {};
     for (const rel of rels)

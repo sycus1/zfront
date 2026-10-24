@@ -4,7 +4,6 @@ import type { ColumnId, StatsTableKind } from "../../../StatsConstants";
 import { formatPercentage, translateText } from "../../../Utils";
 import type { GameView, PlayerView } from "../../../view";
 import {
-  allianceIcon,
   cityIcon,
   claimIcon,
   factoryIcon,
@@ -16,7 +15,6 @@ import {
   samLauncherIcon,
   soldierIcon,
   teamIcon,
-  traitorIcon,
   upperLimitIcon,
   warshipIcon,
 } from "../../HotbarIcons";
@@ -281,22 +279,6 @@ export const COLUMN_DEFS: readonly ColumnDef[] = [
   ),
   unitColumn("sams", "leaderboard.sams", UnitType.SAMLauncher, samLauncherIcon),
   unitColumn("warships", "leaderboard.warships", UnitType.Warship, warshipIcon),
-  defineColumn({
-    id: "allies",
-    labelKey: "leaderboard.allies",
-    headerVisual: { kind: "icon", src: allianceIcon },
-    align: "center",
-    value: (player) => player.allies().length,
-    cell: (row) => renderNumber(row.value),
-  }),
-  defineColumn({
-    id: "betrayals",
-    labelKey: "leaderboard.betrayals",
-    headerVisual: { kind: "icon", src: traitorIcon },
-    align: "center",
-    value: (player) => player.betrayals(),
-    cell: (row) => renderNumber(row.value),
-  }),
 ];
 
 export function columnsFor(kind: StatsTableKind): readonly ColumnDef[] {

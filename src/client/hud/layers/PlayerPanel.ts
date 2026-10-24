@@ -24,34 +24,25 @@ import {
 } from "../../InputHandler";
 import {
   PlayerReportedEvent,
-  SendAllianceRequestIntentEvent,
-  SendBreakAllianceIntentEvent,
-  SendEmbargoAllIntentEvent,
-  SendEmbargoIntentEvent,
   SendEmojiIntentEvent,
   SendTargetPlayerIntentEvent,
 } from "../../Transport";
 import { UIState } from "../../UIState";
 import { UserSettings } from "../../UserSettings";
-import { renderDuration, showToast, translateText } from "../../Utils";
+import { showToast, translateText } from "../../Utils";
 import { GameView, PlayerView } from "../../view";
 import { ChatModal } from "./ChatModal";
 import { EmojiTable } from "./EmojiTable";
 import "./PlayerModerationModal";
 import "./PlayerReportModal";
 import "./SendResourceModal";
-const allianceIcon = assetUrl("images/AllianceIconWhite.svg");
 const chatIcon = assetUrl("images/ChatIconWhite.svg");
 const donateGoldIcon = assetUrl("images/DonateGoldIconWhite.svg");
 const donateTroopIcon = assetUrl("images/DonateTroopIconWhite.svg");
 const emojiIcon = assetUrl("images/EmojiIconWhite.svg");
 const reportIcon = assetUrl("images/SirenIconWhite.svg");
 const shieldIcon = assetUrl("images/ShieldIconWhite.svg");
-const stopTradingIcon = assetUrl("images/StopIconWhite.svg");
 const targetIcon = assetUrl("images/TargetIconWhite.svg");
-const startTradingIcon = assetUrl("images/TradingIconWhite.svg");
-const traitorIcon = assetUrl("images/TraitorIconLightRed.svg");
-const breakAllianceIcon = assetUrl("images/TraitorIconWhite.svg");
 
 @customElement("player-panel")
 export class PlayerPanel extends LitElement implements Controller {
@@ -69,8 +60,6 @@ export class PlayerPanel extends LitElement implements Controller {
   @state() private sendTarget: PlayerView | null = null;
   @state() private sendMode: "troops" | "gold" | "none" = "none";
   @state() public isVisible: boolean = false;
-  @state() private allianceExpiryText: string | null = null;
-  @state() private allianceExpirySeconds: number | null = null;
   @state() private otherProfile: PlayerProfile | null = null;
   @state() private suppressNextHide: boolean = false;
   @state() private moderationTarget: PlayerView | null = null;
@@ -144,7 +133,7 @@ export class PlayerPanel extends LitElement implements Controller {
         }
       }
 
-      // Refresh actions & alliance expiry
+      // Refresh actions
       const myPlayer = this.g.myPlayer();
       if (myPlayer !== null && myPlayer.isAlive()) {
         try {
@@ -152,25 +141,9 @@ export class PlayerPanel extends LitElement implements Controller {
         } catch (error) {
           console.warn("Failed to refresh player panel actions:", error);
         }
-        if (this.actions?.interaction?.allianceInfo?.expiresAt !== undefined) {
-          const expiresAt = this.actions.interaction.allianceInfo.expiresAt;
-          const remainingTicks = expiresAt - this.g.ticks();
-          const remainingSeconds = Math.max(0, Math.floor(remainingTicks / 10)); // 10 ticks per second
-
-          if (remainingTicks > 0) {
-            this.allianceExpirySeconds = remainingSeconds;
-            this.allianceExpiryText = renderDuration(remainingSeconds);
-          } else {
-            this.allianceExpirySeconds = null;
-            this.allianceExpiryText = null;
-          }
-        } else {
-          this.allianceExpirySeconds = null;
-          this.allianceExpiryText = null;
-        }
       }
-      // Keep repainting while the panel is visible so live values (e.g. the
-      // alliance countdowns) keep updating even after the local player dies.
+      // Keep repainting while the panel is visible so live values keep
+      // updating even after the local player dies.
       this.requestUpdate();
     }
   }
@@ -211,26 +184,6 @@ export class PlayerPanel extends LitElement implements Controller {
 
   private handleClose(e: Event) {
     e.stopPropagation();
-    this.hide();
-  }
-
-  private handleAllianceClick(
-    e: Event,
-    myPlayer: PlayerView,
-    other: PlayerView,
-  ) {
-    e.stopPropagation();
-    this.eventBus.emit(new SendAllianceRequestIntentEvent(myPlayer, other));
-    this.hide();
-  }
-
-  private handleBreakAllianceClick(
-    e: Event,
-    myPlayer: PlayerView,
-    other: PlayerView,
-  ) {
-    e.stopPropagation();
-    this.eventBus.emit(new SendBreakAllianceIntentEvent(myPlayer, other));
     this.hide();
   }
 
@@ -275,36 +228,6 @@ export class PlayerPanel extends LitElement implements Controller {
     this.closeSend();
     if (e.detail?.closePanel) this.hide();
   };
-
-  private handleEmbargoClick(
-    e: Event,
-    myPlayer: PlayerView,
-    other: PlayerView,
-  ) {
-    e.stopPropagation();
-    this.eventBus.emit(new SendEmbargoIntentEvent(other, "start"));
-    this.hide();
-  }
-
-  private handleStopEmbargoClick(
-    e: Event,
-    myPlayer: PlayerView,
-    other: PlayerView,
-  ) {
-    e.stopPropagation();
-    this.eventBus.emit(new SendEmbargoIntentEvent(other, "stop"));
-    this.hide();
-  }
-
-  private onStopTradingEnemiesClick(e: Event) {
-    e.stopPropagation();
-    this.eventBus.emit(new SendEmbargoAllIntentEvent("start"));
-  }
-
-  private onStartTradingEnemiesClick(e: Event) {
-    e.stopPropagation();
-    this.eventBus.emit(new SendEmbargoAllIntentEvent("stop"));
-  }
 
   private handleEmojiClick(e: Event, myPlayer: PlayerView, other: PlayerView) {
     e.stopPropagation();
@@ -450,57 +373,6 @@ export class PlayerPanel extends LitElement implements Controller {
     }
   }
 
-  private getExpiryColorClass(seconds: number | null): string {
-    if (seconds === null) return "text-white"; // Default color
-
-    if (seconds <= 30) return "text-red-400"; // Last 30 seconds: Red
-    if (seconds <= 60) return "text-yellow-400"; // Last 60 seconds: Yellow
-    return "text-emerald-400"; // More than 60 seconds: Green
-  }
-
-  private getTraitorRemainingSeconds(player: PlayerView): number | null {
-    const ticksLeft = player.getTraitorRemainingTicks();
-    if (!player.isTraitor() || ticksLeft <= 0) return null;
-    return Math.ceil(ticksLeft / 10); // 10 ticks = 1 second
-  }
-
-  private renderTraitorBadge(other: PlayerView) {
-    if (!other.isTraitor()) return html``;
-
-    const secs = this.getTraitorRemainingSeconds(other);
-    const label = secs !== null ? renderDuration(secs) : null;
-    const dotCls =
-      secs !== null
-        ? `mx-1 size-1 rounded-full bg-red-400/70 ${secs <= 10 ? "animate-pulse" : ""}`
-        : "";
-
-    return html`
-      <div class="mt-1" role="status" aria-live="polite" aria-atomic="true">
-        <span
-          class="inline-flex items-center gap-2 rounded-full border border-red-400/30
-            bg-red-500/10 px-2.5 py-0.5 text-sm font-semibold text-red-200
-            shadow-[inset_0_0_8px_rgba(239,68,68,0.12)]"
-          title=${translateText("player_panel.traitor")}
-        >
-          <img src=${traitorIcon} alt="" aria-hidden="true" class="size-4.5" />
-          <span class="tracking-tight"
-            >${translateText("player_panel.traitor")}</span
-          >
-          ${
-            label
-              ? html`<span class=${dotCls}></span>
-                  <span
-                    class="tabular-nums font-bold text-red-100 whitespace-nowrap text-sm"
-                  >
-                    ${label}
-                  </span>`
-              : ""
-          }
-        </span>
-      </div>
-    `;
-  }
-
   private renderModeration(
     my: PlayerView,
     other: PlayerView,
@@ -552,8 +424,6 @@ export class PlayerPanel extends LitElement implements Controller {
 
   private renderRelationPillIfNation(other: PlayerView, my: PlayerView) {
     if (other.type() !== PlayerType.Nation) return html``;
-    if (other.isTraitor()) return html``;
-    if (my?.isAlliedWith && my.isAlliedWith(other)) return html``;
     if (!this.otherProfile || !my) return html``;
 
     const relation =
@@ -623,7 +493,6 @@ export class PlayerPanel extends LitElement implements Controller {
             : html``
         }
       </div>
-      ${this.renderTraitorBadge(other)}
       ${this.renderRelationPillIfNation(other, my)}
     `;
   }
@@ -684,165 +553,15 @@ export class PlayerPanel extends LitElement implements Controller {
     `;
   }
 
-  private renderStats(other: PlayerView, my: PlayerView) {
-    return html`
-      <!-- Betrayals -->
-      <div class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2">
-        <div
-          class="flex items-center gap-2 text-[15px] font-medium text-zinc-100 leading-snug"
-        >
-          <span aria-hidden="true">⚠️</span>
-          <span>${translateText("player_panel.betrayals")}</span>
-        </div>
-        <div class="text-right text-[14px] font-semibold text-zinc-200">
-          ${other.betrayals()}
-        </div>
-      </div>
-
-      <!-- Trading / Embargo -->
-      <div class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2">
-        <div
-          class="flex items-center gap-2 text-[15px] font-medium text-zinc-100 leading-snug"
-        >
-          <span aria-hidden="true">⚓</span>
-          <span>${translateText("player_panel.trading")}</span>
-        </div>
-        <div
-          class="flex items-center justify-end gap-2 text-[14px] font-semibold"
-        >
-          ${
-            other.hasEmbargoAgainst(my)
-              ? html`<span class="text-amber-400"
-                  >${translateText("player_panel.stopped")}</span
-                >`
-              : html`<span class="text-blue-400"
-                  >${translateText("player_panel.active")}</span
-                >`
-          }
-        </div>
-      </div>
-    `;
-  }
-
-  private renderAlliances(other: PlayerView) {
-    const allies = other.allies();
-
-    // Map ally PlayerID → expiry tick so each ally shows its own remaining time.
-    const expiryByAlly = new Map<string, number>();
-    for (const alliance of other.alliances()) {
-      expiryByAlly.set(alliance.other, alliance.expiresAt);
-    }
-    const remainingSecondsFor = (ally: PlayerView): number | null => {
-      const expiresAt = expiryByAlly.get(ally.id());
-      if (expiresAt === undefined) return null;
-      const remainingTicks = expiresAt - this.g.ticks();
-      return Math.max(0, Math.floor(remainingTicks / 10)); // 10 ticks per second
-    };
-
-    // Soonest-expiring alliances first; ties (and no-expiry allies) by name.
-    const nameCollator = new Intl.Collator(undefined, { sensitivity: "base" });
-    const alliesSorted = [...allies].sort((a, b) => {
-      const remainingA = remainingSecondsFor(a) ?? Infinity;
-      const remainingB = remainingSecondsFor(b) ?? Infinity;
-      if (remainingA !== remainingB) return remainingA - remainingB;
-      return nameCollator.compare(a.displayName(), b.displayName());
-    });
-
-    return html`
-      <div class="select-none">
-        <div class="flex items-center justify-between mb-2">
-          <div
-            id="alliances-title"
-            class="text-[15px] font-medium text-zinc-200"
-          >
-            ${translateText("player_panel.alliances")}
-          </div>
-          <span
-            aria-labelledby="alliances-title"
-            class="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-[10px]
-                 text-[12px] text-zinc-100 bg-white/10 border border-white/20"
-          >
-            ${allies.length}
-          </span>
-        </div>
-
-        <div
-          class="rounded-lg bg-zinc-800/70 ring-1 ring-zinc-700/60 w-full min-w-0"
-        >
-          <ul
-            class="max-h-48 overflow-y-auto p-2
-                 flex flex-wrap gap-1.5
-                 scrollbar-thin scrollbar-thumb-zinc-600 hover:scrollbar-thumb-zinc-500 scrollbar-track-zinc-800"
-            role="list"
-            aria-labelledby="alliances-title"
-            translate="no"
-          >
-            ${
-              alliesSorted.length === 0
-                ? html`<li class="text-zinc-400 text-[14px] px-1">
-                    ${translateText("common.none")}
-                  </li>`
-                : alliesSorted.map((p) => {
-                    const remainingSeconds = remainingSecondsFor(p);
-                    return html`<li
-                      class="max-w-full inline-flex items-center gap-1.5
-                           rounded-md border border-white/10 bg-white/5
-                           px-2.5 py-1 text-[14px] text-zinc-100
-                           hover:bg-white/8 active:scale-[0.99] transition"
-                      title=${p.displayName()}
-                    >
-                      <span class="truncate">${p.displayName()}</span>
-                      ${
-                        remainingSeconds !== null
-                          ? html`<span
-                              class="text-[11px] font-semibold leading-none tabular-nums ${this.getExpiryColorClass(
-                                remainingSeconds,
-                              )}"
-                              >${renderDuration(remainingSeconds)}</span
-                            >`
-                          : ""
-                      }
-                    </li>`;
-                  })
-            }
-          </ul>
-        </div>
-      </div>
-    `;
-  }
-
-  private renderAllianceExpiry() {
-    if (this.allianceExpiryText === null) return html``;
-    return html`
-      <div class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-base">
-        <div class="font-semibold text-zinc-300">
-          ${translateText("player_panel.alliance_time_remaining")}
-        </div>
-        <div class="text-right font-semibold">
-          <span
-            class="inline-flex items-center rounded-full px-2 py-0.5 text-[14px] font-bold ${this.getExpiryColorClass(
-              this.allianceExpirySeconds,
-            )}"
-            >${this.allianceExpiryText}</span
-          >
-        </div>
-      </div>
-    `;
-  }
-
   private renderActions(my: PlayerView, other: PlayerView) {
     const myPlayer = this.g.myPlayer();
     const canDonateGold = this.actions?.interaction?.canDonateGold;
     const canDonateTroops = this.actions?.interaction?.canDonateTroops;
-    const canSendAllianceRequest =
-      this.actions?.interaction?.canSendAllianceRequest;
     const canSendEmoji =
       other === myPlayer
         ? this.actions?.canSendEmojiAllPlayers
         : this.actions?.interaction?.canSendEmoji;
-    const canBreakAlliance = this.actions?.interaction?.canBreakAlliance;
     const canTarget = this.actions?.interaction?.canTarget;
-    const canEmbargo = this.actions?.interaction?.canEmbargo;
 
     return html`
       <div class="flex flex-col gap-2.5">
@@ -906,95 +625,6 @@ export class PlayerPanel extends LitElement implements Controller {
               : ""
           }
         </div>
-        <ui-divider></ui-divider>
-        ${
-          other === my
-            ? html``
-            : html`
-                <div class="grid auto-cols-fr grid-flow-col gap-1">
-                  ${
-                    canEmbargo
-                      ? actionButton({
-                          onClick: (e: MouseEvent) =>
-                            this.handleEmbargoClick(e, my, other),
-                          icon: stopTradingIcon,
-                          iconAlt: "Stop Trading",
-                          title: translateText("player_panel.stop_trade"),
-                          label: translateText("player_panel.stop_trade"),
-                          type: "yellow",
-                        })
-                      : actionButton({
-                          onClick: (e: MouseEvent) =>
-                            this.handleStopEmbargoClick(e, my, other),
-                          icon: startTradingIcon,
-                          iconAlt: "Start Trading",
-                          title: translateText("player_panel.start_trade"),
-                          label: translateText("player_panel.start_trade"),
-                          type: "green",
-                        })
-                  }
-                  ${
-                    canBreakAlliance
-                      ? actionButton({
-                          onClick: (e: MouseEvent) =>
-                            this.handleBreakAllianceClick(e, my, other),
-                          icon: breakAllianceIcon,
-                          iconAlt: "Break Alliance",
-                          title: translateText("player_panel.break_alliance"),
-                          label: translateText("player_panel.break_alliance"),
-                          type: "red",
-                        })
-                      : ""
-                  }
-                  ${
-                    canSendAllianceRequest
-                      ? actionButton({
-                          onClick: (e: MouseEvent) =>
-                            this.handleAllianceClick(e, my, other),
-                          icon: allianceIcon,
-                          iconAlt: "Alliance",
-                          title: translateText("player_panel.send_alliance"),
-                          label: translateText("player_panel.send_alliance"),
-                          type: "indigo",
-                        })
-                      : ""
-                  }
-                </div>
-              `
-        }
-        ${
-          other === my
-            ? html`<div class="grid auto-cols-fr grid-flow-col gap-1">
-                ${actionButton({
-                  onClick: (e: MouseEvent) => this.onStopTradingEnemiesClick(e),
-                  icon: stopTradingIcon,
-                  iconAlt: "Stop Trading With Enemies",
-                  title: !this.actions?.canEmbargoAll
-                    ? `${translateText("player_panel.stop_trade_enemies")} - ${translateText("cooldown")}`
-                    : translateText("player_panel.stop_trade_enemies"),
-                  label: !this.actions?.canEmbargoAll
-                    ? `${translateText("player_panel.stop_trade_enemies")} ⏳`
-                    : translateText("player_panel.stop_trade_enemies"),
-                  type: "yellow",
-                  disabled: !this.actions?.canEmbargoAll,
-                })}
-                ${actionButton({
-                  onClick: (e: MouseEvent) =>
-                    this.onStartTradingEnemiesClick(e),
-                  icon: startTradingIcon,
-                  iconAlt: "Start Trading With Enemies",
-                  title: !this.actions?.canEmbargoAll
-                    ? `${translateText("player_panel.start_trade_enemies")} - ${translateText("cooldown")}`
-                    : translateText("player_panel.start_trade_enemies"),
-                  label: !this.actions?.canEmbargoAll
-                    ? `${translateText("player_panel.start_trade_enemies")} ⏳`
-                    : translateText("player_panel.start_trade_enemies"),
-                  type: "green",
-                  disabled: !this.actions?.canEmbargoAll,
-                })}
-              </div>`
-            : ""
-        }
         ${this.renderModeration(my, other, this.isAdminRole)}
       </div>
     `;
@@ -1021,33 +651,6 @@ export class PlayerPanel extends LitElement implements Controller {
     const myTroopsNum = Number(viewer.troops());
 
     return html`
-      <style>
-        /* Soft glowing ring animation for traitors */
-        .traitor-ring {
-          border-radius: 1rem;
-          box-shadow:
-            0 0 0 2px rgba(239, 68, 68, 0.34),
-            0 0 12px 4px rgba(239, 68, 68, 0.22),
-            inset 0 0 14px rgba(239, 68, 68, 0.13);
-          animation: glowPulse 2.4s ease-in-out infinite;
-        }
-        @keyframes glowPulse {
-          0%,
-          100% {
-            box-shadow:
-              0 0 0 2px rgba(239, 68, 68, 0.22),
-              0 0 8px 2px rgba(239, 68, 68, 0.15),
-              inset 0 0 8px rgba(239, 68, 68, 0.07);
-          }
-          50% {
-            box-shadow:
-              0 0 0 4px rgba(239, 68, 68, 0.38),
-              0 0 18px 6px rgba(239, 68, 68, 0.26),
-              inset 0 0 18px rgba(239, 68, 68, 0.15);
-          }
-        }
-      </style>
-
       <div
         class="fixed inset-0 z-10001 flex items-center justify-center overflow-auto
                bg-black/15 backdrop-brightness-110 pointer-events-auto"
@@ -1065,7 +668,7 @@ export class PlayerPanel extends LitElement implements Controller {
             ></div>
             <div
               class=${`relative w-full bg-zinc-900/95 rounded-2xl text-zinc-100 shadow-2xl shadow-black/50
-                 ${other.isTraitor() ? "traitor-ring" : "ring-1 ring-white/5"}`}
+                 ring-1 ring-white/5`}
             >
               <div class="overflow-visible">
                 <div
@@ -1085,7 +688,7 @@ export class PlayerPanel extends LitElement implements Controller {
                   <div
                     class="p-6 flex flex-col gap-2 font-sans antialiased text-[14.5px] leading-relaxed"
                   >
-                    <!-- Identity (flag, name, type, traitor, relation) -->
+                    <!-- Identity (flag, name, type, relation) -->
                     <div class="mb-1">
                       ${this.renderIdentityRow(other, viewer)}
                     </div>
@@ -1159,19 +762,6 @@ export class PlayerPanel extends LitElement implements Controller {
                         ? this.renderRocketDirectionToggle()
                         : ""
                     }
-
-                    <ui-divider></ui-divider>
-
-                    <!-- Stats: betrayals / trading -->
-                    ${this.renderStats(other, viewer)}
-
-                    <ui-divider></ui-divider>
-
-                    <!-- Alliances list -->
-                    ${this.renderAlliances(other)}
-
-                    <!-- Alliance time remaining -->
-                    ${this.renderAllianceExpiry()}
                     ${
                       !isSpectator
                         ? html`

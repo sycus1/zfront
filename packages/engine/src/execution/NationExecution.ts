@@ -1,11 +1,7 @@
 import { TileRef } from "@openfront/engine-api/game/GameMap";
 import {
   Difficulty,
-  GameMode,
   Nation,
-  PlayerID,
-  PlayerType,
-  Relation,
   TerrainType,
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
@@ -32,7 +28,6 @@ import type {
   SnapshotReader,
   SnapshotWriter,
 } from "../snapshot/SnapshotContext";
-import { NationAllianceBehavior } from "./nation/NationAllianceBehavior";
 import { NationAttackBehavior } from "./nation/NationAttackBehavior";
 import { NationEmojiBehavior } from "./nation/NationEmojiBehavior";
 import { NationMIRVBehavior } from "./nation/NationMIRVBehavior";
@@ -49,7 +44,6 @@ export class NationExecution implements Execution {
   private emojiBehavior!: NationEmojiBehavior;
   private mirvBehavior!: NationMIRVBehavior;
   private attackBehavior!: NationAttackBehavior;
-  private allianceBehavior!: NationAllianceBehavior;
   private warshipBehavior!: NationWarshipBehavior;
   private nukeBehavior!: NationNukeBehavior;
   private structureBehavior!: NationStructureBehavior;
@@ -61,8 +55,6 @@ export class NationExecution implements Execution {
   private triggerRatio: number;
   private reserveRatio: number;
   private expandRatio: number;
-
-  private embargoMalusApplied = new Set<PlayerID>();
 
   constructor(
     private gameID: GameID,
@@ -217,13 +209,9 @@ export class NationExecution implements Execution {
     }
 
     this.emojiBehavior.maybeSendCasualEmoji();
-    this.updateRelationsFromEmbargos();
-    this.allianceBehavior.handleAllianceRequests();
-    this.allianceBehavior.handleAllianceExtensionRequests();
     this.mirvBehavior.considerMIRV();
     this.structureBehavior.handleStructures();
     this.warshipBehavior.maybeSpawnWarship();
-    this.handleEmbargoesToHostileNations();
     this.attackBehavior.maybeAttack();
     this.warshipBehavior.counterWarshipInfestation();
     this.nukeBehavior.maybeSendNuke();
@@ -243,12 +231,6 @@ export class NationExecution implements Execution {
       this.player,
       this.emojiBehavior,
     );
-    this.allianceBehavior = new NationAllianceBehavior(
-      this.random,
-      this.mg,
-      this.player,
-      this.emojiBehavior,
-    );
     this.warshipBehavior = new NationWarshipBehavior(
       this.random,
       this.mg,
@@ -262,7 +244,6 @@ export class NationExecution implements Execution {
       this.triggerRatio,
       this.reserveRatio,
       this.expandRatio,
-      this.allianceBehavior,
       this.emojiBehavior,
       this.warshipBehavior,
     );
@@ -312,77 +293,6 @@ export class NationExecution implements Execution {
     return null;
   }
 
-  private updateRelationsFromEmbargos() {
-    const player = this.player;
-    if (player === null) return;
-    const others = this.mg.players().filter((p) => p.id() !== player.id());
-
-    others.forEach((other: Player) => {
-      const embargoMalus = -20;
-      if (
-        other.hasManualEmbargoAgainst(player) &&
-        !this.embargoMalusApplied.has(other.id())
-      ) {
-        player.updateRelation(other, embargoMalus);
-        this.embargoMalusApplied.add(other.id());
-      } else if (
-        !other.hasManualEmbargoAgainst(player) &&
-        this.embargoMalusApplied.has(other.id())
-      ) {
-        player.updateRelation(other, -embargoMalus);
-        this.embargoMalusApplied.delete(other.id());
-      }
-    });
-  }
-
-  private handleEmbargoesToHostileNations() {
-    const player = this.player;
-    if (player === null) return;
-    const others = this.mg.players().filter((p) => p.id() !== player.id());
-    const difficulty = this.mg.config().gameConfig().difficulty;
-    const isHigherDifficulty =
-      difficulty === Difficulty.Hard || difficulty === Difficulty.Impossible;
-    const teamGame = this.mg.config().gameConfig().gameMode === GameMode.Team;
-
-    others.forEach((other: Player) => {
-      // In team games on higher difficulties, refuse to trade with anyone
-      // not on this nation's team.
-      if (
-        teamGame &&
-        isHigherDifficulty &&
-        other.type() !== PlayerType.Bot &&
-        !player.isOnSameTeam(other)
-      ) {
-        if (!player.hasEmbargoAgainst(other)) {
-          player.addEmbargo(other, false);
-        }
-        return;
-      }
-
-      /* When player is hostile starts embargo. Do not stop until neutral again */
-      if (
-        player.relation(other) <= Relation.Hostile &&
-        !player.hasEmbargoAgainst(other) &&
-        !player.isOnSameTeam(other)
-      ) {
-        player.addEmbargo(other, false);
-      } else if (
-        player.relation(other) >= Relation.Neutral &&
-        player.hasEmbargoAgainst(other) &&
-        difficulty !== Difficulty.Hard &&
-        difficulty !== Difficulty.Impossible
-      ) {
-        player.stopEmbargo(other);
-      } else if (
-        player.relation(other) >= Relation.Friendly &&
-        player.hasEmbargoAgainst(other) &&
-        difficulty !== Difficulty.Impossible
-      ) {
-        player.stopEmbargo(other);
-      }
-    });
-  }
-
   isActive(): boolean {
     return this.active;
   }
@@ -408,13 +318,11 @@ export class NationExecution implements Execution {
       triggerRatio: this.triggerRatio,
       reserveRatio: this.reserveRatio,
       expandRatio: this.expandRatio,
-      embargoMalusApplied: [...this.embargoMalusApplied],
       spawnExecAdded: this.spawnExecAdded,
       behaviors: this.behaviorsInitialized
         ? {
             emoji: this.emojiBehavior.snapshot(w),
             mirv: this.mirvBehavior.snapshot(w),
-            alliance: this.allianceBehavior.snapshot(w),
             warship: this.warshipBehavior.snapshot(w),
             attack: this.attackBehavior.snapshot(w),
             nuke: this.nukeBehavior.snapshot(w),
@@ -446,7 +354,6 @@ export class NationExecution implements Execution {
     this.triggerRatio = s.triggerRatio;
     this.reserveRatio = s.reserveRatio;
     this.expandRatio = s.expandRatio;
-    this.embargoMalusApplied = new Set(s.embargoMalusApplied);
     this.spawnExecAdded = s.spawnExecAdded;
     this.behaviorsInitialized = s.behaviors !== null;
     const b = s.behaviors;
@@ -456,29 +363,18 @@ export class NationExecution implements Execution {
       Object.create(cls.prototype) as T;
     const emoji = shell(NationEmojiBehavior);
     const mirv = shell(NationMIRVBehavior);
-    const alliance = shell(NationAllianceBehavior);
     const warship = shell(NationWarshipBehavior);
     const attack = shell(NationAttackBehavior);
     const nuke = shell(NationNukeBehavior);
     const structure = shell(NationStructureBehavior);
     emoji.restoreSnapshot(b.emoji, r, random, player);
     mirv.restoreSnapshot(b.mirv, r, random, player, emoji);
-    alliance.restoreSnapshot(b.alliance, r, random, player, emoji);
     warship.restoreSnapshot(b.warship, r, random, player, emoji);
-    attack.restoreSnapshot(
-      b.attack,
-      r,
-      random,
-      player,
-      alliance,
-      emoji,
-      warship,
-    );
+    attack.restoreSnapshot(b.attack, r, random, player, emoji, warship);
     nuke.restoreSnapshot(b.nuke, r, random, player, attack, emoji);
     structure.restoreSnapshot(b.structure, r, random, player);
     this.emojiBehavior = emoji;
     this.mirvBehavior = mirv;
-    this.allianceBehavior = alliance;
     this.warshipBehavior = warship;
     this.attackBehavior = attack;
     this.nukeBehavior = nuke;
@@ -501,13 +397,11 @@ const NationStateSchema = z.object({
   triggerRatio: zNum(),
   reserveRatio: zNum(),
   expandRatio: zNum(),
-  embargoMalusApplied: z.array(z.string()),
   spawnExecAdded: z.boolean(),
   behaviors: z
     .object({
       emoji: VersionedSchema,
       mirv: VersionedSchema,
-      alliance: VersionedSchema,
       warship: VersionedSchema,
       attack: VersionedSchema,
       nuke: VersionedSchema,

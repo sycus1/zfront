@@ -21,16 +21,8 @@
       "requiresPlayer": false
     },
     {
-      "key": "alliance",
-      "requiresPlayer": false
-    },
-    {
       "key": "help_defend",
       "requiresPlayer": true
-    },
-    {
-      "key": "trade_partners",
-      "requiresPlayer": false
     },
     {
       "key": "send_troops_to",
@@ -39,14 +31,6 @@
     {
       "key": "send_gold_to",
       "requiresPlayer": true
-    },
-    {
-      "key": "renew_alliance",
-      "requiresPlayer": false
-    },
-    {
-      "key": "break_alliance",
-      "requiresPlayer": false
     }
   ],
   "attack": [
@@ -69,10 +53,6 @@
     {
       "key": "build_warships",
       "requiresPlayer": false
-    },
-    {
-      "key": "betray",
-      "requiresPlayer": true
     },
     {
       "key": "build_sams",
@@ -105,16 +85,8 @@
       "requiresPlayer": true
     },
     {
-      "key": "ally",
-      "requiresPlayer": true
-    },
-    {
       "key": "build_posts",
       "requiresPlayer": false
-    },
-    {
-      "key": "make_ally",
-      "requiresPlayer": true
     }
   ],
   "greet": [
@@ -223,10 +195,6 @@
     {
       "key": "join_discord",
       "requiresPlayer": false
-    },
-    {
-      "key": "alliances_end_together",
-      "requiresPlayer": true
     }
   ],
   "warnings": [
@@ -245,22 +213,6 @@
     {
       "key": "stalemate",
       "requiresPlayer": false
-    },
-    {
-      "key": "has_allies",
-      "requiresPlayer": true
-    },
-    {
-      "key": "no_allies",
-      "requiresPlayer": true
-    },
-    {
-      "key": "betrayed",
-      "requiresPlayer": true
-    },
-    {
-      "key": "betrayed_me",
-      "requiresPlayer": true
     },
     {
       "key": "getting_big",
@@ -287,14 +239,6 @@
       "requiresPlayer": true
     },
     {
-      "key": "stop_trading",
-      "requiresPlayer": true
-    },
-    {
-      "key": "stop_trading_enemies",
-      "requiresPlayer": false
-    },
-    {
       "key": "disconnected",
       "requiresPlayer": true
     },
@@ -308,10 +252,6 @@
     },
     {
       "key": "nuke_threat",
-      "requiresPlayer": false
-    },
-    {
-      "key": "renew_or_nuke",
       "requiresPlayer": false
     }
   ]

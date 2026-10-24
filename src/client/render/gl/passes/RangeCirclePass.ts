@@ -1,7 +1,7 @@
 /**
  * RangeCirclePass — draws a translucent circle showing the effective
  * range of a structure during build-mode ghost preview. White by default,
- * red when the ghost flags a warning (e.g. nuking would break an alliance).
+ * red when the ghost flags a warning.
  *
  * Single quad with circle SDF in the fragment shader.
  * Active only when a ghost preview with rangeRadius > 0 is set.

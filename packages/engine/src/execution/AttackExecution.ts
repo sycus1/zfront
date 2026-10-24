@@ -3,7 +3,6 @@ import {
   Difficulty,
   MessageType,
   PlayerID,
-  PlayerType,
   Relation,
   TerrainType,
   TerraNullius,
@@ -96,27 +95,15 @@ export class AttackExecution implements Execution {
       return;
     }
 
-    // ALLIANCE CHECK — block attacks on friendly (ally or same team)
+    // FRIENDLY CHECK — block attacks on teammates
     if (this.target.isPlayer()) {
       const targetPlayer = this.target as Player;
       if (this._owner.isFriendly(targetPlayer)) {
         console.warn(
-          `${this._owner.displayName()} cannot attack ${targetPlayer.displayName()} because they are friendly (allied or same team)`,
+          `${this._owner.displayName()} cannot attack ${targetPlayer.displayName()} because they are on the same team`,
         );
         this.active = false;
         return;
-      }
-    }
-
-    if (this.target && this.target.isPlayer()) {
-      const targetPlayer = this.target as Player;
-      if (
-        targetPlayer.type() !== PlayerType.Bot &&
-        this._owner.type() !== PlayerType.Bot
-      ) {
-        // Don't let bots embargo since they can't trade anyway.
-        targetPlayer.addEmbargo(this._owner, true);
-        this.rejectIncomingAllianceRequests(targetPlayer);
       }
     }
 
@@ -300,7 +287,7 @@ export class AttackExecution implements Execution {
     }
 
     if (targetPlayer && this._owner.isFriendly(targetPlayer)) {
-      // In this case a new alliance was created AFTER the attack started.
+      // The target became friendly after the attack started.
       this.retreat();
       return;
     }
@@ -391,7 +378,6 @@ export class AttackExecution implements Execution {
               type: defender.type(),
               numTiles: defender.numTilesOwned(),
               troops: defender.troops(),
-              isTraitor: defender.isTraitor(),
               isDisconnectedTeammate:
                 defender.isDisconnected() && this._owner.isOnSameTeam(defender),
             },
@@ -401,15 +387,6 @@ export class AttackExecution implements Execution {
         : null,
       borderSize,
     };
-  }
-
-  private rejectIncomingAllianceRequests(target: Player) {
-    const request = this._owner
-      .incomingAllianceRequests()
-      .find((ar) => ar.requestor() === target);
-    if (request !== undefined) {
-      request.reject();
-    }
   }
 
   private addNeighbors(tile: TileRef) {

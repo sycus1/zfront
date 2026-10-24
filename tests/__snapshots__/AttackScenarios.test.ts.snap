@@ -648,24 +648,6 @@ exports[`attack scenarios > plains small attacker (500 tiles) vs big defender (9
 }
 `;
 
-exports[`attack scenarios > plains traitor defender 1`] = `
-{
-  "attackerLossPerSecond": 2564,
-  "attackerLossPerTile": 40.16,
-  "attackerTiles": 5000,
-  "attackerTroopsLost": 10000,
-  "defenderEliminated": false,
-  "defenderLossPerSecond": 638.5,
-  "defenderLossPerTile": 10,
-  "defenderTiles": 5000,
-  "defenderTroopsLost": 2490,
-  "finished": true,
-  "ticks": 39,
-  "tilesConquered": 249,
-  "tilesPerSecond": 63.85,
-}
-`;
-
 exports[`attack scenarios > plains very dense defender (650k on 5k tiles, 130/tile, ~1 city over cap), stack 1.67x their army 1`] = `
 {
   "attackerLossPerSecond": 30840,

@@ -41,8 +41,6 @@ const NULLABLE_KEYS = [
   "spawnImmunityDuration",
   "goldMultiplier",
   "startingGold",
-  "disableAlliances",
-  "customAllianceDuration",
   "waterNukes",
 ] as const satisfies readonly (keyof GameConfig)[];
 

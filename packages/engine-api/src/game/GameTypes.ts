@@ -161,7 +161,6 @@ export interface PublicGameModifiers {
   isHardNations?: boolean;
   startingGold?: number;
   goldMultiplier?: number;
-  isAlliancesDisabled?: boolean;
   isPortsDisabled?: boolean;
   isNukesDisabled?: boolean;
   isSAMsDisabled?: boolean;
@@ -344,7 +343,6 @@ export interface PlayerActions {
   canAttack: boolean;
   buildableUnits: BuildableUnit[];
   canSendEmojiAllPlayers: boolean;
-  canEmbargoAll?: boolean;
   interaction?: PlayerInteraction;
 }
 
@@ -394,7 +392,6 @@ export const STRUCTURE_BULK_STEPS: readonly number[] = [5, 10];
 
 export interface PlayerProfile {
   relations: Record<number, Relation>;
-  alliances: number[];
 }
 
 export interface PlayerBorderTiles {
@@ -426,24 +423,12 @@ export interface HumanDisconnects {
   disconnectedAt: Record<ClientID, number>;
 }
 
-export interface AllianceInfo {
-  expiresAt: Tick;
-  inExtensionWindow: boolean;
-  myPlayerAgreedToExtend: boolean;
-  otherAgreedToExtend: boolean;
-  canExtend: boolean;
-}
-
 export interface PlayerInteraction {
   sharedBorder: boolean;
   canSendEmoji: boolean;
-  canSendAllianceRequest: boolean;
-  canBreakAlliance: boolean;
   canTarget: boolean;
   canDonateGold: boolean;
   canDonateTroops: boolean;
-  canEmbargo: boolean;
-  allianceInfo?: AllianceInfo;
 }
 
 export interface EmojiMessage {
@@ -467,22 +452,15 @@ export enum MessageType {
   SAM_HIT,
   CAPTURED_ENEMY_UNIT,
   UNIT_DESTROYED,
-  ALLIANCE_ACCEPTED,
-  ALLIANCE_REJECTED,
-  ALLIANCE_REQUEST,
-  ALLIANCE_BROKEN,
-  ALLIANCE_EXPIRED,
   DONATION_SENT,
   DONATION_RECEIVED,
   CHAT,
-  RENEW_ALLIANCE,
 }
 
 // Message categories used for filtering events in the EventsDisplay
 export enum MessageCategory {
   ATTACK = "ATTACK",
   NUKE = "NUKE",
-  ALLIANCE = "ALLIANCE",
   TRADE = "TRADE",
   CHAT = "CHAT",
 }
@@ -502,12 +480,6 @@ export const MESSAGE_TYPE_CATEGORIES: Record<MessageType, MessageCategory> = {
   [MessageType.SAM_HIT]: MessageCategory.ATTACK,
   [MessageType.CAPTURED_ENEMY_UNIT]: MessageCategory.ATTACK,
   [MessageType.UNIT_DESTROYED]: MessageCategory.ATTACK,
-  [MessageType.ALLIANCE_ACCEPTED]: MessageCategory.ALLIANCE,
-  [MessageType.ALLIANCE_REJECTED]: MessageCategory.ALLIANCE,
-  [MessageType.ALLIANCE_REQUEST]: MessageCategory.ALLIANCE,
-  [MessageType.ALLIANCE_BROKEN]: MessageCategory.ALLIANCE,
-  [MessageType.ALLIANCE_EXPIRED]: MessageCategory.ALLIANCE,
-  [MessageType.RENEW_ALLIANCE]: MessageCategory.ALLIANCE,
   [MessageType.DONATION_SENT]: MessageCategory.TRADE,
   [MessageType.DONATION_RECEIVED]: MessageCategory.TRADE,
   [MessageType.CHAT]: MessageCategory.CHAT,

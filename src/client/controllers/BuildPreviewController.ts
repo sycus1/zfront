@@ -15,10 +15,6 @@ import {
   Structures,
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
-import {
-  listNukeBreakAlliance,
-  wouldNukeBreakAlliance,
-} from "@openfront/engine-lib/execution/NukeAlliance";
 import { EventBus } from "@openfront/shared/EventBus";
 import { Controller } from "../Controller";
 import {
@@ -50,31 +46,19 @@ const T_BLOCKED_DST = 0.9999;
 
 /**
  * Whether a SAM belongs in the nuke trajectory preview's threat set.
- * Mirrors SAMLauncherExecution: a SAM ignores a nuke whose owner it's
- * friendly with (same team OR allied).
- * Teammates are excluded unconditionally — a strike can break an alliance
- * but never a team relationship, so a teammate's SAM never engages.
- * Allied SAMs are excluded unless the strike would betray that ally — the
- * alliance breaks at launch, so their SAMs will engage the nuke.
+ * Mirrors SAMLauncherExecution: a SAM ignores a nuke from a teammate.
  * (Own SAMs never threaten; the caller filters those out first.)
  */
 export function samThreatensNukePreview(
   samOwnerSmallId: number,
   teammateSmallIds: ReadonlySet<number>,
-  allySmallIds: ReadonlySet<number>,
-  betrayedSmallIds: ReadonlySet<number>,
 ): boolean {
-  if (teammateSmallIds.has(samOwnerSmallId)) return false;
-  return (
-    !allySmallIds.has(samOwnerSmallId) || betrayedSmallIds.has(samOwnerSmallId)
-  );
+  return !teammateSmallIds.has(samOwnerSmallId);
 }
 
 export class BuildPreviewController implements Controller {
   /** Current ghost (null when no build type is active). */
   private ghostUnit: { buildableUnit: BuildableUnit } | null = null;
-  private readonly connectedAllySmallIds: Set<number> = new Set();
-  private readonly usedSafetyAllies: Set<number> = new Set();
   private readonly mousePos = { x: 0, y: 0 };
   private lastGhostQueryAt: number = 0;
   private pendingConfirm: MouseUpEvent | null = null;
@@ -227,42 +211,13 @@ export class BuildPreviewController implements Controller {
       }
     }
 
-    // Check if targeting an ally (for nuke warning visual)
-    let targetingAlly = false;
-    const myPlayer = this.game.myPlayer();
-    const nukeType = this.ghostUnit.buildableUnit.type;
-    if (
-      tileRef &&
-      myPlayer &&
-      (nukeType === UnitType.AtomBomb || nukeType === UnitType.HydrogenBomb)
-    ) {
-      this.connectedAllySmallIds.clear();
-      const allies = myPlayer.allies();
-      for (let i = 0; i < allies.length; i++) {
-        const ally = allies[i];
-        if (!ally.isDisconnected()) {
-          this.connectedAllySmallIds.add(ally.smallID());
-        }
-      }
-
-      if (this.connectedAllySmallIds.size > 0) {
-        targetingAlly = wouldNukeBreakAlliance({
-          game: this.game,
-          targetTile: tileRef,
-          magnitude: this.game.config().nukeMagnitudes(nukeType),
-          allySmallIds: this.connectedAllySmallIds,
-          threshold: this.game.config().nukeAllianceBreakThreshold(),
-        });
-      }
-    }
-
     this.game
       ?.myPlayer()
       ?.buildables(tileRef, [this.ghostUnit?.buildableUnit.type])
       .then((buildables) => {
         if (!this.ghostUnit) {
           this.pendingConfirm = null;
-          this.emitGhostPreview(tileRef, targetingAlly, trajectoryTileRef);
+          this.emitGhostPreview(tileRef, trajectoryTileRef);
           return;
         }
 
@@ -275,7 +230,7 @@ export class BuildPreviewController implements Controller {
             canUpgrade: false,
           });
           this.pendingConfirm = null;
-          this.emitGhostPreview(tileRef, targetingAlly, trajectoryTileRef);
+          this.emitGhostPreview(tileRef, trajectoryTileRef);
           return;
         }
 
@@ -289,7 +244,7 @@ export class BuildPreviewController implements Controller {
           }
         }
 
-        this.emitGhostPreview(tileRef, targetingAlly, trajectoryTileRef);
+        this.emitGhostPreview(tileRef, trajectoryTileRef);
       });
   }
 
@@ -301,10 +256,9 @@ export class BuildPreviewController implements Controller {
    */
   private emitGhostPreview(
     tileRef: TileRef | undefined,
-    targetingAlly: boolean,
     trajectoryTileRef: TileRef | undefined,
   ): void {
-    const data = this.buildGhostPreviewData(tileRef, targetingAlly);
+    const data = this.buildGhostPreviewData(tileRef);
     if (data === null) {
       this.lastGhostData = null;
       this.view.updateGhostPreview(null);
@@ -369,39 +323,17 @@ export class BuildPreviewController implements Controller {
     const srcX = this.game.x(bestSilo.tile());
     const srcY = this.game.y(bestSilo.tile());
 
-    // Non-friendly SAMs threaten the trajectory; own + teammate + allied SAMs
-    // don't — except allies this strike would betray: the alliance breaks at
-    // launch (NukeExecution.maybeBreakAlliances), so their SAMs will intercept.
-    // Teammates have no such exception (a strike never breaks a team).
-    // listNukeBreakAlliance is the same function the sim uses there.
+    // Non-friendly SAMs threaten the trajectory; own + teammate SAMs don't.
     const teammateIds = new Set<number>();
     for (const p of this.game.players()) {
       if (myPlayer.isOnSameTeam(p)) teammateIds.add(p.smallID());
     }
-    const allyIds = new Set<number>();
-    for (const a of myPlayer.allies()) allyIds.add(a.smallID());
-    const betrayedIds: ReadonlySet<number> =
-      allyIds.size > 0
-        ? listNukeBreakAlliance({
-            game: this.game,
-            targetTile: tileRef,
-            magnitude: this.game.config().nukeMagnitudes(type),
-            threshold: this.game.config().nukeAllianceBreakThreshold(),
-          })
-        : new Set();
     const sams: SAMInfo[] = [];
     for (const s of this.game.units(UnitType.SAMLauncher)) {
       if (!s.isActive()) continue;
       const owner = s.owner();
       if (owner === myPlayer) continue;
-      if (
-        !samThreatensNukePreview(
-          owner.smallID(),
-          teammateIds,
-          allyIds,
-          betrayedIds,
-        )
-      ) {
+      if (!samThreatensNukePreview(owner.smallID(), teammateIds)) {
         continue;
       }
       const r = this.game.config().samRange(s.level());
@@ -429,7 +361,6 @@ export class BuildPreviewController implements Controller {
 
   private buildGhostPreviewData(
     tileRef: TileRef | undefined,
-    targetingAlly: boolean,
   ): GhostPreviewData | null {
     if (!this.ghostUnit) return null;
     if (tileRef === undefined) return null;
@@ -515,7 +446,7 @@ export class BuildPreviewController implements Controller {
       ownerID: myPlayer.smallID(),
       upgradeTargetTile,
       rangeRadius,
-      rangeWarning: targetingAlly,
+      rangeWarning: false,
     };
   }
 
@@ -561,10 +492,6 @@ export class BuildPreviewController implements Controller {
       const unitType = this.ghostUnit.buildableUnit.type;
       const targetTile = this.game.ref(tile.x, tile.y);
 
-      if (this.shouldBlockRecentAllyNuke(targetTile, unitType)) {
-        return;
-      }
-
       const isNuke = unitType === UnitType.AtomBomb;
       const rocketDirectionUp =
         unitType === UnitType.AtomBomb || unitType === UnitType.HydrogenBomb
@@ -584,63 +511,6 @@ export class BuildPreviewController implements Controller {
     } else {
       this.removeGhostStructure();
     }
-  }
-
-  private shouldBlockRecentAllyNuke(
-    tile: TileRef,
-    unitType: UnitType,
-  ): boolean {
-    const duration = this.userSettings.nukeAllianceSafetyDuration();
-    if (
-      duration <= 0 ||
-      (unitType !== UnitType.AtomBomb &&
-        unitType !== UnitType.HydrogenBomb &&
-        unitType !== UnitType.MIRV)
-    ) {
-      return false;
-    }
-
-    const alliances = this.game.myPlayer()?.alliances();
-    if (!alliances?.length) return false;
-
-    const currentTick = this.game.ticks();
-    const freshAllies = new Map<number, number>();
-    for (const a of alliances) {
-      if (
-        !this.usedSafetyAllies.has(a.id) &&
-        currentTick - a.createdAt <= duration
-      ) {
-        freshAllies.set(this.game.player(a.other).smallID(), a.id);
-      }
-    }
-    if (freshAllies.size === 0) return false;
-
-    const broken =
-      unitType === UnitType.MIRV
-        ? [this.game.ownerID(tile)]
-        : listNukeBreakAlliance({
-            game: this.game,
-            targetTile: tile,
-            magnitude: this.game.config().nukeMagnitudes(unitType),
-            threshold: this.game.config().nukeAllianceBreakThreshold(),
-          });
-
-    let blocked = false;
-    for (const smallId of broken) {
-      const allianceId = freshAllies.get(smallId);
-      if (allianceId !== undefined) {
-        this.usedSafetyAllies.add(allianceId);
-        blocked = true;
-      }
-    }
-
-    if (blocked) {
-      this.view.triggerBlockedFlash(
-        this.game.x(tile) + 0.5,
-        this.game.y(tile) + 0.5,
-      );
-    }
-    return blocked;
   }
 
   private moveGhost(e: MouseMoveEvent) {

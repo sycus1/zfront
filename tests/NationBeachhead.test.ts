@@ -6,7 +6,6 @@ import {
 } from "@openfront/engine-api/game/GameTypes";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import { AttackExecution } from "@openfront/engine/execution/AttackExecution";
-import { NationAllianceBehavior } from "@openfront/engine/execution/nation/NationAllianceBehavior";
 import { NationAttackBehavior } from "@openfront/engine/execution/nation/NationAttackBehavior";
 import { NationEmojiBehavior } from "@openfront/engine/execution/nation/NationEmojiBehavior";
 import { NationWarshipBehavior } from "@openfront/engine/execution/nation/NationWarshipBehavior";
@@ -43,7 +42,6 @@ describe("Nation beachhead boats", () => {
       0, // triggerRatio
       0, // reserveRatio
       0, // expandRatio
-      new NationAllianceBehavior(random, game, nation, emoji),
       emoji,
       new NationWarshipBehavior(random, game, nation, emoji),
     );
@@ -198,7 +196,6 @@ describe("Nation beachheads on unowned land", () => {
       0,
       0,
       0,
-      new NationAllianceBehavior(random, game, nation, emoji),
       emoji,
       new NationWarshipBehavior(random, game, nation, emoji),
     );

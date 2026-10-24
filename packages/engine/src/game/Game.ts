@@ -1,6 +1,5 @@
 import { GameMap, TileRef } from "@openfront/engine-api/game/GameMap";
 import {
-  AllianceInfo,
   AllPlayers,
   BuildableUnit,
   Cell,
@@ -154,35 +153,6 @@ export interface Attack {
   clusteredPositions(): TileRef[];
 }
 
-export interface AllianceRequest {
-  accept(): void;
-  reject(): void;
-  requestor(): Player;
-  recipient(): Player;
-  createdAt(): Tick;
-  status(): "pending" | "accepted" | "rejected";
-}
-
-export interface Alliance {
-  requestor(): Player;
-  recipient(): Player;
-  createdAt(): Tick;
-  expiresAt(): Tick;
-  other(player: Player): Player;
-}
-
-export interface MutableAlliance extends Alliance {
-  expire(): void;
-  other(player: Player): Player;
-  bothAgreedToExtend(): boolean;
-  addExtensionRequest(player: Player): void;
-  id(): number;
-  extend(): void;
-  onlyOneAgreedToExtend(): boolean;
-
-  agreedToExtend(player: Player): boolean;
-}
-
 export function isUnit(unit: unknown): unit is Unit {
   return (
     unit &&
@@ -294,12 +264,6 @@ export interface Unit extends UnitLike {
   decreaseLevel(destroyer?: Player): void;
 }
 
-export interface Embargo {
-  createdAt: Tick;
-  isTemporary: boolean;
-  target: Player;
-}
-
 export interface DisconnectSnapshot {
   currentTick: number;
   teamTiles: number;
@@ -323,8 +287,6 @@ export interface Player extends PlayerLike {
 
   // State & Properties
   isAlive(): boolean;
-  isTraitor(): boolean;
-  markTraitor(): void;
   // Doomsday Clock (anti-stall): marked when below the rising territory bar.
   inDoomsdayClock(): boolean;
   /** Territory is actively rotting away (the final doomsday phase). */
@@ -426,22 +388,9 @@ export interface Player extends PlayerLike {
   updateRelation(other: Player, delta: number): void;
   decayRelations(): void;
   isOnSameTeam(other: Player): boolean;
-  // Either allied or on same team.
+  // On the same team.
   isFriendly(other: Player, treatAFKFriendly?: boolean): boolean;
   team(): Team | null;
-  incomingAllianceRequests(): AllianceRequest[];
-  outgoingAllianceRequests(): AllianceRequest[];
-  alliances(): MutableAlliance[];
-  expiredAlliances(): Alliance[];
-  allies(): Player[];
-  isAlliedWith(other: Player): boolean;
-  allianceWith(other: Player): MutableAlliance | null;
-  allianceInfo(other: Player): AllianceInfo | null;
-  canSendAllianceRequest(other: Player): boolean;
-  breakAlliance(alliance: Alliance): void;
-  removeAllAlliances(): void;
-  createAllianceRequest(recipient: Player): AllianceRequest | null;
-  betrayals(): number;
 
   // Targeting
   canTarget(other: Player): boolean;
@@ -463,18 +412,9 @@ export interface Player extends PlayerLike {
   donateGold(recipient: Player, gold: Gold): boolean;
   canDeleteUnit(): boolean;
   recordDeleteUnit(): void;
-  canEmbargoAll(): boolean;
-  recordEmbargoAll(): void;
 
-  // Embargo
-  hasEmbargoAgainst(other: Player): boolean;
-  // Excludes the temporary embargo every attacked player places on its attacker
-  hasManualEmbargoAgainst(other: Player): boolean;
+  // Trade
   tradingPartners(): Player[];
-  addEmbargo(other: Player, isTemporary: boolean): void;
-  getEmbargoes(): Embargo[];
-  stopEmbargo(other: Player): void;
-  endTemporaryEmbargo(other: Player): void;
   canTrade(other: Player): boolean;
 
   // Attacking.
@@ -542,9 +482,6 @@ export interface Game extends GameLike {
   teamTilesOwned(team: Team): number;
   totalLandTiles(): number;
   teamSpawnArea(team: Team): SpawnArea | undefined;
-
-  // Alliances
-  expireAlliance(alliance: Alliance): void;
 
   // Immunity timer
   isSpawnImmunityActive(): boolean;

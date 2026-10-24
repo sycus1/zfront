@@ -15,7 +15,6 @@ import type {
   SnapshotReader,
   SnapshotWriter,
 } from "../snapshot/SnapshotContext";
-import { AllianceExtensionExecution } from "./alliance/AllianceExtensionExecution";
 import { DeleteUnitExecution } from "./DeleteUnitExecution";
 import { TribeAttackBehavior } from "./TribeAttackBehavior";
 
@@ -73,28 +72,8 @@ export class TribeExecution implements Execution {
       return;
     }
 
-    this.acceptAllAllianceRequests();
     this.deleteNextStructure();
     this.maybeAttack();
-  }
-
-  private acceptAllAllianceRequests() {
-    // Accept all alliance requests
-    for (const req of this.tribe.incomingAllianceRequests()) {
-      req.accept();
-    }
-
-    // Accept all alliance extension requests
-    for (const alliance of this.tribe.alliances()) {
-      // Alliance expiration tracked by Events Panel, only human ally can click Request to Renew
-      // Skip if no expiration yet/ ally didn't request extension yet / tribe already agreed to extend
-      if (!alliance.onlyOneAgreedToExtend()) continue;
-
-      const human = alliance.other(this.tribe);
-      this.mg.addExecution(
-        new AllianceExtensionExecution(this.tribe, human.id()),
-      );
-    }
   }
 
   private deleteNextStructure() {
@@ -111,21 +90,6 @@ export class TribeExecution implements Execution {
     if (this.attackBehavior === null) {
       throw new Error("not initialized");
     }
-    const toAttack = this.attackBehavior.getNeighborTraitorToAttack(true);
-    if (toAttack !== null) {
-      const odds = this.tribe.isFriendly(toAttack) ? 6 : 3;
-      if (this.random.chance(odds)) {
-        // Check and break alliance before attacking if needed
-        const alliance = this.tribe.allianceWith(toAttack);
-
-        if (alliance !== null) {
-          this.tribe.breakAlliance(alliance);
-        }
-
-        if (this.attackBehavior.sendAttack(toAttack)) return;
-      }
-    }
-
     if (this.neighborsTerraNullius) {
       if (this.tribe.nearby().some((n) => !n.isPlayer())) {
         if (this.attackBehavior.sendAttack(this.mg.terraNullius())) return;

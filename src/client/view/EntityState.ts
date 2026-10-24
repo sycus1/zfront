@@ -6,11 +6,7 @@
  * (src/client/replay/codec) can use them in a worker and get the same records as
  * the live client.
  */
-import {
-  PlayerID,
-  PlayerType,
-  TrainType,
-} from "@openfront/engine-api/game/GameTypes";
+import { PlayerType, TrainType } from "@openfront/engine-api/game/GameTypes";
 import {
   ATTACK_DELTA_OUTGOING,
   PlayerUpdate,
@@ -152,9 +148,6 @@ export function playerStaticFromUpdate(pu: PlayerUpdate): PlayerStatic {
 }
 
 export function playerStateFromUpdate(pu: PlayerUpdate): PlayerState {
-  // embargoes: Set<PlayerID strings> on the wire, but the renderer stores
-  // smallIDs (numbers). Callers fill these in once they have the
-  // PlayerID → smallID lookup table (GameView.setEmbargoes()).
   return {
     smallID: pu.smallID!,
     isAlive: pu.isAlive!,
@@ -168,40 +161,17 @@ export function playerStateFromUpdate(pu: PlayerUpdate): PlayerState {
     piracyGold: Number(pu.piracyGold ?? 0n),
     goldEarned: Number(pu.goldEarned ?? 0n),
     troops: pu.troops!,
-    isTraitor: pu.isTraitor!,
-    traitorRemainingTicks: Math.max(0, pu.traitorRemainingTicks ?? 0),
     inDoomsdayClock: pu.inDoomsdayClock ?? false,
     isDecaying: pu.isDecaying ?? false,
     markedDoomsdayClockTick: pu.markedDoomsdayClockTick ?? -1,
-    betrayals: pu.betrayals!,
     hasSpawned: pu.hasSpawned!,
     spawnTile: pu.spawnTile,
     lastDeleteUnitTick: pu.lastDeleteUnitTick!,
-    allies: pu.allies!.slice(),
-    embargoes: [],
     targets: pu.targets!.slice(),
     outgoingAttacks: pu.outgoingAttacks!,
     incomingAttacks: pu.incomingAttacks!,
-    outgoingAllianceRequests: pu.outgoingAllianceRequests!.slice(),
-    alliances: pu.alliances!,
     outgoingEmojis: pu.outgoingEmojis!,
   };
-}
-
-/**
- * A player's embargoes as smallIDs (the renderer's form). The engine sends
- * PlayerIDs; ones that don't resolve yet are left out.
- */
-export function embargoSmallIDs(
-  embargoes: Iterable<PlayerID>,
-  smallIDOf: (id: PlayerID) => number | undefined,
-): number[] {
-  const out: number[] = [];
-  for (const id of embargoes) {
-    const smallID = smallIDOf(id);
-    if (smallID !== undefined) out.push(smallID);
-  }
-  return out;
 }
 
 /**

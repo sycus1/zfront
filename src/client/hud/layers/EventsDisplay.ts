@@ -1,8 +1,5 @@
 import { AllPlayers, MessageType } from "@openfront/engine-api/game/GameTypes";
 import {
-  AllianceExpiredUpdate,
-  AllianceRequestReplyUpdate,
-  BrokeAllianceUpdate,
   DisplayChatMessageUpdate,
   DisplayMessageUpdate,
   DonateEventUpdate,
@@ -17,7 +14,6 @@ import { customElement, query, state } from "lit/decorators.js";
 import { DirectiveResult } from "lit/directive.js";
 import { unsafeHTML, UnsafeHTMLDirective } from "lit/directives/unsafe-html.js";
 import { Controller } from "../../Controller";
-import { SendAllianceRequestIntentEvent } from "../../Transport";
 import { UserSettings } from "../../UserSettings";
 
 import { GoToPlayerEvent, GoToUnitEvent } from "../../TransformHandler";
@@ -49,10 +45,6 @@ const TIER_1_TYPES: ReadonlySet<MessageType> = new Set([
   MessageType.NUKE_DETONATED,
   MessageType.NAVAL_INVASION_INBOUND,
   MessageType.ATTACK_REQUEST,
-  MessageType.ALLIANCE_ACCEPTED,
-  MessageType.ALLIANCE_REJECTED,
-  MessageType.ALLIANCE_BROKEN,
-  MessageType.RENEW_ALLIANCE,
   MessageType.CONQUERED_PLAYER,
   MessageType.CHAT,
   MessageType.DONATION_RECEIVED,
@@ -125,48 +117,15 @@ export class EventsDisplay extends LitElement implements Controller {
   private updateMap = [
     [GameUpdateType.DisplayEvent, this.onDisplayMessageEvent.bind(this)],
     [GameUpdateType.DisplayChatEvent, this.onDisplayChatEvent.bind(this)],
-    [
-      GameUpdateType.AllianceRequestReply,
-      this.onAllianceRequestReplyEvent.bind(this),
-    ],
-    [GameUpdateType.BrokeAlliance, this.onBrokeAllianceEvent.bind(this)],
     [GameUpdateType.TargetPlayer, this.onTargetPlayerEvent.bind(this)],
     [GameUpdateType.Emoji, this.onEmojiMessageEvent.bind(this)],
     [GameUpdateType.UnitIncoming, this.onUnitIncomingEvent.bind(this)],
-    [GameUpdateType.AllianceExpired, this.onAllianceExpiredEvent.bind(this)],
     [GameUpdateType.DonateEvent, this.onDonateEvent.bind(this)],
   ] as const;
 
   constructor() {
     super();
     this.events = [];
-  }
-
-  init() {
-    this.eventBus.on(
-      SendAllianceRequestIntentEvent,
-      this.onAllianceRequestSentConfirmation.bind(this),
-    );
-  }
-
-  private onAllianceRequestSentConfirmation(e: SendAllianceRequestIntentEvent) {
-    const myPlayer = this.game.myPlayer();
-    if (!myPlayer || e.requestor.id() !== myPlayer.id()) {
-      return;
-    }
-    // If the recipient already has a pending alliance request to us, this
-    // action accepts that request instead of sending a new one, so don't
-    // show the "alliance request sent" confirmation.
-    if (e.recipient.isRequestingAllianceWith(e.requestor)) {
-      return;
-    }
-    this.addEvent({
-      description: translateText("events_display.alliance_request_sent", {
-        name: e.recipient.displayName(),
-      }),
-      type: MessageType.ALLIANCE_REQUEST,
-      createdAt: this.game.ticks(),
-    });
   }
 
   tick() {
@@ -365,111 +324,6 @@ export class EventsDisplay extends LitElement implements Controller {
     }
   }
 
-  onAllianceRequestReplyEvent(update: AllianceRequestReplyUpdate) {
-    const myPlayer = this.game.myPlayer();
-    if (!myPlayer || update.request.requestorID !== myPlayer.smallID()) {
-      return;
-    }
-
-    const recipient = this.game.playerBySmallID(
-      update.request.recipientID,
-    ) as PlayerView;
-    this.addEvent({
-      description: translateText("events_display.alliance_request_status", {
-        name: recipient.displayName(),
-        status: update.accepted
-          ? translateText("events_display.alliance_accepted")
-          : translateText("events_display.alliance_rejected"),
-      }),
-      type: update.accepted
-        ? MessageType.ALLIANCE_ACCEPTED
-        : MessageType.ALLIANCE_REJECTED,
-      highlight: true,
-      createdAt: this.game.ticks(),
-      focusID: update.request.recipientID,
-    });
-    this.eventBus.emit(
-      new PlaySoundEffectEvent(
-        update.accepted ? "alliance-accepted" : "alliance-declined",
-      ),
-    );
-  }
-
-  onBrokeAllianceEvent(update: BrokeAllianceUpdate) {
-    const myPlayer = this.game.myPlayer();
-    if (!myPlayer) return;
-
-    const betrayed = this.game.playerBySmallID(update.betrayedID) as PlayerView;
-    const traitor = this.game.playerBySmallID(update.traitorID) as PlayerView;
-
-    if (betrayed.isDisconnected()) return; // Do not send the message if betraying a disconnected player
-
-    if (!betrayed.isTraitor() && traitor === myPlayer) {
-      this.eventBus.emit(new PlaySoundEffectEvent("alliance-broken"));
-      const malusPercent = Math.round(
-        (1 - this.game.config().traitorDefenseDebuff()) * 100,
-      );
-
-      const traitorDuration = Math.floor(
-        this.game.config().traitorDuration() * 0.1,
-      );
-      const durationText =
-        traitorDuration === 1
-          ? translateText("events_display.duration_second")
-          : translateText("events_display.duration_seconds_plural", {
-              seconds: traitorDuration,
-            });
-
-      this.addEvent({
-        description: translateText("events_display.betrayal_description", {
-          name: betrayed.displayName(),
-          malusPercent: malusPercent,
-          durationText: durationText,
-        }),
-        type: MessageType.ALLIANCE_BROKEN,
-        highlight: true,
-        createdAt: this.game.ticks(),
-        focusID: update.betrayedID,
-      });
-    } else if (betrayed === myPlayer) {
-      this.eventBus.emit(new PlaySoundEffectEvent("alliance-broken"));
-      this.addEvent({
-        description: translateText("events_display.betrayed_you", {
-          name: traitor.displayName(),
-        }),
-        type: MessageType.ALLIANCE_BROKEN,
-        highlight: true,
-        createdAt: this.game.ticks(),
-        focusID: update.traitorID,
-      });
-    }
-  }
-
-  onAllianceExpiredEvent(update: AllianceExpiredUpdate) {
-    const myPlayer = this.game.myPlayer();
-    if (!myPlayer) return;
-
-    const otherID =
-      update.player1ID === myPlayer.smallID()
-        ? update.player2ID
-        : update.player2ID === myPlayer.smallID()
-          ? update.player1ID
-          : null;
-    if (otherID === null) return;
-    const other = this.game.playerBySmallID(otherID) as PlayerView;
-    if (!other || !myPlayer.isAlive() || !other.isAlive()) return;
-
-    this.addEvent({
-      description: translateText("events_display.alliance_expired", {
-        name: other.displayName(),
-      }),
-      type: MessageType.ALLIANCE_EXPIRED,
-      highlight: true,
-      createdAt: this.game.ticks(),
-      focusID: otherID,
-    });
-  }
-
   onDonateEvent(update: DonateEventUpdate) {
     const myPlayer = this.game.myPlayer();
     if (!myPlayer) return;
@@ -624,30 +478,6 @@ export class EventsDisplay extends LitElement implements Controller {
       : event.description;
   }
 
-  private renderBetrayalDebuffTimer() {
-    const myPlayer = this.game.myPlayer();
-    if (!myPlayer || !myPlayer.isTraitor()) {
-      return html``;
-    }
-
-    const remainingTicks = myPlayer.getTraitorRemainingTicks();
-    const remainingSeconds = Math.ceil(remainingTicks / 10);
-
-    if (remainingSeconds <= 0) {
-      return html``;
-    }
-
-    return html`
-      ${this.renderButton({
-        content: html`${translateText("events_display.betrayal_debuff_ends", {
-          time: remainingSeconds,
-        })}`,
-        className: "text-left text-yellow-400",
-        translate: false,
-      })}
-    `;
-  }
-
   private renderEventRow(event: GameEvent) {
     return html`
       <tr>
@@ -686,13 +516,6 @@ export class EventsDisplay extends LitElement implements Controller {
       return html``;
     }
 
-    const myPlayer = this.game.myPlayer();
-    const showBetrayalTimer = !!(
-      myPlayer &&
-      myPlayer.isTraitor() &&
-      myPlayer.getTraitorRemainingTicks() > 0
-    );
-
     const tier1Events: GameEvent[] = [];
     let tier2Events: GameEvent[] = [];
     for (const event of this.events) {
@@ -704,11 +527,7 @@ export class EventsDisplay extends LitElement implements Controller {
     tier2Events.sort((a, b) => a.createdAt - b.createdAt);
     tier2Events = tier2Events.slice(-4);
 
-    if (
-      tier1Events.length === 0 &&
-      tier2Events.length === 0 &&
-      !showBetrayalTimer
-    ) {
+    if (tier1Events.length === 0 && tier2Events.length === 0) {
       return html``;
     }
 
@@ -732,7 +551,7 @@ export class EventsDisplay extends LitElement implements Controller {
             : ""
         }
         ${
-          tier1Events.length > 0 || showBetrayalTimer
+          tier1Events.length > 0
             ? html`
                 <div
                   class="bg-gray-800 backdrop-blur-sm max-h-[30vh] lg:max-h-[40vh] overflow-y-auto rounded-lg shadow-lg border-l-4 border-red-500 important-events-container"
@@ -742,17 +561,6 @@ export class EventsDisplay extends LitElement implements Controller {
                   >
                     <tbody>
                       ${tier1Events.map((event) => this.renderEventRow(event))}
-                      ${
-                        showBetrayalTimer
-                          ? html`
-                              <tr>
-                                <td class="lg:px-2 lg:py-1 p-1 text-left">
-                                  ${this.renderBetrayalDebuffTimer()}
-                                </td>
-                              </tr>
-                            `
-                          : ""
-                      }
                     </tbody>
                   </table>
                 </div>

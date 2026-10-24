@@ -6,13 +6,7 @@ import {
   SnapshotType,
   Versioned,
 } from "@openfront/engine-lib/snapshot/SnapshotType";
-import type {
-  Attack,
-  Execution,
-  MutableAlliance,
-  Player,
-  Unit,
-} from "../game/Game";
+import type { Attack, Execution, Player, Unit } from "../game/Game";
 import type { GameImpl } from "../game/GameImpl";
 import type { Railroad } from "../game/Railroad";
 import type { Cluster, TrainStation } from "../game/TrainStation";
@@ -50,16 +44,13 @@ export class RefTable<T> {
  *
  * Nothing in a snapshot holds an object pointer. Players are their small id,
  * tiles are TileRefs, and every other shared object (units, attacks,
- * alliances, alliance requests, executions, train stations, railroads,
- * clusters) becomes an index into a table that the writer fills in
+ * executions, train stations, railroads, clusters) becomes an index into a table that the writer fills in
  * first-reference order. Dead objects that are still referenced land in the
  * tables like live ones.
  */
 export class SnapshotWriter {
   readonly units = new RefTable<Unit>();
   readonly attacks = new RefTable<Attack>();
-  readonly alliances = new RefTable<MutableAlliance>();
-  readonly allianceRequests = new RefTable<object>();
   readonly execs = new RefTable<Execution>();
   readonly stations = new RefTable<TrainStation>();
   readonly railroads = new RefTable<Railroad>();
@@ -89,14 +80,6 @@ export class SnapshotWriter {
 
   attack(a: Attack): number {
     return this.attacks.ref(a);
-  }
-
-  alliance(a: MutableAlliance): number {
-    return this.alliances.ref(a);
-  }
-
-  allianceRequest(r: object): number {
-    return this.allianceRequests.ref(r);
   }
 
   exec(e: Execution): number {
@@ -135,8 +118,6 @@ export class SnapshotReader {
     private readonly tables: {
       units: Unit[];
       attacks: Attack[];
-      alliances: MutableAlliance[];
-      allianceRequests: object[];
       execs: Execution[];
       stations: TrainStation[];
       railroads: Railroad[];
@@ -189,14 +170,6 @@ export class SnapshotReader {
 
   attack(i: number): Attack {
     return this.row(this.tables.attacks, i, "attack");
-  }
-
-  alliance(i: number): MutableAlliance {
-    return this.row(this.tables.alliances, i, "alliance");
-  }
-
-  allianceRequest<T = object>(i: number): T {
-    return this.row(this.tables.allianceRequests, i, "alliance request") as T;
   }
 
   exec<T extends Execution = Execution>(i: number): T {

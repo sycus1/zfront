@@ -1,8 +1,4 @@
 // Every entry is `<ClassName>Snapshot`, exported next to its class.
-import { AllianceExtensionExecutionSnapshot } from "../execution/alliance/AllianceExtensionExecution";
-import { AllianceRejectExecutionSnapshot } from "../execution/alliance/AllianceRejectExecution";
-import { AllianceRequestExecutionSnapshot } from "../execution/alliance/AllianceRequestExecution";
-import { BreakAllianceExecutionSnapshot } from "../execution/alliance/BreakAllianceExecution";
 import { AttackExecutionSnapshot } from "../execution/AttackExecution";
 import { BoatRetreatExecutionSnapshot } from "../execution/BoatRetreatExecution";
 import { CityExecutionSnapshot } from "../execution/CityExecution";
@@ -12,8 +8,6 @@ import { DeleteUnitExecutionSnapshot } from "../execution/DeleteUnitExecution";
 import { DonateGoldExecutionSnapshot } from "../execution/DonateGoldExecution";
 import { DonateTroopsExecutionSnapshot } from "../execution/DonateTroopExecution";
 import { DoomsdayClockExecutionSnapshot } from "../execution/DoomsdayClockExecution";
-import { EmbargoAllExecutionSnapshot } from "../execution/EmbargoAllExecution";
-import { EmbargoExecutionSnapshot } from "../execution/EmbargoExecution";
 import { EmojiExecutionSnapshot } from "../execution/EmojiExecution";
 import { FactoryExecutionSnapshot } from "../execution/FactoryExecution";
 import { MarkDisconnectedExecutionSnapshot } from "../execution/MarkDisconnectedExecution";
@@ -54,12 +48,8 @@ import type { ExecutionSnapshotType } from "./ExecutionSnapshot";
  * replaced it.
  */
 export const EXECUTION_SNAPSHOT_TYPES = [
-  AllianceExtensionExecutionSnapshot,
-  AllianceRejectExecutionSnapshot,
-  AllianceRequestExecutionSnapshot,
   AttackExecutionSnapshot,
   BoatRetreatExecutionSnapshot,
-  BreakAllianceExecutionSnapshot,
   CityExecutionSnapshot,
   ConstructionExecutionSnapshot,
   DefensePostExecutionSnapshot,
@@ -67,8 +57,6 @@ export const EXECUTION_SNAPSHOT_TYPES = [
   DonateGoldExecutionSnapshot,
   DonateTroopsExecutionSnapshot,
   DoomsdayClockExecutionSnapshot,
-  EmbargoAllExecutionSnapshot,
-  EmbargoExecutionSnapshot,
   EmojiExecutionSnapshot,
   FactoryExecutionSnapshot,
   HordeExecutionSnapshot,

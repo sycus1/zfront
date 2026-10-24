@@ -1,9 +1,8 @@
-import type { PlayerState, PlayerStatic } from "../../types";
+import type { PlayerStatic } from "../../types";
 
 const RELATION_SIZE = 1024;
 const RELATION_NEUTRAL = 0;
 const RELATION_FRIENDLY = 1;
-const RELATION_EMBARGO = 2;
 
 /** Reusable matrix buffer — one allocation, rewritten each frame. */
 const matrix = new Uint8Array(RELATION_SIZE * RELATION_SIZE);
@@ -14,19 +13,17 @@ export interface RelationMatrixResult {
 }
 
 /**
- * Build a relationship matrix from player alliance, embargo, and team data.
- * Indexed by `[ownerA * size + ownerB]` → 0=neutral, 1=friendly, 2=embargo.
- * Embargo overrides friendly (matching game priority).
+ * Build a relationship matrix from team data.
+ * Indexed by `[ownerA * size + ownerB]` → 0=neutral, 1=friendly.
  *
  * @param teams  Optional smallID→team map. Same-team players are marked friendly.
  */
 export function buildRelationMatrix(
-  players: ReadonlyMap<number, PlayerState>,
   teams?: ReadonlyMap<number, string>,
 ): RelationMatrixResult {
   matrix.fill(RELATION_NEUTRAL);
 
-  // Teammates — mark same-team pairs as friendly (before embargoes, which override)
+  // Teammates — mark same-team pairs as friendly
   if (teams && teams.size > 0) {
     const byTeam = new Map<string, number[]>();
     for (const [sid, team] of teams) {
@@ -45,32 +42,6 @@ export function buildRelationMatrix(
             b = members[j]!;
           matrix[a * RELATION_SIZE + b] = RELATION_FRIENDLY;
           matrix[b * RELATION_SIZE + a] = RELATION_FRIENDLY;
-        }
-      }
-    }
-  }
-
-  // Alliances
-  for (const ps of players.values()) {
-    const sid = ps.smallID;
-    if (sid <= 0 || sid >= RELATION_SIZE) continue;
-
-    if (ps.allies) {
-      for (const allyID of ps.allies) {
-        if (allyID > 0 && allyID < RELATION_SIZE) {
-          const ab = sid * RELATION_SIZE + allyID;
-          const ba = allyID * RELATION_SIZE + sid;
-          if (matrix[ab]! < RELATION_FRIENDLY) matrix[ab] = RELATION_FRIENDLY;
-          if (matrix[ba]! < RELATION_FRIENDLY) matrix[ba] = RELATION_FRIENDLY;
-        }
-      }
-    }
-
-    if (ps.embargoes) {
-      for (const eID of ps.embargoes) {
-        if (eID > 0 && eID < RELATION_SIZE) {
-          matrix[sid * RELATION_SIZE + eID] = RELATION_EMBARGO;
-          matrix[eID * RELATION_SIZE + sid] = RELATION_EMBARGO;
         }
       }
     }

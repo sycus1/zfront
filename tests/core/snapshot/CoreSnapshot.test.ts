@@ -5,7 +5,6 @@ import {
 } from "@openfront/engine-api/game/GameTypes";
 import { WinCheckExecution } from "@openfront/engine/execution/WinCheckExecution";
 import { Game } from "@openfront/engine/game/Game";
-import { GameImpl } from "@openfront/engine/game/GameImpl";
 import { snapshotGame } from "@openfront/engine/snapshot/GameSnapshot";
 import { setup } from "../../util/Setup";
 import { diffGraphs, diffSnapshots, roundTrip } from "../../util/Snapshot";
@@ -34,11 +33,7 @@ async function builtGame(): Promise<Game> {
   b.relinquish(game.ref(29, 14));
   a.addGold(12345n);
   b.addTroops(777);
-  a.addEmbargo(b, false);
   a.updateRelation(b, -50);
-  const g = game as GameImpl;
-  g.createAllianceRequest(a, b)?.accept();
-  g.createAllianceRequest(b, game.player("bot"));
   game.setFallout(game.ref(40, 40), true);
   game.addExecution(new WinCheckExecution());
   for (let i = 0; i < 5; i++) game.executeNextTick();

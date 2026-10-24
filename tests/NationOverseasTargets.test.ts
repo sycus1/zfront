@@ -7,7 +7,6 @@ import {
 } from "@openfront/engine-api/game/GameTypes";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import { ConstructionExecution } from "@openfront/engine/execution/ConstructionExecution";
-import { NationAllianceBehavior } from "@openfront/engine/execution/nation/NationAllianceBehavior";
 import { NationAttackBehavior } from "@openfront/engine/execution/nation/NationAttackBehavior";
 import { NationEmojiBehavior } from "@openfront/engine/execution/nation/NationEmojiBehavior";
 import { NationWarshipBehavior } from "@openfront/engine/execution/nation/NationWarshipBehavior";
@@ -67,7 +66,6 @@ function setupSea(
     0, // triggerRatio
     0, // reserveRatio
     0, // expandRatio
-    new NationAllianceBehavior(random, game, nation, emoji),
     emoji,
     new NationWarshipBehavior(random, game, nation, emoji),
   );

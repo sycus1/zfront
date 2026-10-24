@@ -32,7 +32,6 @@ const PLAYER_PLACEHOLDER = "[P1]";
 const CORE_PHRASES = new Set([
   "help.troops",
   "help.gold",
-  "help.alliance",
   "help.no_attack",
   "help.sorry_attack",
   "help.help_defend",
@@ -48,9 +47,7 @@ const CORE_PHRASES = new Set([
   "greet.oops",
   "misc.go",
   "misc.team_up",
-  "warnings.betrayed",
   "warnings.mirv_ready",
-  "warnings.renew_or_nuke",
 ]);
 
 // Phrases the panel shows under another category than their key's. Display

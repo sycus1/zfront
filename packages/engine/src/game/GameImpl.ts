@@ -74,18 +74,7 @@ import type {
   SnapshotReader,
   SnapshotWriter,
 } from "../snapshot/SnapshotContext";
-import { AllianceImpl } from "./AllianceImpl";
-import { AllianceRequestImpl } from "./AllianceRequestImpl";
-import {
-  Alliance,
-  AllianceRequest,
-  EngineUnitInfo,
-  Execution,
-  Game,
-  MutableAlliance,
-  Player,
-  Unit,
-} from "./Game";
+import { EngineUnitInfo, Execution, Game, Player, Unit } from "./Game";
 import { PlayerImpl } from "./PlayerImpl";
 import { RailNetwork } from "./RailNetwork";
 import {
@@ -134,8 +123,6 @@ export class GameImpl implements Game {
   private _height: number;
   _terraNullius: TerraNulliusImpl;
 
-  allianceRequests: AllianceRequestImpl[] = [];
-
   private nextPlayerID = 1;
   private _nextUnitID = 1;
 
@@ -154,9 +141,6 @@ export class GameImpl implements Game {
   private playerTeams: Team[] = [];
   private botTeam: Team = ColoredTeams.Bot;
   private _railNetwork: RailNetwork = createRailNetwork(this);
-
-  // Used to assign unique IDs to each new alliance
-  private nextAllianceID: number = 0;
 
   private _mirvsLaunched = 0;
   private shipStaggers = { tradeShip: 0, transportShip: 0 };
@@ -424,88 +408,6 @@ export class GameImpl implements Game {
     return this._nations;
   }
 
-  createAllianceRequest(
-    requestor: Player,
-    recipient: Player,
-  ): AllianceRequest | null {
-    if (requestor.isAlliedWith(recipient)) {
-      console.log("cannot request alliance, already allied");
-      return null;
-    }
-    if (
-      recipient
-        .incomingAllianceRequests()
-        .find((ar) => ar.requestor() === requestor) !== undefined
-    ) {
-      console.log(`duplicate alliance request from ${requestor.name()}`);
-      return null;
-    }
-    const correspondingReq = requestor
-      .incomingAllianceRequests()
-      .find((ar) => ar.requestor() === recipient);
-    if (correspondingReq !== undefined) {
-      console.log(`got corresponding alliance requests, accepting`);
-      correspondingReq.accept();
-      return null;
-    }
-    const ar = new AllianceRequestImpl(requestor, recipient, this._ticks, this);
-    this.allianceRequests.push(ar);
-    this.addUpdate(ar.toUpdate());
-    return ar;
-  }
-
-  acceptAllianceRequest(request: AllianceRequestImpl) {
-    this.allianceRequests = this.allianceRequests.filter(
-      (ar) => ar !== request,
-    );
-
-    const requestor = request.requestor();
-    const recipient = request.recipient();
-
-    const existing = requestor.allianceWith(recipient);
-    if (existing) {
-      throw new Error(
-        `cannot accept alliance request, already allied with ${recipient.name()}`,
-      );
-    }
-
-    // Create and register the new alliance
-    const alliance = new AllianceImpl(
-      this,
-      requestor as PlayerImpl,
-      recipient as PlayerImpl,
-      this._ticks,
-      this.nextAllianceID++,
-    );
-    (alliance.requestor() as PlayerImpl)._alliances.push(alliance);
-    (alliance.recipient() as PlayerImpl)._alliances.push(alliance);
-    this.stats().allianceFormed(requestor);
-    this.stats().allianceFormed(recipient);
-    (request.requestor() as PlayerImpl).pastOutgoingAllianceRequests.push(
-      request,
-    );
-
-    this.addUpdate({
-      type: GameUpdateType.AllianceRequestReply,
-      request: request.toUpdate(),
-      accepted: true,
-    });
-  }
-
-  rejectAllianceRequest(request: AllianceRequestImpl) {
-    this.allianceRequests = this.allianceRequests.filter(
-      (ar) => ar !== request,
-    );
-    (request.requestor() as PlayerImpl).pastOutgoingAllianceRequests.push(
-      request,
-    );
-    this.addUpdate({
-      type: GameUpdateType.AllianceRequestReply,
-      request: request.toUpdate(),
-      accepted: false,
-    });
-  }
-
   hasPlayer(id: PlayerID): boolean {
     return this._players.has(id);
   }
@@ -624,7 +526,6 @@ export class GameImpl implements Game {
           player,
           player.numTilesOwned(),
           player.troops(),
-          player.alliances().length,
         );
       }
       const update = player.toUpdate(
@@ -937,91 +838,6 @@ export class GameImpl implements Game {
     });
   }
 
-  public breakAlliance(breaker: Player, alliance: MutableAlliance) {
-    let other: Player;
-    if (alliance.requestor() === breaker) {
-      other = alliance.recipient();
-    } else {
-      other = alliance.requestor();
-    }
-    if (!breaker.isAlliedWith(other)) {
-      throw new Error(
-        `${breaker} not allied with ${other}, cannot break alliance`,
-      );
-    }
-    const duration = this._ticks - alliance.createdAt();
-    if (!other.isTraitor() && !other.isDisconnected()) {
-      breaker.markTraitor();
-      // Only a real betrayal counts as being betrayed. Gated on the same
-      // condition as markTraitor so that a teammate dropping their connection
-      // is not recorded as having stabbed anyone in the back.
-      this.stats().allianceEnded(other, duration, "brokenByOther");
-    } else {
-      this.stats().allianceEnded(other, duration, null);
-    }
-    // The breaker's side is already counted by betray(); this call is only
-    // here so their longest-held maximum still sees this alliance.
-    this.stats().allianceEnded(breaker, duration, null);
-
-    this.detachAlliance(alliance);
-
-    this.addUpdate({
-      type: GameUpdateType.BrokeAlliance,
-      traitorID: breaker.smallID(),
-      betrayedID: other.smallID(),
-      allianceID: alliance.id(),
-    });
-  }
-
-  public expireAlliance(alliance: Alliance) {
-    const p1Set = new Set(alliance.recipient().alliances());
-    const alliances = alliance
-      .requestor()
-      .alliances()
-      .filter((a) => p1Set.has(a));
-    if (alliances.length !== 1) {
-      throw new Error(
-        `cannot expire alliance: must have exactly one alliance, have ${alliances.length}`,
-      );
-    }
-    const expiring = alliances[0];
-    const duration = this._ticks - expiring.createdAt();
-    this.stats().allianceEnded(expiring.requestor(), duration, "expired");
-    this.stats().allianceEnded(expiring.recipient(), duration, "expired");
-    this.detachAlliance(expiring);
-    this.addUpdate({
-      type: GameUpdateType.AllianceExpired,
-      player1ID: alliance.requestor().smallID(),
-      player2ID: alliance.recipient().smallID(),
-    });
-  }
-
-  public removeAlliancesByPlayerSilently(player: Player): void {
-    // Snapshot — detachAlliance reassigns the player's _alliances as it goes.
-    const removed = [...(player as PlayerImpl)._alliances];
-    for (const alliance of removed) {
-      // Elimination is the fourth way an alliance ends, and in practice the
-      // commonest. Nobody betrayed and nothing expired, so no counter moves;
-      // the null counter is here purely so both sides' longest-held maximum
-      // still sees the alliance. Without this the survivor's longest held
-      // would silently read 0 from an alliance that ran the whole game, and
-      // recordAlliancesAtEnd cannot pick it up either — by then it is
-      // already detached.
-      const duration = this._ticks - alliance.createdAt();
-      this.stats().allianceEnded(alliance.requestor(), duration, null);
-      this.stats().allianceEnded(alliance.recipient(), duration, null);
-      this.detachAlliance(alliance);
-    }
-  }
-
-  /** Remove an alliance from both participants' per-player alliance lists. */
-  private detachAlliance(alliance: Alliance): void {
-    const requestor = alliance.requestor() as PlayerImpl;
-    const recipient = alliance.recipient() as PlayerImpl;
-    requestor._alliances = requestor._alliances.filter((a) => a !== alliance);
-    recipient._alliances = recipient._alliances.filter((a) => a !== alliance);
-  }
-
   public isSpawnImmunityActive(): boolean {
     return (
       this.inSpawnPhase() ||
@@ -1063,13 +879,6 @@ export class GameImpl implements Game {
     // OFM: snapshot final tiles for standings (bots skipped in recordFinalTiles).
     for (const player of this.players()) {
       this.stats().recordFinalTiles(player, player.numTilesOwned());
-      const standing = player.alliances();
-      let longest = 0;
-      for (const a of standing) {
-        const held = this._ticks - a.createdAt();
-        if (held > longest) longest = held;
-      }
-      this.stats().recordAlliancesAtEnd(player, standing.length, longest);
     }
     this.addUpdate({
       type: GameUpdateType.Win,
@@ -1511,10 +1320,8 @@ export class GameImpl implements Game {
       players: [...this._players.values()].map((p) => w.player(p)),
       execs,
       unInitExecs,
-      allianceRequests: this.allianceRequests.map((r) => w.allianceRequest(r)),
       nextPlayerID: this.nextPlayerID,
       nextUnitID: this._nextUnitID,
-      nextAllianceID: this.nextAllianceID,
       units: [...this._unitMap.values()].map((u) => w.unit(u)),
       planDrivenUnitIds: [...this.planDrivenUnitIds],
       unitGrid: this.unitGrid.snapshot((u) => w.unit(u)),
@@ -1560,12 +1367,8 @@ export class GameImpl implements Game {
     this.startTick = s.startTick;
     this.execs = s.execs.map((i) => r.exec(i));
     this.unInitExecs = s.unInitExecs.map((i) => r.exec(i));
-    this.allianceRequests = s.allianceRequests.map((i) =>
-      r.allianceRequest<AllianceRequestImpl>(i),
-    );
     this.nextPlayerID = s.nextPlayerID;
     this._nextUnitID = s.nextUnitID;
-    this.nextAllianceID = s.nextAllianceID;
     this._unitMap = new Map(
       s.units.map((i) => {
         const u = r.unit(i);
@@ -1699,10 +1502,8 @@ export const GameSnapshot = snapshotType({
     players: z.array(zPlayerRef()),
     execs: z.array(zRef()),
     unInitExecs: z.array(zRef()),
-    allianceRequests: z.array(zRef()),
     nextPlayerID: zInt(),
     nextUnitID: zInt(),
-    nextAllianceID: zInt(),
     units: z.array(zRef()),
     planDrivenUnitIds: z.array(zInt()),
     unitGrid: z.array(z.array(z.tuple([UnitTypeSchema, z.array(zRef())]))),

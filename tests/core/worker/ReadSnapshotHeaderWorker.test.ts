@@ -13,7 +13,7 @@ import { SCRIPTED_HUMANS } from "../../util/ScriptedGame";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(
   __dirname,
-  "../../testdata/snapshots/format-1.snapshot.gz",
+  "../../testdata/snapshots/format-2.snapshot.gz",
 );
 
 const self = Object.assign(new EventTarget(), { postMessage: vi.fn() });

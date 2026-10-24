@@ -92,20 +92,9 @@ export function applyGraphicsOverrides(
       settings.mapOverlay.friendlyTintB = b;
     });
   }
-  if (overrides.mapOverlay?.embargoTintColor !== undefined) {
-    applyHexColor(overrides.mapOverlay.embargoTintColor, (r, g, b) => {
-      settings.mapOverlay.embargoTintR = r;
-      settings.mapOverlay.embargoTintG = g;
-      settings.mapOverlay.embargoTintB = b;
-    });
-  }
   if (overrides.mapOverlay?.friendlyTintRatio !== undefined) {
     settings.mapOverlay.friendlyTintRatio =
       overrides.mapOverlay.friendlyTintRatio;
-  }
-  if (overrides.mapOverlay?.embargoTintRatio !== undefined) {
-    settings.mapOverlay.embargoTintRatio =
-      overrides.mapOverlay.embargoTintRatio;
   }
   if (overrides.altView?.fillAlpha !== undefined) {
     settings.altView.fillAlpha = overrides.altView.fillAlpha;

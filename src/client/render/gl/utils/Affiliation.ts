@@ -2,7 +2,7 @@
  * Affiliation palette — maps ownerID → affiliation color for alt-view.
  *
  * TEX_W×2 RGBA8 texture (TEX_W = PALETTE_SIZE = 4096):
- *   Row 0: border colors (4-state: self/ally/neutral/embargo)
+ *   Row 0: border colors (3-state: self/ally/neutral)
  *   Row 1: unit colors (3-state: self/ally/enemy)
  *
  * Colors are computed from the local player's perspective.
@@ -17,7 +17,6 @@ import { createTexture2D } from "./GlUtils";
 // Relationship constants (must match adapter.ts)
 const RELATION_NEUTRAL = 0;
 const RELATION_FRIENDLY = 1;
-const RELATION_EMBARGO = 2;
 
 const TEX_W = getPaletteSize(); // 4096 — covers full 12-bit smallID range
 const TEX_H = 2;
@@ -132,11 +131,6 @@ export class AffiliationPalette {
         d[bOff] = ALLY_R;
         d[bOff + 1] = ALLY_G;
         d[bOff + 2] = ALLY_B;
-        d[bOff + 3] = 255;
-      } else if (relation === RELATION_EMBARGO) {
-        d[bOff] = ENEMY_R;
-        d[bOff + 1] = ENEMY_G;
-        d[bOff + 2] = ENEMY_B;
         d[bOff + 3] = 255;
       } else {
         d[bOff] = NEUTRAL_R;

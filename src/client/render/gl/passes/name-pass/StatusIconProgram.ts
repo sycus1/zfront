@@ -51,7 +51,6 @@ export class StatusIconProgram {
     // Crown-cosmetic images; skins the first-place crown (slot 0).
     private crownAtlas: FlagAtlasArray,
     maxPlayers: number,
-    allianceFlashWindowTicks: number,
   ) {
     this.gl = gl;
     this.playerDataTex = playerDataTex;
@@ -100,10 +99,10 @@ export class StatusIconProgram {
       1 / sm.width,
       1 / sm.height,
     );
-    // Flash window matches the alliance renewal prompt (10 ticks/sec)
+    // The alliance-expiry flash is unused: zfront has no alliances.
     gl.uniform1f(
       gl.getUniformLocation(this.program, "uAllianceFlashWindowSec")!,
-      allianceFlashWindowTicks / 10,
+      0,
     );
 
     // Dynamic uniform locations

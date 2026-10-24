@@ -1,15 +1,11 @@
 import { TileRef } from "@openfront/engine-api/game/GameMap";
 import { EventBus } from "@openfront/shared/EventBus";
 import {
-  SendAllianceExtensionIntentEvent,
-  SendAllianceRequestIntentEvent,
   SendAttackIntentEvent,
   SendBoatAttackIntentEvent,
-  SendBreakAllianceIntentEvent,
   SendDeleteUnitIntentEvent,
   SendDonateGoldIntentEvent,
   SendDonateTroopsIntentEvent,
-  SendEmbargoIntentEvent,
   SendEmojiIntentEvent,
   SendSpawnIntentEvent,
   SendTargetPlayerIntentEvent,
@@ -52,18 +48,6 @@ export class PlayerActionHandler {
     this.eventBus.emit(new SendSpawnIntentEvent(tile));
   }
 
-  handleAllianceRequest(player: PlayerView, recipient: PlayerView) {
-    this.eventBus.emit(new SendAllianceRequestIntentEvent(player, recipient));
-  }
-
-  handleExtendAlliance(recipient: PlayerView) {
-    this.eventBus.emit(new SendAllianceExtensionIntentEvent(recipient));
-  }
-
-  handleBreakAlliance(player: PlayerView, recipient: PlayerView) {
-    this.eventBus.emit(new SendBreakAllianceIntentEvent(player, recipient));
-  }
-
   handleTargetPlayer(targetId: string | null) {
     if (!targetId) return;
 
@@ -80,10 +64,6 @@ export class PlayerActionHandler {
       return;
     }
     this.eventBus.emit(new SendDonateTroopsIntentEvent(recipient, amount));
-  }
-
-  handleEmbargo(recipient: PlayerView, action: "start" | "stop") {
-    this.eventBus.emit(new SendEmbargoIntentEvent(recipient, action));
   }
 
   handleEmoji(targetPlayer: PlayerView | "AllPlayers", emojiIndex: number) {

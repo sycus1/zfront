@@ -6,7 +6,6 @@ export {
   TrainType,
 } from "./Renderer";
 export type {
-  AllianceData,
   AttackData,
   AttackRingInput,
   ConquestFx,

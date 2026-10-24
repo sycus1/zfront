@@ -35,6 +35,13 @@ async function newGame() {
   third = game.player("third_id");
 }
 
+// Friendly players are teammates now; the tests here run in FFA, so they
+// stand that in directly.
+function befriend(a: Player, b: Player) {
+  vi.spyOn(a, "isFriendly").mockImplementation((o) => o === b);
+  vi.spyOn(b, "isFriendly").mockImplementation((o) => o === a);
+}
+
 type Shape = (x: number, y: number) => boolean;
 const rect =
   (x0: number, y0: number, x1: number, y1: number): Shape =>
@@ -629,17 +636,17 @@ describe("land a nuke severs from the main body is annexed", () => {
     expect(defenderTilesIn(mainBody)).toBe(mainBefore);
   });
 
-  test("a hole bordering only an ally and fallout stays cheap and attached", () => {
+  test("a hole bordering only a friendly player and fallout stays cheap and attached", () => {
     // The defender holds the whole map but the attacker's top-left corner,
     // so the main body's only outer border is far from the hole below.
     const corner = rect(0, 0, 49, 49);
     const piece = rect(10, 20, 25, 30);
     paint((x, y) => !corner(x, y) || piece(x, y));
     startClusterChecks();
-    // An ally's enclave in a hole near the bottom-right, with fallout beside
-    // it: the ring around the hole borders only the ally and fallout, so it
+    // A friendly player's enclave in a hole near the bottom-right, with fallout beside
+    // it: the ring around the hole borders only that player and fallout, so it
     // is a candidate on every pass although it belongs to the main body.
-    defender.createAllianceRequest(third)!.accept();
+    befriend(defender, third);
     for (let x = 165; x <= 175; x++) {
       for (let y = 150; y <= 160; y++) third.conquer(game.ref(x, y));
     }
@@ -770,9 +777,9 @@ describe("land a nuke severs from the main body is annexed", () => {
     );
   });
 
-  test("a cut-off piece next to only fallout and an ally is kept", () => {
+  test("a cut-off piece next to only fallout and a friendly player is kept", () => {
     paint(union(mainBody, arm));
-    defender.createAllianceRequest(attacker)!.accept();
+    befriend(defender, attacker);
     startClusterChecks();
     crater(100, 100, 12);
     const tipBefore = defenderTilesIn(armTip);

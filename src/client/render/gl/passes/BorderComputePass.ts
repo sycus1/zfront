@@ -157,7 +157,7 @@ export class BorderComputePass {
 
   /**
    * Upload a relationship matrix (R8UI, size × size).
-   * Values: 0 = neutral, 1 = friendly, 2 = embargo.
+   * Values: 0 = neutral, 1 = friendly.
    * Indexed by [ownerA, ownerB]. Size must be ≤ RELATION_TEX_SIZE.
    */
   updateRelations(data: Uint8Array, size: number): void {

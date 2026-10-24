@@ -12,7 +12,6 @@
  */
 
 import type {
-  AllianceData,
   AttackData,
   EmojiData,
   PlayerState,
@@ -242,14 +241,6 @@ function sameAttackIndex(prev: readonly AttackData[], a: AttackData): number {
   return -1;
 }
 
-const ALLIANCE = struct<AllianceData>({
-  id: U32,
-  other: STRING,
-  createdAt: U32,
-  expiresAt: U32,
-  hasExtensionRequest: BOOL,
-});
-
 const ALL_PLAYERS_RECIPIENT = 0xffff;
 const EMOJI_RECIPIENT: ValueCodec<number | "AllPlayers"> = {
   write: (w, v) => w.writeU16(v === "AllPlayers" ? ALL_PLAYERS_RECIPIENT : v),
@@ -370,22 +361,15 @@ export const PLAYER_FIELDS: readonly FieldDef<PlayerFields>[] = [
   field(["piracyGold", COUNTER]),
   field(["goldEarned", COUNTER]),
   field(["troops", COUNTER]),
-  field(["isTraitor", BOOL]),
-  field(["traitorRemainingTicks", U32]),
   field(["inDoomsdayClock", BOOL]),
   field(["isDecaying", BOOL]),
   field(["markedDoomsdayClockTick", I32]),
-  field(["betrayals", U16]),
   field(["hasSpawned", BOOL]),
   field(["spawnTile", maybe(U32, undefined)]),
   field(["lastDeleteUnitTick", I32]),
-  field(["allies", list(U16)]),
-  field(["embargoes", list(U16)]),
   field(["targets", list(U16)]),
   field(["outgoingAttacks", ATTACKS]),
   field(["incomingAttacks", ATTACKS]),
-  field(["outgoingAllianceRequests", list(STRING)]),
-  field(["alliances", list(ALLIANCE)]),
   field(["outgoingEmojis", list(EMOJI)]),
 ];
 

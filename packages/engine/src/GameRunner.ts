@@ -341,7 +341,6 @@ export class GameRunner {
       canAttack: tile !== null && player.canAttack(tile),
       buildableUnits: units === null ? [] : player.buildableUnits(tile, units),
       canSendEmojiAllPlayers: player.canSendEmoji(AllPlayers),
-      canEmbargoAll: player.canEmbargoAll(),
     } as PlayerActions;
 
     if (tile !== null && this.game.hasOwner(tile)) {
@@ -350,12 +349,8 @@ export class GameRunner {
         sharedBorder: player.sharesBorderWith(other),
         canSendEmoji: player.canSendEmoji(other),
         canTarget: player.canTarget(other),
-        canSendAllianceRequest: player.canSendAllianceRequest(other),
-        canBreakAlliance: player.isAlliedWith(other),
         canDonateGold: player.canDonateGold(other),
         canDonateTroops: player.canDonateTroops(other),
-        canEmbargo: !player.hasEmbargoAgainst(other),
-        allianceInfo: player.allianceInfo(other) ?? undefined,
       };
     }
 

@@ -1,6 +1,5 @@
 import { PlayerType } from "@openfront/engine-api/game/GameTypes";
 import {
-  AllianceView,
   AttackUpdate,
   GameUpdateType,
   PlayerUpdate,
@@ -13,7 +12,7 @@ import Benchmark from "benchmark";
  * worker thread.
  *
  * BEFORE compared the array/object fields (outgoingAttacks, incomingAttacks,
- * alliances, outgoingEmojis) with JSON.stringify — two allocations per field,
+ * outgoingEmojis) with JSON.stringify — two allocations per field,
  * run on every call even when nothing changed. AFTER uses typed structural
  * comparisons that early-exit and allocate nothing.
  */
@@ -25,16 +24,6 @@ function makeAttacks(n: number): AttackUpdate[] {
     troops: 1000 + i,
     id: `attack-${i}`,
     retreating: false,
-  }));
-}
-
-function makeAlliances(n: number): AllianceView[] {
-  return Array.from({ length: n }, (_, i) => ({
-    id: i,
-    other: `player-${i}`,
-    createdAt: 100 + i,
-    expiresAt: 1000 + i,
-    hasExtensionRequest: false,
   }));
 }
 
@@ -58,19 +47,12 @@ function makeRealisticUpdate(
     piracyGold: 900n,
     goldEarned: 987000n,
     troops: 50000,
-    allies: [2, 3, 4, 5, 6],
-    embargoes: new Set(["7", "8", "9"]),
-    isTraitor: false,
-    traitorRemainingTicks: 0,
     targets: [10, 11],
     outgoingEmojis: [],
     outgoingAttacks: makeAttacks(4),
     incomingAttacks: makeAttacks(3),
-    outgoingAllianceRequests: ["12", "13"],
-    alliances: makeAlliances(5),
     hasSpawned: true,
     spawnTile: 999,
-    betrayals: 0,
     lastDeleteUnitTick: 0,
     isLobbyCreator: false,
     ...overrides,
@@ -89,22 +71,6 @@ function numberArrayEqual(a?: number[], b?: number[]): boolean {
   if (!a || !b) return false;
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
-
-function stringArrayEqual(a?: string[], b?: string[]): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
-
-function stringSetEqual(a?: Set<string>, b?: Set<string>): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  if (a.size !== b.size) return false;
-  for (const v of a) if (!b.has(v)) return false;
   return true;
 }
 
@@ -136,29 +102,14 @@ function diffPlayerUpdateBefore(
   setIfDifferent("tilesOwned", prev.tilesOwned === next.tilesOwned);
   setIfDifferent("gold", prev.gold === next.gold);
   setIfDifferent("troops", prev.troops === next.troops);
-  setIfDifferent("isTraitor", prev.isTraitor === next.isTraitor);
-  setIfDifferent(
-    "traitorRemainingTicks",
-    prev.traitorRemainingTicks === next.traitorRemainingTicks,
-  );
   setIfDifferent("hasSpawned", prev.hasSpawned === next.hasSpawned);
   setIfDifferent("spawnTile", prev.spawnTile === next.spawnTile);
-  setIfDifferent("betrayals", prev.betrayals === next.betrayals);
   setIfDifferent(
     "lastDeleteUnitTick",
     prev.lastDeleteUnitTick === next.lastDeleteUnitTick,
   );
   setIfDifferent("isLobbyCreator", prev.isLobbyCreator === next.isLobbyCreator);
-  setIfDifferent("allies", numberArrayEqual(prev.allies, next.allies));
   setIfDifferent("targets", numberArrayEqual(prev.targets, next.targets));
-  setIfDifferent(
-    "outgoingAllianceRequests",
-    stringArrayEqual(
-      prev.outgoingAllianceRequests,
-      next.outgoingAllianceRequests,
-    ),
-  );
-  setIfDifferent("embargoes", stringSetEqual(prev.embargoes, next.embargoes));
   setIfDifferent(
     "outgoingEmojis",
     jsonEqual(prev.outgoingEmojis, next.outgoingEmojis),
@@ -171,7 +122,6 @@ function diffPlayerUpdateBefore(
     "incomingAttacks",
     jsonEqual(prev.incomingAttacks, next.incomingAttacks),
   );
-  setIfDifferent("alliances", jsonEqual(prev.alliances, next.alliances));
 
   return changed ? diff : null;
 }

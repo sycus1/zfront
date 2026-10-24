@@ -1,6 +1,5 @@
 import { PlayerInfo, PlayerType } from "@openfront/engine-api/game/GameTypes";
 import {
-  ALLIANCE_INDEX_PEAK_CONCURRENT,
   PlayerStats,
   TILE_INDEX_DRAWDOWN_PEAK,
   TILE_INDEX_DRAWDOWN_TROUGH,
@@ -33,8 +32,8 @@ describe("tick sampling", () => {
     player1 = game.player("player_1_id");
   });
 
-  const sample = (tiles: number, troops = 0, alliances = 0) =>
-    stats.recordTickSample(player1, tiles, troops, alliances);
+  const sample = (tiles: number, troops = 0) =>
+    stats.recordTickSample(player1, tiles, troops);
 
   /** stats.stats() indexes by clientID into a record whose values are
    * themselves optional, so `.client1` alone is `PlayerStats | undefined`. */
@@ -74,11 +73,10 @@ describe("tick sampling", () => {
     );
   });
 
-  it("records peak troops and peak concurrent alliances, not final", () => {
-    sample(10, 500, 3);
-    sample(10, 100, 1);
+  it("records peak troops, not final", () => {
+    sample(10, 500);
+    sample(10, 100);
     expect(client1Stats().peakTroops).toBe(500n);
-    expect(client1Stats().alliances![ALLIANCE_INDEX_PEAK_CONCURRENT]).toBe(3n);
   });
 
   it("still tracks drawdown after a leading zero-tile sample", () => {
@@ -125,13 +123,12 @@ describe("tick loop wiring", () => {
 
     game.executeNextTick();
     const stats1 = game.stats().stats().client1!;
-    // Argument order: tiles, troops, allianceCount land on the matching
+    // Argument order: tiles and troops land on the matching
     // fields rather than being silently transposed.
     expect(stats1.tiles![TILE_INDEX_PEAK]).toBe(
       BigInt(player1.numTilesOwned()),
     );
     expect(stats1.peakTroops).toBe(BigInt(player1.troops()));
-    expect(stats1.alliances![ALLIANCE_INDEX_PEAK_CONCURRENT]).toBe(0n);
 
     const ddPeakWhileAlive = stats1.tiles![TILE_INDEX_DRAWDOWN_PEAK];
     const ddTroughWhileAlive = stats1.tiles![TILE_INDEX_DRAWDOWN_TROUGH];

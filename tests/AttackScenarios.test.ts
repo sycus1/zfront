@@ -37,7 +37,6 @@ interface Side {
   rect: Rect;
   troops: number;
   type?: PlayerType;
-  traitor?: boolean;
   /** Defense posts at these coordinates (defender only). */
   defensePosts?: [number, number][];
 }
@@ -119,14 +118,12 @@ async function runScenario(s: Scenario): Promise<Metrics> {
   if (defenderSide !== null) {
     conquerRect(game, defender, defenderSide.rect);
     defender.setTroops(defenderSide.troops);
-    if (defenderSide.traitor) defender.markTraitor();
     for (const [x, y] of defenderSide.defensePosts ?? []) {
       defender.buildUnit(UnitType.DefensePost, game.ref(x, y), {});
     }
   }
   if (!attackerFirst) conquerRect(game, attacker, s.attacker.rect);
   attacker.setTroops(s.attacker.troops);
-  if (s.attacker.traitor) attacker.markTraitor();
 
   const targetID =
     defenderSide === null ? game.terraNullius().id() : defender.id();
@@ -340,12 +337,6 @@ const scenarios: Record<string, Scenario> = {
     attackTroops: 10_000,
   },
   // --- modifiers ------------------------------------------------------------
-  "plains traitor defender": {
-    map: "plains",
-    attacker: { rect: PLAINS_LEFT, troops: 50_000 },
-    defender: { rect: PLAINS_RIGHT, troops: 50_000, traitor: true },
-    attackTroops: 10_000,
-  },
   "plains defender with one defense post at the border": {
     map: "plains",
     attacker: { rect: PLAINS_LEFT, troops: 50_000 },

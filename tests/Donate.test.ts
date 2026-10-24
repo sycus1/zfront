@@ -1,11 +1,16 @@
-import { PlayerInfo, PlayerType } from "@openfront/engine-api/game/GameTypes";
+import {
+  ColoredTeams,
+  PlayerInfo,
+  PlayerType,
+} from "@openfront/engine-api/game/GameTypes";
 import { GameID } from "@openfront/engine-api/Schemas";
 import { DonateGoldExecution } from "@openfront/engine/execution/DonateGoldExecution";
 import { DonateTroopsExecution } from "@openfront/engine/execution/DonateTroopExecution";
 import { SpawnExecution } from "@openfront/engine/execution/SpawnExecution";
+import { GameImpl } from "@openfront/engine/game/GameImpl";
 import { setup } from "./util/Setup";
 
-describe("Donate troops to an ally", () => {
+describe("Donate troops to a teammate", () => {
   it("Troops should be successfully donated", async () => {
     const gameID: GameID = "game_id";
     const game = await setup("ocean_and_land", {
@@ -26,8 +31,8 @@ describe("Donate troops to an ally", () => {
       "recipient_id",
     );
 
-    game.addPlayer(donorInfo);
-    game.addPlayer(recipientInfo);
+    (game as GameImpl).addPlayer(donorInfo, ColoredTeams.Red);
+    (game as GameImpl).addPlayer(recipientInfo, ColoredTeams.Red);
 
     const donor = game.player(donorInfo.id);
     const recipient = game.player(recipientInfo.id);
@@ -40,15 +45,6 @@ describe("Donate troops to an ally", () => {
       new SpawnExecution(gameID, donorInfo, spawnA),
       new SpawnExecution(gameID, recipientInfo, spawnB),
     );
-
-    // donor sends alliance request to recipient
-    const allianceRequest = donor.createAllianceRequest(recipient);
-    expect(allianceRequest).not.toBeNull();
-
-    // recipient accepts the alliance request
-    if (allianceRequest) {
-      allianceRequest.accept();
-    }
 
     // Ensure donor can actually donate the requested amount
     donor.addTroops(6000);
@@ -65,7 +61,7 @@ describe("Donate troops to an ally", () => {
   });
 });
 
-describe("Donate gold to an ally", () => {
+describe("Donate gold to a teammate", () => {
   it("Gold should be successfully donated", async () => {
     const game = await setup("ocean_and_land", {
       infiniteGold: false,
@@ -86,8 +82,8 @@ describe("Donate gold to an ally", () => {
       "recipient_id",
     );
 
-    game.addPlayer(donorInfo);
-    game.addPlayer(recipientInfo);
+    (game as GameImpl).addPlayer(donorInfo, ColoredTeams.Red);
+    (game as GameImpl).addPlayer(recipientInfo, ColoredTeams.Red);
 
     const donor = game.player(donorInfo.id);
     const recipient = game.player(recipientInfo.id);
@@ -101,14 +97,6 @@ describe("Donate gold to an ally", () => {
       new SpawnExecution(gameID, recipientInfo, spawnB),
     );
 
-    // donor sends alliance request to recipient
-    const allianceRequest = donor.createAllianceRequest(recipient);
-    expect(allianceRequest).not.toBeNull();
-
-    // recipient accepts the alliance request
-    if (allianceRequest) {
-      allianceRequest.accept();
-    }
     game.executeNextTick();
 
     // Ensure donor can actually donate the requested amount
@@ -133,15 +121,14 @@ describe("Donate gold to an ally", () => {
     });
     const dInfo = new PlayerInfo("d", PlayerType.Human, null, "d_id");
     const rInfo = new PlayerInfo("r", PlayerType.Human, null, "r_id");
-    game.addPlayer(dInfo);
-    game.addPlayer(rInfo);
+    (game as GameImpl).addPlayer(dInfo, ColoredTeams.Red);
+    (game as GameImpl).addPlayer(rInfo, ColoredTeams.Red);
     const donor = game.player(dInfo.id),
       recipient = game.player(rInfo.id);
     game.addExecution(
       new SpawnExecution("g", dInfo, game.ref(0, 10)),
       new SpawnExecution("g", rInfo, game.ref(0, 15)),
     );
-    donor.createAllianceRequest(recipient)?.accept();
     game.executeNextTick();
     const donation = new DonateGoldExecution(donor, rInfo.id, null);
     donor.addGold(9000n);
@@ -158,7 +145,7 @@ describe("Donate gold to an ally", () => {
   });
 });
 
-describe("Donate troops to a non ally", () => {
+describe("Donate troops to a non-teammate", () => {
   it("Troops should not be donated", async () => {
     const game = await setup("ocean_and_land", {
       infiniteTroops: false,
@@ -179,8 +166,8 @@ describe("Donate troops to a non ally", () => {
       "recipient_id",
     );
 
-    game.addPlayer(donorInfo);
-    game.addPlayer(recipientInfo);
+    (game as GameImpl).addPlayer(donorInfo, ColoredTeams.Red);
+    (game as GameImpl).addPlayer(recipientInfo, ColoredTeams.Blue);
 
     const donor = game.player(donorInfo.id);
     const recipient = game.player(recipientInfo.id);
@@ -194,28 +181,19 @@ describe("Donate troops to a non ally", () => {
       new SpawnExecution(gameID, recipientInfo, spawnB),
     );
 
-    // Donor sends alliance request to Recipient
-    const allianceRequest = donor.createAllianceRequest(recipient);
-    expect(allianceRequest).not.toBeNull();
-
-    // Donor rejects the Recipient
-    if (allianceRequest) {
-      allianceRequest.reject();
-    }
-
     const donorTroopsBefore = donor.troops();
     const recipientTroopsBefore = recipient.troops();
 
     game.addExecution(new DonateTroopsExecution(donor, recipientInfo.id, 5000));
     game.executeNextTick();
 
-    // Troops should not be donated since they are not allies
+    // Troops should not be donated since they are not teammates
     expect(donor.troops() >= donorTroopsBefore).toBe(true);
     expect(recipient.troops() >= recipientTroopsBefore).toBe(true);
   });
 });
 
-describe("Donate Gold to a non ally", () => {
+describe("Donate Gold to a non-teammate", () => {
   it("Gold should not be donated", async () => {
     const game = await setup("ocean_and_land", {
       infiniteGold: false,
@@ -236,8 +214,8 @@ describe("Donate Gold to a non ally", () => {
       "recipient_id",
     );
 
-    game.addPlayer(donorInfo);
-    game.addPlayer(recipientInfo);
+    (game as GameImpl).addPlayer(donorInfo, ColoredTeams.Red);
+    (game as GameImpl).addPlayer(recipientInfo, ColoredTeams.Blue);
 
     const donor = game.player(donorInfo.id);
     const recipient = game.player(recipientInfo.id);
@@ -251,22 +229,13 @@ describe("Donate Gold to a non ally", () => {
       new SpawnExecution(gameID, recipientInfo, spawnB),
     );
 
-    // Donor sends alliance request to Recipient
-    const allianceRequest = donor.createAllianceRequest(recipient);
-    expect(allianceRequest).not.toBeNull();
-
-    // Donor rejects the Recipient
-    if (allianceRequest) {
-      allianceRequest.reject();
-    }
-
     const donorGoldBefore = donor.gold();
     const recipientGoldBefore = donor.gold();
 
     game.addExecution(new DonateGoldExecution(donor, recipientInfo.id, 5000));
     game.executeNextTick();
 
-    // Gold should not be donated since they are not allies
+    // Gold should not be donated since they are not teammates
     expect(donor.gold() >= donorGoldBefore).toBe(true);
     expect(recipient.gold() >= recipientGoldBefore).toBe(true);
   });

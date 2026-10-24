@@ -75,15 +75,6 @@ export const TILE_INDEX_PEAK = 0;
 export const TILE_INDEX_DRAWDOWN_PEAK = 1;
 export const TILE_INDEX_DRAWDOWN_TROUGH = 2;
 
-// Alliances. BROKEN_BY_OTHER is the betrayed side; the breaker's side is
-// already counted by `betrayals`. LONGEST_HELD is in ticks.
-export const ALLIANCE_INDEX_FORMED = 0;
-export const ALLIANCE_INDEX_BROKEN_BY_OTHER = 1;
-export const ALLIANCE_INDEX_EXPIRED = 2;
-export const ALLIANCE_INDEX_HELD_TO_END = 3;
-export const ALLIANCE_INDEX_PEAK_CONCURRENT = 4;
-export const ALLIANCE_INDEX_LONGEST_HELD = 5;
-
 // Player types
 export const PLAYER_INDEX_HUMAN = 0;
 export const PLAYER_INDEX_NATION = 1;
@@ -167,7 +158,6 @@ export type AtLeastOneNumber = z.infer<typeof AtLeastOneNumberSchema>;
 export const PlayerStatsSchema = z
   .object({
     attacks: AtLeastOneNumberSchema.optional(),
-    betrayals: BigIntStringSchema.optional(),
     killedAt: BigIntStringSchema.optional(),
     // OFM live standings: the eliminator's clientID (null = eliminated by a
     // non-client, e.g. a bot/nation) and finishing place at elimination. Both
@@ -189,7 +179,6 @@ export const PlayerStatsSchema = z
     // in declaration order (zbin/zb.ts), so inserting above would silently
     // change the wire layout for every field after the insertion point.
     tiles: AtLeastOneNumberSchema.optional(),
-    alliances: AtLeastOneNumberSchema.optional(),
     peakTroops: BigIntStringSchema.optional(),
     donations: AtLeastOneNumberSchema.optional(),
     // Centre of the player's final spawn (a TileRef into the map as loaded,

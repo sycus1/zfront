@@ -153,11 +153,7 @@ export interface RenderSettings {
     highlightFillBrighten: number;
     highlightThicken: number;
     defensePostRange: number;
-    embargoTintRatio: number;
     friendlyTintRatio: number;
-    embargoTintR: number;
-    embargoTintG: number;
-    embargoTintB: number;
     friendlyTintR: number;
     friendlyTintG: number;
     friendlyTintB: number;
@@ -290,7 +286,7 @@ export interface RenderSettings {
     nameShadeBot: number;
     emojiRowOffset: number;
     statusRowOffset: number;
-    /** Dark outline radius (atlas texels) drawn behind the alliance icon; 0 = off. */
+    /** Dark outline radius (atlas texels) drawn behind status icons; 0 = off. */
     statusOutlineWidth: number;
     /** Alpha multiplier applied to a name while the cursor is over it. */
     hoverFadeAlpha: number;

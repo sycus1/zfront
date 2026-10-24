@@ -5,18 +5,12 @@ import {
   PlayerType,
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
-import { AllianceExtensionExecution } from "@openfront/engine/execution/alliance/AllianceExtensionExecution";
-import { AllianceRejectExecution } from "@openfront/engine/execution/alliance/AllianceRejectExecution";
-import { AllianceRequestExecution } from "@openfront/engine/execution/alliance/AllianceRequestExecution";
-import { BreakAllianceExecution } from "@openfront/engine/execution/alliance/BreakAllianceExecution";
 import { BoatRetreatExecution } from "@openfront/engine/execution/BoatRetreatExecution";
 import { CityExecution } from "@openfront/engine/execution/CityExecution";
 import { DefensePostExecution } from "@openfront/engine/execution/DefensePostExecution";
 import { DeleteUnitExecution } from "@openfront/engine/execution/DeleteUnitExecution";
 import { DonateGoldExecution } from "@openfront/engine/execution/DonateGoldExecution";
 import { DonateTroopsExecution } from "@openfront/engine/execution/DonateTroopExecution";
-import { EmbargoAllExecution } from "@openfront/engine/execution/EmbargoAllExecution";
-import { EmbargoExecution } from "@openfront/engine/execution/EmbargoExecution";
 import { EmojiExecution } from "@openfront/engine/execution/EmojiExecution";
 import { FactoryExecution } from "@openfront/engine/execution/FactoryExecution";
 import { MarkDisconnectedExecution } from "@openfront/engine/execution/MarkDisconnectedExecution";
@@ -147,16 +141,11 @@ describe("basic execution snapshots", () => {
 
     test("diplomacy executions: pending, initialized, finished", async () => {
       game.addExecution(
-        new AllianceRequestExecution(a, b.id()),
-        new AllianceRequestExecution(c, d.id()),
         new EmojiExecution(a, b.id(), 2),
         new EmojiExecution(c, AllPlayers, 3),
         new EmojiExecution(c, "nobody", 3),
         new QuickChatExecution(a, b.id(), "greet.hello", c.id()),
         new QuickChatExecution(b, a.id(), "greet.hello", undefined),
-        new EmbargoExecution(a, c.id(), "start"),
-        new EmbargoExecution(a, "nobody", "stop"),
-        new EmbargoAllExecution(b, "start"),
         new TargetPlayerExecution(c, d.id()),
         new TargetPlayerExecution(c, "nobody"),
         new MarkDisconnectedExecution(d, true),
@@ -173,41 +162,22 @@ describe("basic execution snapshots", () => {
       game.executeNextTick(); // init
       await expectSnapshotRoundTrip(game, MAP, 2);
 
-      // Bob accepts, Dave rejects, then donations inside the alliance,
-      // an extension and a break, all queued on both games.
+      // Donations queued mid-run on both games.
       await expectSnapshotRoundTrip(game, MAP, 30, (g, i) => {
-        const [ga, gb, gc, gd] = ["alice", "bob", "carol", "dave"].map((id) =>
-          g.player(id),
-        );
-        if (i === 0) {
-          g.addExecution(
-            new AllianceRequestExecution(gb, ga.id()),
-            new AllianceRejectExecution(gc.id(), gd),
-          );
-        }
+        const [ga, gb] = ["alice", "bob"].map((id) => g.player(id));
         if (i === 3) {
           g.addExecution(
             new DonateGoldExecution(ga, gb.id(), 5000),
             new DonateTroopsExecution(ga, gb.id(), null),
-            new AllianceExtensionExecution(ga, gb.id()),
-            new AllianceExtensionExecution(gb, ga.id()),
           );
-        }
-        if (i === 8) {
-          expect(ga.isAlliedWith(gb)).toBe(true);
-          expect(gc.isAlliedWith(gd)).toBe(false);
-          g.addExecution(new BreakAllianceExecution(ga, gb.id()));
         }
       });
 
       const ga = game.player("alice");
       const gb = game.player("bob");
-      expect(ga.isAlliedWith(gb)).toBe(false);
       expect(gb.relation(ga)).toBeDefined();
-      expect(ga.hasEmbargoAgainst(game.player("carol"))).toBe(true);
 
       // Retreat is still waiting out its cancel delay here.
-      game.addExecution(new BreakAllianceExecution(a, "nobody"));
       game.executeNextTick();
       await expectSnapshotRoundTrip(game, MAP, 10);
     });

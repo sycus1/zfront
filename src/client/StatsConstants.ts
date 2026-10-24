@@ -23,9 +23,6 @@ export const COLUMN_IDS = [
   "silos",
   "sams",
   "warships",
-  // Diplomacy.
-  "allies",
-  "betrayals",
 ] as const;
 
 export type ColumnId = (typeof COLUMN_IDS)[number];

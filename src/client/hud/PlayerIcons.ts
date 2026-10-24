@@ -1,16 +1,8 @@
 import { AllPlayers, Nukes } from "@openfront/engine-api/game/GameTypes";
 import { assetUrl } from "@openfront/shared/AssetUrls";
 import { GameView, PlayerView } from "../view";
-const allianceRequestBlackIcon = assetUrl(
-  "images/AllianceRequestBlackIcon.svg",
-);
-const allianceRequestWhiteIcon = assetUrl(
-  "images/AllianceRequestWhiteIcon.svg",
-);
 const crownIcon = assetUrl("images/CrownIcon.svg");
 const disconnectedIcon = assetUrl("images/DisconnectedIcon.svg");
-const embargoBlackIcon = assetUrl("images/EmbargoBlackIcon.svg");
-const embargoWhiteIcon = assetUrl("images/EmbargoWhiteIcon.svg");
 const nukeRedIcon = assetUrl("images/NukeIconRed.svg");
 const nukeWhiteIcon = assetUrl("images/NukeIconWhite.svg");
 const targetIcon = assetUrl("images/TargetIcon.svg");
@@ -19,10 +11,8 @@ const doomsdayClockIcon = assetUrl("images/DoomsdayClockSkull.svg");
 const DOOMSDAY_CLOCK_ICON_ID = "doomsday-clock" as const;
 const CROWN_ICON_ID = "crown" as const;
 const DISCONNECTED_ICON_ID = "disconnected" as const;
-const ALLIANCE_REQUEST_ICON_ID = "alliance-request" as const;
 const TARGET_ICON_ID = "target" as const;
 const EMOJI_ICON_ID = "emoji" as const;
-const EMBARGO_ICON_ID = "embargo" as const;
 const NUKE_ICON_ID = "nuke" as const;
 
 export const IMAGE_ICON_KIND = "image" as const;
@@ -44,7 +34,6 @@ interface PlayerIconParams {
   player: PlayerView;
   /** Player currently in first place, used for the crown icon */
   firstPlace: PlayerView | null;
-  darkMode?: boolean;
   transitiveTargets?: PlayerView[];
 }
 
@@ -59,10 +48,9 @@ export function getFirstPlacePlayer(game: GameView): PlayerView | null {
 export function getPlayerIcons(
   params: PlayerIconParams,
 ): PlayerIconDescriptor[] {
-  const { game, player, firstPlace, darkMode, transitiveTargets } = params;
+  const { game, player, firstPlace, transitiveTargets } = params;
 
   const myPlayer = game.myPlayer();
-  const isDarkMode = darkMode ?? false;
 
   const icons: PlayerIconDescriptor[] = [];
 
@@ -94,19 +82,6 @@ export function getPlayerIcons(
     });
   }
 
-  // Alliance request icon (theme dependent)
-  if (myPlayer !== null && player.isRequestingAllianceWith(myPlayer)) {
-    // TODO: default white icon to align with name-pass, make Graphics preset default/night pick the black/white version for name-pass and here?
-    const allianceRequestIcon = isDarkMode
-      ? allianceRequestBlackIcon
-      : allianceRequestWhiteIcon;
-    icons.push({
-      id: ALLIANCE_REQUEST_ICON_ID,
-      kind: IMAGE_ICON_KIND,
-      src: allianceRequestIcon,
-    });
-  }
-
   // Target icon (centered on the map, but regular in overlays)
   const targets = transitiveTargets ?? myPlayer?.transitiveTargets() ?? [];
   if (targets.includes(player)) {
@@ -130,17 +105,6 @@ export function getPlayerIcons(
       id: EMOJI_ICON_ID,
       kind: EMOJI_ICON_KIND,
       text: emoji.message,
-    });
-  }
-
-  // Embargo icon (theme dependent)
-  if (myPlayer?.hasEmbargo(player)) {
-    // TODO: default white icon to align with name-pass, make Graphics preset default/night pick the black/white version for name-pass and here?
-    const embargoIcon = isDarkMode ? embargoBlackIcon : embargoWhiteIcon;
-    icons.push({
-      id: EMBARGO_ICON_ID,
-      kind: IMAGE_ICON_KIND,
-      src: embargoIcon,
     });
   }
 

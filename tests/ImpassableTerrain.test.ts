@@ -126,7 +126,7 @@ describe("Impassable Terrain", () => {
       inner: 5,
       outer: 5,
     }));
-    (game.config() as TestConfig).nukeAllianceBreakThreshold = vi.fn(() => 999);
+    (game.config() as TestConfig).nukeAngerThreshold = vi.fn(() => 999);
     (game.config() as TestConfig).setDefaultNukeSpeed(50);
 
     player = game.player("player_id");

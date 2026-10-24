@@ -1,6 +1,5 @@
 import { AllPlayersStats } from "@openfront/engine-api/Schemas";
 import {
-  ALLIANCE_INDEX_LONGEST_HELD,
   ATTACK_INDEX_MAX_RECV,
   BOAT_INDEX_LOST,
   DONATION_INDEX_GOLD_RECV,
@@ -71,7 +70,7 @@ describe("StatsSchema", () => {
   test("null array elements coerce to 0n (LEFT JOIN rows with no stats)", () => {
     // Postgres SUM() over all-NULL rows returns NULL. These should parse as 0n.
     testPlayerSchema(
-      '{"attacks":[null,null,null],"betrayals":null,"gold":[null,null,null,null,null,null]}',
+      '{"attacks":[null,null,null],"gold":[null,null,null,null,null,null]}',
     );
   });
 });
@@ -100,7 +99,7 @@ describe("PlayerStatsLeafSchema", () => {
       wins: "0",
       losses: "1",
       total: "1",
-      stats: { attacks: [null, null, null], betrayals: null },
+      stats: { attacks: [null, null, null] },
     });
     expect(result.success).toBe(true);
   });
@@ -195,14 +194,12 @@ describe("PlayerStatsTreeSchema", () => {
 });
 
 describe("PlayerStats new fields", () => {
-  it("parses tiles, alliances and peakTroops", () => {
+  it("parses tiles and peakTroops", () => {
     const parsed = PlayerStatsSchema.parse({
       tiles: ["1000", "1000", "100"],
-      alliances: ["3", "1", "1", "1", "2", "540"],
       peakTroops: "250000",
     });
     expect(parsed?.tiles?.[TILE_INDEX_DRAWDOWN_TROUGH]).toBe(100n);
-    expect(parsed?.alliances?.[ALLIANCE_INDEX_LONGEST_HELD]).toBe(540n);
     expect(parsed?.peakTroops).toBe(250000n);
   });
 
@@ -263,7 +260,6 @@ describe("PlayerStats new fields", () => {
     const parsed = PlayerStatsSchema.parse({ attacks: ["1", "2", "3"] });
     expect(parsed?.spawnTile).toBeUndefined();
     expect(parsed?.tiles).toBeUndefined();
-    expect(parsed?.alliances).toBeUndefined();
     expect(parsed?.peakTroops).toBeUndefined();
     expect(parsed?.donations).toBeUndefined();
     expect(parsed?.attacks?.[ATTACK_INDEX_MAX_RECV]).toBeUndefined();

@@ -25,9 +25,7 @@ export class BorderStampPass {
   private uMapSize: WebGLUniformLocation;
   private uHighlightBrighten: WebGLUniformLocation;
   private uDefenseCheckerDarken: WebGLUniformLocation;
-  private uEmbargoTintRatio: WebGLUniformLocation;
   private uFriendlyTintRatio: WebGLUniformLocation;
-  private uEmbargoTint: WebGLUniformLocation;
   private uFriendlyTint: WebGLUniformLocation;
   private uAltView: WebGLUniformLocation;
 
@@ -75,15 +73,10 @@ export class BorderStampPass {
       this.program,
       "uDefenseCheckerDarken",
     )!;
-    this.uEmbargoTintRatio = gl.getUniformLocation(
-      this.program,
-      "uEmbargoTintRatio",
-    )!;
     this.uFriendlyTintRatio = gl.getUniformLocation(
       this.program,
       "uFriendlyTintRatio",
     )!;
-    this.uEmbargoTint = gl.getUniformLocation(this.program, "uEmbargoTint")!;
     this.uFriendlyTint = gl.getUniformLocation(this.program, "uFriendlyTint")!;
     this.uAltView = gl.getUniformLocation(this.program, "uAltView")!;
 
@@ -117,14 +110,7 @@ export class BorderStampPass {
     gl.uniform2f(this.uMapSize, this.mapW, this.mapH);
     gl.uniform1f(this.uHighlightBrighten, mo.highlightBrighten);
     gl.uniform1f(this.uDefenseCheckerDarken, mo.defenseCheckerDarken);
-    gl.uniform1f(this.uEmbargoTintRatio, mo.embargoTintRatio);
     gl.uniform1f(this.uFriendlyTintRatio, mo.friendlyTintRatio);
-    gl.uniform3f(
-      this.uEmbargoTint,
-      mo.embargoTintR,
-      mo.embargoTintG,
-      mo.embargoTintB,
-    );
     gl.uniform3f(
       this.uFriendlyTint,
       mo.friendlyTintR,

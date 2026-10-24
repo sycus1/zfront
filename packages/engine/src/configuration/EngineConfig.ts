@@ -30,7 +30,6 @@ export interface AttackLogicInput {
     type: PlayerType;
     numTiles: number;
     troops: number;
-    isTraitor: boolean;
     /** Defender is disconnected and on the attacker's team. */
     isDisconnectedTeammate: boolean;
   } | null;
@@ -123,10 +122,6 @@ function terrainAttackBase(terrain: TerrainType): {
  */
 export class EngineConfig extends Config {
   private engineUnitInfoCache = new Map<UnitType, EngineUnitInfo>();
-
-  traitorSpeedDebuff(): number {
-    return 0.8;
-  }
 
   teamLandShareWinThresholdTenths(): number {
     return 7;
@@ -237,7 +232,7 @@ export class EngineConfig extends Config {
   }
 
   trainGold(
-    rel: "self" | "team" | "ally" | "other",
+    rel: "self" | "team" | "other",
     citiesVisited: number,
     player: PlayerLike,
   ): Gold {
@@ -245,9 +240,6 @@ export class EngineConfig extends Config {
     citiesVisited = Math.max(0, citiesVisited - 9);
     let baseGold: number;
     switch (rel) {
-      case "ally":
-        baseGold = 35_000;
-        break;
       case "team":
       case "other":
         baseGold = 25_000;
@@ -465,9 +457,6 @@ export class EngineConfig extends Config {
   donateCooldown(): Tick {
     return 10 * 10;
   }
-  embargoAllCooldown(): Tick {
-    return 10 * 10;
-  }
   emojiMessageDuration(): Tick {
     return 5 * 10;
   }
@@ -490,12 +479,6 @@ export class EngineConfig extends Config {
   }
   targetCooldown(): Tick {
     return 15 * 10;
-  }
-  allianceRequestCooldown(): Tick {
-    return 30 * 10;
-  }
-  temporaryEmbargoDuration(): Tick {
-    return 300 * 10; // 5 minutes.
   }
   minDistanceBetweenPlayers(): number {
     return 30;
@@ -574,9 +557,6 @@ export class EngineConfig extends Config {
       LARGE_DEFENDER_DEPTH,
     );
 
-    const traitorLossMod = defender.isTraitor ? this.traitorDefenseDebuff() : 1;
-    const traitorCostMod = defender.isTraitor ? this.traitorSpeedDebuff() : 1;
-
     // Defender loses its average troops-per-tile.
     const defenderTroopLoss = defender.troops / defender.numTiles;
 
@@ -587,7 +567,6 @@ export class EngineConfig extends Config {
     const troopRatio = defender.troops / attackTroops;
     const attackerTroopLoss =
       mag *
-      traitorLossMod *
       within(troopRatio, CHEAPEST_TROOP_RATIO, 2) *
       (ATTACKER_LOSS_BASE * largeAttackerBonus * largeDefenderBonus +
         ATTACKER_LOSS_PER_DENSITY * defenderTroopLoss);
@@ -607,11 +586,7 @@ export class EngineConfig extends Config {
       attackerTroopLoss,
       defenderTroopLoss,
       tickFraction:
-        (speedCost *
-          tileCost *
-          largeAttackerSpeedBonus *
-          largeDefenderBonus *
-          traitorCostMod) /
+        (speedCost * tileCost * largeAttackerSpeedBonus * largeDefenderBonus) /
         input.borderSize,
     };
   }

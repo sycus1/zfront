@@ -18,13 +18,8 @@ import {
 } from "@openfront/engine-lib/snapshot/SnapshotType";
 import { z } from "zod";
 import { EngineConfig } from "../configuration/EngineConfig";
-import { AllianceImpl, AllianceSnapshot } from "../game/AllianceImpl";
-import {
-  AllianceRequestImpl,
-  AllianceRequestSnapshot,
-} from "../game/AllianceRequestImpl";
 import { AttackImpl, AttackSnapshot } from "../game/AttackImpl";
-import { Attack, Execution, Game, MutableAlliance, Unit } from "../game/Game";
+import { Attack, Execution, Game, Unit } from "../game/Game";
 import { GameImpl, GameSnapshot } from "../game/GameImpl";
 import { PlayerImpl, PlayerSnapshot } from "../game/PlayerImpl";
 import { Railroad, RailroadSnapshot } from "../game/Railroad";
@@ -52,7 +47,14 @@ export const SNAPSHOT_MAGIC = "OpenFrontGameSnapshot";
  * Version of the root layout below. Everything inside it carries its own
  * record version, so this only moves when the root itself changes.
  */
-export const SNAPSHOT_FORMAT_VERSION = 1;
+export const SNAPSHOT_FORMAT_VERSION = 2;
+
+/**
+ * Oldest root format this build reads. Format 1 predates zfront's removal of
+ * alliances and embargoes: its alliance tables and executions no longer exist,
+ * and no zfront release ever wrote it.
+ */
+export const MIN_SNAPSHOT_FORMAT_VERSION = 2;
 
 const ExecRecordSchema = z.object({
   t: z.string(),
@@ -74,8 +76,6 @@ const RootSchema = z.object({
   players: z.array(VersionedSchema),
   units: z.array(VersionedSchema),
   attacks: z.array(VersionedSchema),
-  alliances: z.array(VersionedSchema),
-  allianceRequests: z.array(VersionedSchema),
   stations: z.array(VersionedSchema),
   railroads: z.array(VersionedSchema),
   clusters: z.array(VersionedSchema),
@@ -123,8 +123,6 @@ export function snapshotGameData(game: Game, opts: SnapshotOptions = {}): Root {
 
   const units: Versioned[] = [];
   const attacks: Versioned[] = [];
-  const alliances: Versioned[] = [];
-  const allianceRequests: Versioned[] = [];
   const stations: Versioned[] = [];
   const railroads: Versioned[] = [];
   const clusters: Versioned[] = [];
@@ -163,15 +161,6 @@ export function snapshotGameData(game: Game, opts: SnapshotOptions = {}): Root {
     progressed ||= drain(w.attacks, attacks, (a) =>
       w.versioned(AttackSnapshot, (a as AttackImpl).snapshot(w)),
     );
-    progressed ||= drain(w.alliances, alliances, (a) =>
-      w.versioned(AllianceSnapshot, (a as AllianceImpl).snapshot(w)),
-    );
-    progressed ||= drain(w.allianceRequests, allianceRequests, (r) =>
-      w.versioned(
-        AllianceRequestSnapshot,
-        (r as AllianceRequestImpl).snapshot(w),
-      ),
-    );
     progressed ||= drain(w.stations, stations, (s) =>
       w.versioned(TrainStationSnapshot, s.snapshot(w)),
     );
@@ -200,8 +189,6 @@ export function snapshotGameData(game: Game, opts: SnapshotOptions = {}): Root {
     players,
     units,
     attacks,
-    alliances,
-    allianceRequests,
     stations,
     railroads,
     clusters,
@@ -227,6 +214,11 @@ function decodeRoot(bytes: Uint8Array): Root {
   if (typeof format !== "number" || format > SNAPSHOT_FORMAT_VERSION) {
     throw new SnapshotError(
       `snapshot format ${String(format)} is newer than this build supports (${SNAPSHOT_FORMAT_VERSION})`,
+    );
+  }
+  if (format < MIN_SNAPSHOT_FORMAT_VERSION) {
+    throw new SnapshotError(
+      `snapshot format ${format} is older than this build supports (${MIN_SNAPSHOT_FORMAT_VERSION})`,
     );
   }
   const root = RootSchema.safeParse(raw);
@@ -325,16 +317,6 @@ export function restoreGame(bytes: Uint8Array, deps: RestoreDeps): Game {
     AttackSnapshot,
     AttackImpl.prototype,
   );
-  const alliances = shells<unknown, AllianceImpl>(
-    root.alliances,
-    AllianceSnapshot,
-    AllianceImpl.prototype,
-  );
-  const requests = shells<unknown, AllianceRequestImpl>(
-    root.allianceRequests,
-    AllianceRequestSnapshot,
-    AllianceRequestImpl.prototype,
-  );
   const stations = shells<unknown, TrainStation>(
     root.stations,
     TrainStationSnapshot,
@@ -364,8 +346,6 @@ export function restoreGame(bytes: Uint8Array, deps: RestoreDeps): Game {
   const r = new SnapshotReader(game, {
     units: units.objs as Unit[],
     attacks: attacks.objs as Attack[],
-    alliances: alliances.objs as MutableAlliance[],
-    allianceRequests: requests.objs,
     execs,
     stations: stations.objs,
     railroads: railroads.objs,
@@ -384,8 +364,6 @@ export function restoreGame(bytes: Uint8Array, deps: RestoreDeps): Game {
   }) => t.objs.forEach((o, i) => o.restoreSnapshot(t.data[i] as never, r));
   fill(units);
   fill(attacks);
-  fill(alliances);
-  fill(requests);
   fill(stations);
   fill(railroads);
   fill(clusters);

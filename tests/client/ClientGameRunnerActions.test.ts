@@ -72,13 +72,11 @@ import {
   LobbyConfig,
 } from "../../src/client/ClientGameRunner";
 import {
-  DoRequestAllianceEvent,
   DoTargetPlayerEvent,
   MouseMoveEvent,
   MouseUpEvent,
 } from "../../src/client/InputHandler";
 import {
-  SendAllianceRequestIntentEvent,
   SendAttackIntentEvent,
   SendBoatAttackIntentEvent,
   SendSpawnIntentEvent,
@@ -310,21 +308,6 @@ describe("player actions from keybinds and panel buttons", () => {
     await flushPromises();
 
     expect(targets).toHaveLength(0);
-  });
-
-  it("requests an alliance with the panel's player", async () => {
-    const { eventBus, myPlayer } = setup({
-      actions: { interaction: { canSendAllianceRequest: true } },
-    });
-    const requests: SendAllianceRequestIntentEvent[] = [];
-    eventBus.on(SendAllianceRequestIntentEvent, (e) => requests.push(e));
-
-    eventBus.emit(new DoRequestAllianceEvent(PANEL_TILE));
-    await flushPromises();
-
-    expect(myPlayer.actions).toHaveBeenCalledWith(PANEL_TILE);
-    expect(requests).toHaveLength(1);
-    expect(requests[0].recipient).toBe(enemy);
   });
 
   it("drops a panel action once its tile has changed hands", async () => {

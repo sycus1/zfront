@@ -27,21 +27,14 @@ function makePlayerState(overrides: Partial<PlayerState> = {}): PlayerState {
     piracyGold: 0,
     goldEarned: 0,
     troops: 100,
-    isTraitor: false,
-    traitorRemainingTicks: 0,
     inDoomsdayClock: false,
     isDecaying: false,
     markedDoomsdayClockTick: -1,
-    betrayals: 0,
     hasSpawned: true,
     lastDeleteUnitTick: 0,
-    allies: [],
-    embargoes: [],
     targets: [],
     outgoingAttacks: [],
     incomingAttacks: [],
-    outgoingAllianceRequests: [],
-    alliances: [],
     outgoingEmojis: [],
     ...overrides,
   };
@@ -55,23 +48,23 @@ describe("diffPlayerUpdate", () => {
   });
 
   it("returns a diff with only changed primitives plus type+id", () => {
-    const prev = makePlayerUpdate({ betrayals: 0 });
-    const next = makePlayerUpdate({ betrayals: 1 });
+    const prev = makePlayerUpdate({ isDisconnected: false });
+    const next = makePlayerUpdate({ isDisconnected: true });
     const diff = diffPlayerUpdate(prev, next);
     expect(diff).not.toBeNull();
     expect(diff).toEqual({
       type: GameUpdateType.Player,
       id: "player-a",
-      betrayals: 1,
+      isDisconnected: true,
     });
   });
 
   it("includes every changed primitive in a single diff", () => {
-    const prev = makePlayerUpdate({ betrayals: 0, isTraitor: false });
-    const next = makePlayerUpdate({ betrayals: 1, isTraitor: true });
+    const prev = makePlayerUpdate({ isDisconnected: false, isDecaying: false });
+    const next = makePlayerUpdate({ isDisconnected: true, isDecaying: true });
     const diff = diffPlayerUpdate(prev, next)!;
-    expect(diff.betrayals).toBe(1);
-    expect(diff.isTraitor).toBe(true);
+    expect(diff.isDisconnected).toBe(true);
+    expect(diff.isDecaying).toBe(true);
     expect(diff.hasSpawned).toBeUndefined();
   });
 
@@ -151,37 +144,24 @@ describe("diffPlayerUpdate", () => {
     expect(diffPlayerUpdate(prev, next)).toBeNull();
   });
 
-  it("detects allies array additions", () => {
-    const prev = makePlayerUpdate({ allies: [2, 3] });
-    const next = makePlayerUpdate({ allies: [2, 3, 4] });
+  it("detects targets array additions", () => {
+    const prev = makePlayerUpdate({ targets: [2, 3] });
+    const next = makePlayerUpdate({ targets: [2, 3, 4] });
     const diff = diffPlayerUpdate(prev, next)!;
-    expect(diff.allies).toEqual([2, 3, 4]);
+    expect(diff.targets).toEqual([2, 3, 4]);
   });
 
-  it("ignores allies array when contents are equal (different identity)", () => {
-    const prev = makePlayerUpdate({ allies: [2, 3] });
-    const next = makePlayerUpdate({ allies: [2, 3] });
+  it("ignores targets array when contents are equal (different identity)", () => {
+    const prev = makePlayerUpdate({ targets: [2, 3] });
+    const next = makePlayerUpdate({ targets: [2, 3] });
     expect(diffPlayerUpdate(prev, next)).toBeNull();
   });
 
-  it("treats allies reorder as a change (order is significant)", () => {
-    const prev = makePlayerUpdate({ allies: [2, 3] });
-    const next = makePlayerUpdate({ allies: [3, 2] });
+  it("treats targets reorder as a change (order is significant)", () => {
+    const prev = makePlayerUpdate({ targets: [2, 3] });
+    const next = makePlayerUpdate({ targets: [3, 2] });
     const diff = diffPlayerUpdate(prev, next)!;
-    expect(diff.allies).toEqual([3, 2]);
-  });
-
-  it("detects embargo set membership changes", () => {
-    const prev = makePlayerUpdate({ embargoes: new Set(["x", "y"]) });
-    const next = makePlayerUpdate({ embargoes: new Set(["x", "y", "z"]) });
-    const diff = diffPlayerUpdate(prev, next)!;
-    expect(diff.embargoes).toEqual(new Set(["x", "y", "z"]));
-  });
-
-  it("ignores embargo set when membership is equal regardless of object identity", () => {
-    const prev = makePlayerUpdate({ embargoes: new Set(["x", "y"]) });
-    const next = makePlayerUpdate({ embargoes: new Set(["y", "x"]) });
-    expect(diffPlayerUpdate(prev, next)).toBeNull();
+    expect(diff.targets).toEqual([3, 2]);
   });
 
   it("detects outgoingAttacks membership/retreating changes", () => {
@@ -213,42 +193,25 @@ describe("diffPlayerUpdate", () => {
     expect(diffPlayerUpdate(prev, next)).toBeNull();
   });
 
-  it("detects alliance list changes", () => {
-    const prev = makePlayerUpdate({ alliances: [] });
-    const next = makePlayerUpdate({
-      alliances: [
-        {
-          id: 1,
-          other: "player-b",
-          createdAt: 10,
-          expiresAt: 110,
-          hasExtensionRequest: false,
-        },
-      ],
-    });
-    const diff = diffPlayerUpdate(prev, next)!;
-    expect(diff.alliances).toEqual(next.alliances);
-  });
-
   it("treats undefined→number transition as a change", () => {
-    const prev = makePlayerUpdate({ traitorRemainingTicks: undefined });
-    const next = makePlayerUpdate({ traitorRemainingTicks: 5 });
+    const prev = makePlayerUpdate({ spawnTile: undefined });
+    const next = makePlayerUpdate({ spawnTile: 5 });
     const diff = diffPlayerUpdate(prev, next)!;
-    expect(diff.traitorRemainingTicks).toBe(5);
+    expect(diff.spawnTile).toBe(5);
   });
 
   it("treats number→undefined transition as a change", () => {
-    const prev = makePlayerUpdate({ traitorRemainingTicks: 5 });
-    const next = makePlayerUpdate({ traitorRemainingTicks: undefined });
+    const prev = makePlayerUpdate({ spawnTile: 5 });
+    const next = makePlayerUpdate({ spawnTile: undefined });
     const diff = diffPlayerUpdate(prev, next);
     expect(diff).not.toBeNull();
-    expect("traitorRemainingTicks" in diff!).toBe(true);
-    expect(diff!.traitorRemainingTicks).toBeUndefined();
+    expect("spawnTile" in diff!).toBe(true);
+    expect(diff!.spawnTile).toBeUndefined();
   });
 
   it("always includes type and id on a non-null diff", () => {
-    const prev = makePlayerUpdate({ betrayals: 0 });
-    const next = makePlayerUpdate({ betrayals: 1 });
+    const prev = makePlayerUpdate({ isDisconnected: false });
+    const next = makePlayerUpdate({ isDisconnected: true });
     const diff = diffPlayerUpdate(prev, next)!;
     expect(diff.type).toBe(GameUpdateType.Player);
     expect(diff.id).toBe(next.id);
@@ -334,13 +297,8 @@ describe("applyStateUpdate", () => {
       gold: 500n,
       troops: 999,
       tilesOwned: 42,
-      allies: [7, 8],
       targets: [9],
-      outgoingAllianceRequests: ["player-b"],
       isAlive: false,
-      isTraitor: true,
-      traitorRemainingTicks: 3,
-      betrayals: 2,
       hasSpawned: true,
       lastDeleteUnitTick: 50,
     });
@@ -348,13 +306,8 @@ describe("applyStateUpdate", () => {
     expect(target.gold).toBe(500);
     expect(target.troops).toBe(999);
     expect(target.tilesOwned).toBe(42);
-    expect(target.allies).toEqual([7, 8]);
     expect(target.targets).toEqual([9]);
-    expect(target.outgoingAllianceRequests).toEqual(["player-b"]);
     expect(target.isAlive).toBe(false);
-    expect(target.isTraitor).toBe(true);
-    expect(target.traitorRemainingTicks).toBe(3);
-    expect(target.betrayals).toBe(2);
     expect(target.lastDeleteUnitTick).toBe(50);
   });
 
@@ -391,16 +344,6 @@ describe("applyStateUpdate", () => {
     expect(typeof target.goldEarned).toBe("number");
   });
 
-  it("clamps negative traitorRemainingTicks to zero", () => {
-    const target = makePlayerState({ traitorRemainingTicks: 5 });
-    applyStateUpdate(target, {
-      type: GameUpdateType.Player,
-      id: "p",
-      traitorRemainingTicks: -10,
-    });
-    expect(target.traitorRemainingTicks).toBe(0);
-  });
-
   it("only mutates fields present on the partial update", () => {
     const target = makePlayerState({ gold: 100, troops: 50, tilesOwned: 7 });
     const partial: PlayerUpdate = {
@@ -416,27 +359,21 @@ describe("applyStateUpdate", () => {
 
   it("leaves array fields untouched when omitted", () => {
     const original = [1, 2, 3];
-    const target = makePlayerState({ allies: original });
+    const target = makePlayerState({ targets: original });
     applyStateUpdate(target, { type: GameUpdateType.Player, id: "p" });
-    expect(target.allies).toBe(original);
+    expect(target.targets).toBe(original);
   });
 
   it("detaches array fields by slicing (no shared reference with wire payload)", () => {
-    const wireAllies = [1, 2, 3];
     const wireTargets = [9];
-    const wireRequests = ["player-b"];
     const target = makePlayerState();
     applyStateUpdate(target, {
       type: GameUpdateType.Player,
       id: "p",
-      allies: wireAllies,
       targets: wireTargets,
-      outgoingAllianceRequests: wireRequests,
     });
-    expect(target.allies).toEqual(wireAllies);
-    expect(target.allies).not.toBe(wireAllies);
+    expect(target.targets).toEqual(wireTargets);
     expect(target.targets).not.toBe(wireTargets);
-    expect(target.outgoingAllianceRequests).not.toBe(wireRequests);
   });
 
   it("does not touch smallID even when present (identity field)", () => {
@@ -476,8 +413,8 @@ describe("diff + apply round-trip", () => {
   it("emitting full first + diff second reconstructs final state", () => {
     // tilesOwned/gold/troops round-trip via packedPlayerUpdates instead
     // (covered in tests/client/view/GameView.test.ts).
-    const v0 = makePlayerUpdate({ betrayals: 0, allies: [] });
-    const v1 = makePlayerUpdate({ betrayals: 2, allies: [2] });
+    const v0 = makePlayerUpdate({ isDisconnected: false, targets: [] });
+    const v1 = makePlayerUpdate({ isDisconnected: true, targets: [2] });
 
     // Initial state: receiver applies the full update.
     const target = makePlayerState();
@@ -488,8 +425,8 @@ describe("diff + apply round-trip", () => {
     expect(diff).not.toBeNull();
     applyStateUpdate(target, diff);
 
-    expect(target.betrayals).toBe(2);
-    expect(target.allies).toEqual([2]);
+    expect(target.isDisconnected).toBe(true);
+    expect(target.targets).toEqual([2]);
   });
 
   it("no-change tick produces null diff so receiver state is untouched", () => {

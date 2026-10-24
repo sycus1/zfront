@@ -189,7 +189,6 @@ export type SpecialModifierKey =
   | "startingGold5M"
   | "startingGold25M"
   | "goldMultiplier"
-  | "isAlliancesDisabled"
   | "isNukesDisabled"
   | "isSAMsDisabled"
   | "isPeaceTime"

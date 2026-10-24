@@ -12,7 +12,6 @@ import {
 } from "@openfront/engine-lib/configuration/Config";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import { MissileSiloExecution } from "@openfront/engine/execution/MissileSiloExecution";
-import { NationAllianceBehavior } from "@openfront/engine/execution/nation/NationAllianceBehavior";
 import { NationAttackBehavior } from "@openfront/engine/execution/nation/NationAttackBehavior";
 import { NationEmojiBehavior } from "@openfront/engine/execution/nation/NationEmojiBehavior";
 import { NationNukeBehavior } from "@openfront/engine/execution/nation/NationNukeBehavior";
@@ -59,12 +58,6 @@ function sendNukes(game: Game, nation: Player) {
     0.5,
     0.3,
     0.2,
-    new NationAllianceBehavior(
-      new PseudoRandom(1),
-      game,
-      nation,
-      emojiBehavior,
-    ),
     emojiBehavior,
     new NationWarshipBehavior(new PseudoRandom(1), game, nation, emojiBehavior),
   );
@@ -190,12 +183,9 @@ describe("NationNukeBehavior - maybeDestroyEnemySam", () => {
     }
   });
 
-  it.each([
-    [false, 2],
-    [true, 0],
-  ])(
-    "only overwhelms a SAM whose blast would hit a third player if not allied with them (allied: %s)",
-    async (allied, expectedBombs) => {
+  it.each([[2]])(
+    "overwhelms a SAM even when its blast would hit a third player (%s bombs)",
+    async (expectedBombs) => {
       const game = await setup(
         "big_plains",
         {
@@ -225,7 +215,6 @@ describe("NationNukeBehavior - maybeDestroyEnemySam", () => {
       // 20 tiles from the SAM, inside the atom bomb's 30-tile blast
       conquerRect(game, other, 170, 130, 185, 170);
       nation.updateRelation(human, -100);
-      if (allied) nation.createAllianceRequest(other)?.accept();
 
       sendNukes(game, nation);
 
@@ -234,7 +223,6 @@ describe("NationNukeBehavior - maybeDestroyEnemySam", () => {
       for (const bomb of atomBombs) {
         expect(bomb.targetTile()).toBe(samTile);
       }
-      expect(nation.isAlliedWith(other)).toBe(allied);
     },
   );
 

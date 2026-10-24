@@ -38,34 +38,12 @@ export class PauseGameIntentEvent implements GameEvent {
   constructor(public readonly paused: boolean) {}
 }
 
-export class SendAllianceRequestIntentEvent implements GameEvent {
-  constructor(
-    public readonly requestor: PlayerView,
-    public readonly recipient: PlayerView,
-  ) {}
-}
-
-export class SendBreakAllianceIntentEvent implements GameEvent {
-  constructor(
-    public readonly requestor: PlayerView,
-    public readonly recipient: PlayerView,
-  ) {}
-}
-
 export class SendUpgradeStructureIntentEvent implements GameEvent {
   constructor(
     public readonly unitId: number,
     public readonly unitType: UnitType,
     public readonly amount: number = 1,
   ) {}
-}
-
-export class SendAllianceRejectIntentEvent implements GameEvent {
-  constructor(public readonly requestor: PlayerView) {}
-}
-
-export class SendAllianceExtensionIntentEvent implements GameEvent {
-  constructor(public readonly recipient: PlayerView) {}
 }
 
 export class SendSpawnIntentEvent implements GameEvent {
@@ -141,17 +119,6 @@ export class SendQuickChatEvent implements GameEvent {
   ) {}
 }
 
-export class SendEmbargoIntentEvent implements GameEvent {
-  constructor(
-    public readonly target: PlayerView,
-    public readonly action: "start" | "stop",
-  ) {}
-}
-
-export class SendEmbargoAllIntentEvent implements GameEvent {
-  constructor(public readonly action: "start" | "stop") {}
-}
-
 export class SendDeleteUnitIntentEvent implements GameEvent {
   constructor(public readonly unitId: number) {}
 }
@@ -223,18 +190,6 @@ export class Transport {
     private lobbyConfig: LobbyConfig,
     private eventBus: EventBus,
   ) {
-    this.subscribe(SendAllianceRequestIntentEvent, (e) =>
-      this.onSendAllianceRequest(e),
-    );
-    this.subscribe(SendAllianceRejectIntentEvent, (e) =>
-      this.onAllianceRejectUIEvent(e),
-    );
-    this.subscribe(SendAllianceExtensionIntentEvent, (e) =>
-      this.onSendAllianceExtensionIntent(e),
-    );
-    this.subscribe(SendBreakAllianceIntentEvent, (e) =>
-      this.onBreakAllianceRequestUIEvent(e),
-    );
     this.subscribe(SendSpawnIntentEvent, (e) => this.onSendSpawnIntentEvent(e));
     this.subscribe(SendAttackIntentEvent, (e) => this.onSendAttackIntent(e));
     this.subscribe(SendUpgradeStructureIntentEvent, (e) =>
@@ -254,10 +209,6 @@ export class Transport {
       this.onSendDonateTroopIntent(e),
     );
     this.subscribe(SendQuickChatEvent, (e) => this.onSendQuickChatIntent(e));
-    this.subscribe(SendEmbargoIntentEvent, (e) => this.onSendEmbargoIntent(e));
-    this.subscribe(SendEmbargoAllIntentEvent, (e) =>
-      this.onSendEmbargoAllIntent(e),
-    );
     this.subscribe(BuildUnitIntentEvent, (e) => this.onBuildUnitIntent(e));
 
     this.subscribe(PauseGameIntentEvent, (e) => this.onPauseGameIntent(e));
@@ -351,36 +302,6 @@ export class Transport {
     this.localServer.endGame();
   }
 
-  private onSendAllianceRequest(event: SendAllianceRequestIntentEvent) {
-    this.sendIntent({
-      type: "allianceRequest",
-      recipient: event.recipient.id(),
-    });
-  }
-
-  private onAllianceRejectUIEvent(event: SendAllianceRejectIntentEvent) {
-    this.sendIntent({
-      type: "allianceReject",
-      requestor: event.requestor.id(),
-    });
-  }
-
-  private onBreakAllianceRequestUIEvent(event: SendBreakAllianceIntentEvent) {
-    this.sendIntent({
-      type: "breakAlliance",
-      recipient: event.recipient.id(),
-    });
-  }
-
-  private onSendAllianceExtensionIntent(
-    event: SendAllianceExtensionIntentEvent,
-  ) {
-    this.sendIntent({
-      type: "allianceExtension",
-      recipient: event.recipient.id(),
-    });
-  }
-
   private onSendSpawnIntentEvent(event: SendSpawnIntentEvent) {
     this.sendIntent({
       type: "spawn",
@@ -453,21 +374,6 @@ export class Transport {
       recipient: event.recipient.id(),
       quickChatKey: event.quickChatKey,
       target: event.target,
-    });
-  }
-
-  private onSendEmbargoIntent(event: SendEmbargoIntentEvent) {
-    this.sendIntent({
-      type: "embargo",
-      targetID: event.target.id(),
-      action: event.action,
-    });
-  }
-
-  private onSendEmbargoAllIntent(event: SendEmbargoAllIntentEvent) {
-    this.sendIntent({
-      type: "embargo_all",
-      action: event.action,
     });
   }
 

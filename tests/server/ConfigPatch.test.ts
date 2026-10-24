@@ -47,8 +47,6 @@ const NULLABLE: { [K in keyof GameConfig]?: NonNullable<GameConfig[K]> } = {
   spawnImmunityDuration: 50,
   goldMultiplier: 2,
   startingGold: 1000,
-  disableAlliances: true,
-  customAllianceDuration: 5,
   waterNukes: true,
 };
 

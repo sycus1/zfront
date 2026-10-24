@@ -22,7 +22,6 @@ import type { UserSettingModal } from "../UserSettingModal";
 import { UserSettings } from "../UserSettings";
 import { GameView } from "../view";
 import { FrameProfiler } from "./FrameProfiler";
-import { ActionableEvents } from "./layers/ActionableEvents";
 import { AlertFrame } from "./layers/AlertFrame";
 import { AttacksDisplay } from "./layers/AttacksDisplay";
 import { BuildMenu } from "./layers/BuildMenu";
@@ -116,16 +115,6 @@ export function createRenderer(
   eventsDisplay.eventBus = eventBus;
   eventsDisplay.game = game;
   eventsDisplay.uiState = uiState;
-
-  const actionableEvents = document.querySelector(
-    "actionable-events",
-  ) as ActionableEvents;
-  if (!(actionableEvents instanceof ActionableEvents)) {
-    console.error("actionable events not found");
-  }
-  actionableEvents.eventBus = eventBus;
-  actionableEvents.game = game;
-  actionableEvents.uiState = uiState;
 
   const attacksDisplay = document.querySelector(
     "attacks-display",
@@ -322,7 +311,6 @@ export function createRenderer(
     new AmbienceController(game, eventBus, transformHandler),
     ...(mapLayerController ? [mapLayerController] : []),
     eventsDisplay,
-    actionableEvents,
     attacksDisplay,
     chatDisplay,
     buildMenu,

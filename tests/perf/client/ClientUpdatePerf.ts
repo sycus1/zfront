@@ -270,10 +270,6 @@ function computeViewHash(gameView: GameView): string {
     fnv.mixU32(sid);
     fnv.mixString(JSON.stringify(status, jsonReplacer));
   }
-  for (const [sid, cluster] of frame.allianceClusters) {
-    fnv.mixU32(sid);
-    fnv.mixU32(cluster);
-  }
   for (const state of gameView.unitStates().values()) {
     fnv.mixString(JSON.stringify(state, jsonReplacer));
   }

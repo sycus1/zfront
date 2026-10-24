@@ -1,6 +1,6 @@
 /**
  * Coverage for the EventsDisplay update handlers: the tick() dispatch loop
- * over updateMap, and the alliance/target/unit handlers' myPlayer guards.
+ * over updateMap, and the target/unit handlers' myPlayer guards.
  */
 
 vi.mock("lit", () => ({
@@ -46,7 +46,6 @@ import { MessageType } from "@openfront/engine-api/game/GameTypes";
 import { GameUpdateType } from "@openfront/engine-api/game/GameUpdates";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EventsDisplay } from "../../../../src/client/hud/layers/EventsDisplay";
-import { PlaySoundEffectEvent } from "../../../../src/client/sound/Sounds";
 
 interface Ed {
   events: { description: string; type: MessageType; focusID?: number }[];
@@ -68,14 +67,12 @@ describe("EventsDisplay handlers", () => {
     displayName: () => "Friend",
     isAlive: () => true,
     isDisconnected: () => false,
-    isTraitor: () => false,
   };
   const stranger = {
     smallID: () => 3,
     displayName: () => "Stranger",
     isAlive: () => true,
     isDisconnected: () => false,
-    isTraitor: () => false,
   };
   const byID: Record<number, unknown> = { 1: myPlayer, 2: friend, 3: stranger };
 
@@ -97,10 +94,7 @@ describe("EventsDisplay handlers", () => {
       }),
       ticks: () => 0,
       inSpawnPhase: () => false,
-      config: () => ({
-        traitorDefenseDebuff: () => 0.5,
-        traitorDuration: () => 25, // ticks -> floor(2.5) = 2 seconds
-      }),
+      config: () => ({}),
       updatesSinceLastTick: () => null,
     };
     (ed as unknown as Ed).game = game;
@@ -192,84 +186,8 @@ describe("EventsDisplay handlers", () => {
     });
   });
 
-  describe("onAllianceRequestReplyEvent", () => {
-    const reply = (requestorID: number, accepted: boolean) => ({
-      type: GameUpdateType.AllianceRequestReply,
-      request: { requestorID, recipientID: 2, createdAt: 0 },
-      accepted,
-    });
-
-    it("shows the reply to my own request", () => {
-      ed.onAllianceRequestReplyEvent(reply(1, true) as never);
-      expect(events()).toHaveLength(1);
-      expect(events()[0].type).toBe(MessageType.ALLIANCE_ACCEPTED);
-      expect(events()[0].focusID).toBe(2);
-      expect(events()[0].description).toContain("Friend");
-    });
-
-    it("ignores replies to other players' requests", () => {
-      ed.onAllianceRequestReplyEvent(reply(3, true) as never);
-      expect(events()).toHaveLength(0);
-    });
-  });
-
-  describe("onBrokeAllianceEvent", () => {
-    it("shows the betrayal malus and duration when I am the traitor", () => {
-      ed.onBrokeAllianceEvent({
-        type: GameUpdateType.BrokeAlliance,
-        traitorID: 1,
-        betrayedID: 2,
-        allianceID: 0,
-      } as never);
-
-      expect(events()).toHaveLength(1);
-      expect(events()[0].type).toBe(MessageType.ALLIANCE_BROKEN);
-      // malus = (1 - 0.5) * 100; duration = floor(25 * 0.1) = 2 -> plural text
-      expect(events()[0].description).toContain('"malusPercent":50');
-      expect(events()[0].description).toContain(
-        "events_display.duration_seconds_plural",
-      );
-      expect(events()[0].description).toContain(String.raw`\"seconds\":2`);
-      expect(emit).toHaveBeenCalledWith(expect.any(PlaySoundEffectEvent));
-    });
-
-    it("shows nothing for a betrayal between other players", () => {
-      ed.onBrokeAllianceEvent({
-        type: GameUpdateType.BrokeAlliance,
-        traitorID: 3,
-        betrayedID: 2,
-        allianceID: 0,
-      } as never);
-      expect(events()).toHaveLength(0);
-    });
-  });
-
-  describe("onAllianceExpiredEvent", () => {
-    it("shows the expiry when I am one of the parties", () => {
-      ed.onAllianceExpiredEvent({
-        type: GameUpdateType.AllianceExpired,
-        player1ID: 1,
-        player2ID: 2,
-      } as never);
-
-      expect(events()).toHaveLength(1);
-      expect(events()[0].type).toBe(MessageType.ALLIANCE_EXPIRED);
-      expect(events()[0].focusID).toBe(2);
-      expect(events()[0].description).toContain("Friend");
-    });
-
-    it("ignores expiries between other players", () => {
-      ed.onAllianceExpiredEvent({
-        type: GameUpdateType.AllianceExpired,
-        player1ID: 2,
-        player2ID: 3,
-      } as never);
-      expect(events()).toHaveLength(0);
-    });
-  });
-
   describe("onTargetPlayerEvent", () => {
-    it("shows an ally's attack request", () => {
+    it("shows a teammate's attack request", () => {
       ed.onTargetPlayerEvent({
         type: GameUpdateType.TargetPlayer,
         playerID: 2,

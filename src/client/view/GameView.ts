@@ -25,7 +25,6 @@ import { TerrainMapData } from "@openfront/engine-lib/game/TerrainMapLoader";
 import { TerraNulliusImpl } from "@openfront/engine-lib/game/TerraNulliusImpl";
 import { UnitGrid } from "@openfront/engine-lib/game/UnitGrid";
 import { PlayerCosmetics, WirePlayer } from "@openfront/shared/WireSchemas";
-import { computeAllianceClusters } from "../render/frame/derive/AllianceClusters";
 import { extractAttackRings } from "../render/frame/derive/AttackRings";
 import { extractNukeTelegraphs } from "../render/frame/derive/NukeTelegraphs";
 import { computePlayerStatus } from "../render/frame/derive/PlayerStatus";
@@ -41,11 +40,7 @@ import { UserSettings } from "../UserSettings";
 import { resolveTeamClanTag } from "../Utils";
 import { WorkerClient } from "../WorkerClient";
 import type { CosmeticVisibility } from "./CosmeticVisibility";
-import {
-  applyPackedAttackTroops,
-  applyPackedPlayerStats,
-  embargoSmallIDs,
-} from "./EntityState";
+import { applyPackedAttackTroops, applyPackedPlayerStats } from "./EntityState";
 import {
   MotionPlanResolver,
   type GridMotionPlan,
@@ -114,10 +109,8 @@ export class GameView implements GameLike {
   // tick (PlayerUpdates are partial — field presence means "changed").
   /** Names: nameData record applied, or a player was added. */
   private _namesDirty = true;
-  /** Relation matrix: allies/embargoes changed, or a player was added. */
+  /** Relation matrix: a player was added. */
   private _relationsDirty = true;
-  /** Alliance clusters: allies changed, or a player was added. */
-  private _clustersDirty = true;
 
   private unitGrid: UnitGrid<UnitView>;
   private readonly motion = new MotionPlanResolver();
@@ -204,7 +197,6 @@ export class GameView implements GameLike {
       relationMatrix: new Uint8Array(0),
       relationSize: 0,
       relationsDirty: false,
-      allianceClusters: new Map(),
       nukeTelegraphs: [],
       attackRings: [],
       structuresDirty: false,
@@ -298,8 +290,7 @@ export class GameView implements GameLike {
       this._namesDirty = true;
     }
 
-    // Pass 1: ensure every player exists with up-to-date PlayerState. We need
-    // all smallIDs registered before pass 2 can translate embargo PlayerIDs.
+    // Pass 1: ensure every player exists with up-to-date PlayerState.
     // PlayerUpdate is now partial: only `id` is guaranteed; everything else
     // is present only when its value changed since the last emission.
     gu.updates[GameUpdateType.Player].forEach((pu) => {
@@ -318,16 +309,6 @@ export class GameView implements GameLike {
 
       if (pu.smallID !== undefined) {
         this.smallIDToID.set(pu.smallID, pu.id);
-      }
-
-      // Derived-data dirty tracking: field presence on a partial update
-      // means the field changed this tick.
-      if (pu.allies !== undefined) {
-        this._relationsDirty = true;
-        this._clustersDirty = true;
-      }
-      if (pu.embargoes !== undefined) {
-        this._relationsDirty = true;
       }
 
       if (existing !== undefined) {
@@ -361,22 +342,8 @@ export class GameView implements GameLike {
         }
         this._namesDirty = true;
         this._relationsDirty = true;
-        this._clustersDirty = true;
         this._teamClanTags = null;
       }
-    });
-
-    // Pass 2: translate engine embargoes (Set<PlayerID>) → renderer-format
-    // smallIDs. Only re-translate when embargoes changed (field present);
-    // unchanged sets stay at the previously-computed renderer-format list.
-    gu.updates[GameUpdateType.Player].forEach((pu) => {
-      if (pu.embargoes === undefined) return;
-      const player = this._players.get(pu.id);
-      if (player === undefined) return;
-      const smallIDs = embargoSmallIDs(pu.embargoes, (id) =>
-        this._players.get(id)?.smallID(),
-      );
-      player.setEmbargoSmallIDs(smallIDs);
     });
 
     // Packed per-player stats and attack troop counts, the per-tick churn
@@ -519,35 +486,28 @@ export class GameView implements GameLike {
 
     f.playerStatus = computePlayerStatus(this._playerStates, this._unitStates, {
       localPlayerSmallID: this._myPlayer?.smallID() ?? 0,
-      localPlayerID: this._myPlayer?.id() ?? "",
       tileState: this._map.tileStateBuffer(),
       tick: gu.tick,
-      allianceDuration: this._config.allianceDuration(),
       isTransitiveTarget: (sid) =>
         (this._markedPlayers?.has(sid) ?? false) ||
         (this._myPlayer?.hasTransitiveTarget(sid) ?? false),
       doomsdayClockWarnTicks:
         this._config.doomsdayClockConfig().warnSeconds * 10,
     });
-    // Relations + clusters depend only on allies/embargoes/teams, which
-    // change rarely (teams only when a player is added) — recompute only
-    // when one of those inputs arrived this tick. buildRelationMatrix
+    // Relations depend only on teams, which change only when a player is
+    // added — recompute only then. buildRelationMatrix
     // writes into a reusable module-level buffer, so skipping the call
     // leaves f.relationMatrix's contents intact. f.relationsDirty lets the
     // upload layer skip the GPU push (and the full-map border recompute it
     // triggers) on unchanged ticks.
     if (this._relationsDirty) {
       this._relationsDirty = false;
-      const rel = buildRelationMatrix(this._playerStates, this._teams);
+      const rel = buildRelationMatrix(this._teams);
       f.relationMatrix = rel.matrix;
       f.relationSize = rel.size;
       f.relationsDirty = true;
     } else {
       f.relationsDirty = false;
-    }
-    if (this._clustersDirty) {
-      this._clustersDirty = false;
-      f.allianceClusters = computeAllianceClusters(this._playerStates);
     }
     f.nukeTelegraphs = extractNukeTelegraphs(
       this._unitStates,

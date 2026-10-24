@@ -1,8 +1,4 @@
-import {
-  PlayerType,
-  Relation,
-  UnitType,
-} from "@openfront/engine-api/game/GameTypes";
+import { PlayerType, UnitType } from "@openfront/engine-api/game/GameTypes";
 import { renderNumber } from "@openfront/engine-lib/Format";
 import { EventBus } from "@openfront/shared/EventBus";
 import { LitElement, html, nothing } from "lit";
@@ -69,7 +65,6 @@ const TOUCH_TEXT_STEPS = new Set([
   "spawn",
   "attack_wilderness",
   "buy_city",
-  "propose_alliance",
   "buy_factory",
   "send_boat",
   "buy_port",
@@ -116,8 +111,6 @@ export class TutorialPanel extends LitElement implements Controller {
   private boatSeen = false;
   /** Attack ratio as of the previous tick, to spot the slider moving. */
   private lastAttackRatio: number | null = null;
-  /** Nation smallID → its attitude toward us, fetched during the ally step. */
-  private nationRelations = new Map<number, Relation>();
   /** smallIDs we share a border with; null until the first fetch lands. */
   private borderingIds: Set<number> | null = null;
   /**
@@ -192,11 +185,11 @@ export class TutorialPanel extends LitElement implements Controller {
 
   /**
    * Marks players with the target crosshair while a step points at the map
-   * (tribes to capture, a nation to ally with); as they die or are captured,
+   * (tribes to capture); as they die or are captured,
    * the next candidates take their place.
    */
   private syncMapMarkers(target: TutorialHighlight | null) {
-    if (target !== "tribes" && target !== "nation") {
+    if (target !== "tribes") {
       if (this.mapMarksActive) {
         this.mapMarksActive = false;
         this.game.setMarkedPlayers(null);
@@ -209,10 +202,7 @@ export class TutorialPanel extends LitElement implements Controller {
     // Keep the last set while ours is missing rather than flashing empty.
     const me = player.nameLocation();
     if (!me || (me.x === 0 && me.y === 0)) return;
-    const ids =
-      target === "tribes"
-        ? this.attackTargets(player, me)
-        : this.allianceTarget(me);
+    const ids = this.attackTargets(player, me);
     this.game.setMarkedPlayers(new Set(ids));
     this.mapMarksActive = true;
   }
@@ -264,23 +254,6 @@ export class TutorialPanel extends LitElement implements Controller {
       : bots.slice(0, NEARBY_TRIBE_MARK_COUNT);
   }
 
-  /** Ally step: the nearest nation that doesn't dislike us, if any. */
-  private allianceTarget(me: { x: number; y: number }): number[] {
-    const nations = this.nearest(PlayerType.Nation, me);
-    // Refresh from the pre-filter list: relations decay back toward
-    // neutral, so a nation that dipped hostile must stay refreshable or
-    // it would be blacklisted forever.
-    this.fetchNationRelations(nations.slice(0, 5));
-    // Unknown relations count as neutral until their profile fetch lands.
-    return nations
-      .filter(
-        (id) =>
-          (this.nationRelations.get(id) ?? Relation.Neutral) >=
-          Relation.Neutral,
-      )
-      .slice(0, 1);
-  }
-
   /**
    * Recompute (once a second, one fetch in flight) who we share a border
    * with and whether any of it is coast.
@@ -321,23 +294,6 @@ export class TutorialPanel extends LitElement implements Controller {
     return p.isPlayer() ? (p as PlayerView) : null;
   }
 
-  /** Refresh (throttled) how the given nations feel about us. */
-  private fetchNationRelations(ids: number[]) {
-    if (this.game.ticks() % 20 !== 0) return;
-    const me = this.game.myPlayer();
-    if (me === null) return;
-    for (const id of ids) {
-      const nation = this.game.playerBySmallID(id);
-      if (!nation.isPlayer()) continue;
-      (nation as PlayerView).profile().then((profile) => {
-        this.nationRelations.set(
-          id,
-          profile.relations[me.smallID()] ?? Relation.Neutral,
-        );
-      });
-    }
-  }
-
   private buildContext(player: PlayerView): TutorialContext {
     const attacks = player.outgoingAttacks();
     const attackRatio = this.uiState.attackRatio;
@@ -358,8 +314,6 @@ export class TutorialPanel extends LitElement implements Controller {
       nationsExist: this.game
         .playerViews()
         .some((p) => p.type() === PlayerType.Nation && p.isAlive()),
-      alliancesDisabled: this.game.config().disableAlliances(),
-      allied: player.alliances().length > 0,
       gold: player.gold(),
       cityCost: this.costs.get(UnitType.City) ?? null,
       cityDisabled: this.game.config().isUnitDisabled(UnitType.City),

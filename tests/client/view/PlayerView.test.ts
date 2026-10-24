@@ -68,36 +68,12 @@ describe("PlayerView accessors", () => {
     expect(makePlayerView({ data: { team: "red" } }).team()).toBe("red");
   });
 
-  it("isTraitor + getTraitorRemainingTicks forward, with min clamp at 0", () => {
-    const traitor = makePlayerView({
-      data: { isTraitor: true, traitorRemainingTicks: 5 },
-    });
-    expect(traitor.isTraitor()).toBe(true);
-    expect(traitor.getTraitorRemainingTicks()).toBe(5);
-
-    // Negative or missing → clamped to 0
-    const expired = makePlayerView({
-      data: { isTraitor: false, traitorRemainingTicks: -3 },
-    });
-    expect(expired.getTraitorRemainingTicks()).toBe(0);
-
-    const missing = makePlayerView({ data: { isTraitor: false } });
-    expect(missing.getTraitorRemainingTicks()).toBe(0);
-  });
-
   it("nameLocation() returns nameData passed at construction", () => {
     const nameData = makeNameViewData({ x: 12, y: 34, size: 20 });
     expect(makePlayerView({ nameData }).nameLocation()).toBe(nameData);
   });
 
-  it("outgoingEmojis / outgoingAttacks / incomingAttacks / alliances forward arrays", () => {
-    const alliance = {
-      id: 1,
-      other: { id: "ally", smallID: 2 },
-      createdAt: 0,
-      expiresAt: 100,
-      onlyOneAgreedToExtend: false,
-    } as unknown as ReturnType<PlayerView["alliances"]>[number];
+  it("outgoingEmojis / outgoingAttacks / incomingAttacks forward arrays", () => {
     const attack = {
       attackerID: 1,
       targetID: 0,
@@ -114,14 +90,12 @@ describe("PlayerView accessors", () => {
 
     const p = makePlayerView({
       data: {
-        alliances: [alliance],
         outgoingAttacks: [attack],
         incomingAttacks: [],
         outgoingEmojis: [emoji],
       },
     });
 
-    expect(p.alliances()).toEqual([alliance]);
     expect(p.outgoingAttacks()).toEqual([attack]);
     expect(p.incomingAttacks()).toEqual([]);
     expect(p.outgoingEmojis()).toEqual([emoji]);
@@ -153,22 +127,15 @@ describe("PlayerView relations", () => {
     aSmall: number,
     bSmall: number,
     opts: {
-      aAllies?: number[];
       aTeam?: string;
       bTeam?: string;
-      // Embargoes are renderer-format: stringified smallIDs of the OTHER player.
-      aEmbargoSmallIDs?: number[];
-      bEmbargoSmallIDs?: number[];
-      aOutgoingReq?: string[];
     } = {},
   ) {
     const a = makePlayerView({
       data: {
         id: "a",
         smallID: aSmall,
-        allies: opts.aAllies ?? [],
         team: opts.aTeam,
-        outgoingAllianceRequests: opts.aOutgoingReq ?? [],
       },
     });
     const b = makePlayerView({
@@ -178,16 +145,8 @@ describe("PlayerView relations", () => {
         team: opts.bTeam,
       },
     });
-    if (opts.aEmbargoSmallIDs) a.setEmbargoSmallIDs(opts.aEmbargoSmallIDs);
-    if (opts.bEmbargoSmallIDs) b.setEmbargoSmallIDs(opts.bEmbargoSmallIDs);
     return { a, b };
   }
-
-  it("isAlliedWith() reflects ally smallIDs in data.allies", () => {
-    const { a, b } = pair(1, 2, { aAllies: [2] });
-    expect(a.isAlliedWith(b)).toBe(true);
-    expect(b.isAlliedWith(a)).toBe(false); // b has no allies set
-  });
 
   it("isOnSameTeam() compares data.team and treats undefined as no team", () => {
     const same = pair(1, 2, { aTeam: "red", bTeam: "red" });
@@ -199,68 +158,16 @@ describe("PlayerView relations", () => {
     expect(noTeam.a.isOnSameTeam(noTeam.b)).toBe(false);
   });
 
-  it("isFriendly() = allied OR same team", () => {
-    const allied = pair(1, 2, { aAllies: [2] });
-    expect(allied.a.isFriendly(allied.b)).toBe(true);
-
+  it("isFriendly() = same team", () => {
     const teammates = pair(1, 2, { aTeam: "red", bTeam: "red" });
     expect(teammates.a.isFriendly(teammates.b)).toBe(true);
 
     const strangers = pair(1, 2);
     expect(strangers.a.isFriendly(strangers.b)).toBe(false);
   });
-
-  it("hasEmbargoAgainst / hasEmbargo are symmetric on the second", () => {
-    // a embargoes b — by smallID (renderer format)
-    const aEmbargoesB = pair(1, 2, { aEmbargoSmallIDs: [2] });
-    // One-way directional embargo from a
-    expect(aEmbargoesB.a.hasEmbargoAgainst(aEmbargoesB.b)).toBe(true);
-    expect(aEmbargoesB.b.hasEmbargoAgainst(aEmbargoesB.a)).toBe(false);
-    // Symmetric version is true from either side
-    expect(aEmbargoesB.a.hasEmbargo(aEmbargoesB.b)).toBe(true);
-    expect(aEmbargoesB.b.hasEmbargo(aEmbargoesB.a)).toBe(true);
-  });
-
-  it("isRequestingAllianceWith() reflects outgoingAllianceRequests", () => {
-    const { a, b } = pair(1, 2, { aOutgoingReq: ["b"] });
-    expect(a.isRequestingAllianceWith(b)).toBe(true);
-    expect(b.isRequestingAllianceWith(a)).toBe(false);
-  });
 });
 
 describe("PlayerView in a GameView context", () => {
-  it("allies() resolves smallIDs through the game's smallID → PlayerView map", () => {
-    // Build a GameView and feed it two players so allies() can resolve.
-    const game = makeGameView();
-    const aliceUpdate = makePlayerUpdate({
-      id: "alice",
-      smallID: 1,
-      clientID: "c-alice",
-      name: "Alice",
-      allies: [2],
-    });
-    const bobUpdate = makePlayerUpdate({
-      id: "bob",
-      smallID: 2,
-      clientID: "c-bob",
-      name: "Bob",
-    });
-
-    // Drive a tick through the GameView so it creates the PlayerViews and
-    // registers smallID lookups — that's the path FrameBuilder & PlayerView use.
-    const gu = makeEmptyGu(1);
-    gu.updates[GameUpdateType.Player] = [aliceUpdate, bobUpdate];
-    gu.playerNameViewData = {
-      alice: makeNameViewData(),
-      bob: makeNameViewData(),
-    };
-    game.update(gu);
-
-    const alice = game.player("alice");
-    const bob = game.player("bob");
-    expect(alice.allies()).toEqual([bob]);
-  });
-
   it("isMe() is true only for the player matching myClientID", () => {
     const game = makeGameView({ myClientID: "c-me" });
     const me = makePlayerUpdate({

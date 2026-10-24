@@ -25,7 +25,7 @@ void main() {
 
   // --- Border detection ---
   float borderType = 0.0; // 0=interior, ~0.5=normal border, ~1.0=highlight border
-  uint maxRel = 0u;       // 0=neutral, 1=friendly, 2=embargo
+  uint maxRel = 0u;       // 0=neutral, 1=friendly
 
   if (owner != 0u) {
     // Cardinal neighbor check (standard border)
@@ -77,7 +77,7 @@ void main() {
     }
   }
 
-  // A = relationship: 0.0=neutral, 0.5=friendly, 1.0=embargo
+  // A = relationship: 0.0=neutral, 0.5=friendly
   float relation = float(maxRel) * 0.5;
   // G channel is unused (formerly emberIntensity; ember is now computed in
   // FalloutBloomPass and FalloutLightPass). B channel is unused (defense post

@@ -73,7 +73,6 @@ type ModifierKey =
   | "startingGold5M"
   | "startingGold25M"
   | "goldMultiplier"
-  | "isAlliancesDisabled"
   | "isNukesDisabled"
   | "isSAMsDisabled"
   | "isPeaceTime"
@@ -91,7 +90,6 @@ const SPECIAL_MODIFIER_POOL: ModifierKey[] = [
   ...Array<ModifierKey>(4).fill("startingGold5M"),
   ...Array<ModifierKey>(3).fill("startingGold25M"),
   ...Array<ModifierKey>(6).fill("goldMultiplier"),
-  ...Array<ModifierKey>(1).fill("isAlliancesDisabled"),
   ...Array<ModifierKey>(1).fill("isNukesDisabled"),
   ...Array<ModifierKey>(1).fill("isSAMsDisabled"),
   ...Array<ModifierKey>(1).fill("isPeaceTime"),
@@ -334,7 +332,6 @@ export class MapPlaylist {
       isCompact,
       isRandomSpawn,
       goldMultiplier,
-      isAlliancesDisabled,
       isHardNations,
       isNukesDisabled,
       isSAMsDisabled,
@@ -352,7 +349,6 @@ export class MapPlaylist {
     if (appliedForced.has("startingGold5M")) startingGold = 5_000_000;
     if (appliedForced.has("startingGold25M")) startingGold = 25_000_000;
     if (appliedForced.has("goldMultiplier")) goldMultiplier = 2;
-    if (appliedForced.has("isAlliancesDisabled")) isAlliancesDisabled = true;
     if (appliedForced.has("isNukesDisabled")) isNukesDisabled = true;
     if (appliedForced.has("isSAMsDisabled")) isSAMsDisabled = true;
     if (appliedForced.has("isPeaceTime")) isPeaceTime = true;
@@ -374,7 +370,6 @@ export class MapPlaylist {
           !isHardNations &&
           startingGold === undefined &&
           goldMultiplier === undefined &&
-          !isAlliancesDisabled &&
           !isNukesDisabled &&
           !isSAMsDisabled &&
           !isPeaceTime &&
@@ -391,7 +386,6 @@ export class MapPlaylist {
             isCompact,
             startingGold,
             goldMultiplier,
-            isAlliancesDisabled,
             isNukesDisabled,
             isSAMsDisabled,
             isPeaceTime,
@@ -459,7 +453,6 @@ export class MapPlaylist {
         isHardNations,
         startingGold,
         goldMultiplier,
-        isAlliancesDisabled,
         isNukesDisabled,
         isSAMsDisabled,
         isPeaceTime,
@@ -479,7 +472,6 @@ export class MapPlaylist {
         : undefined,
       startingGold,
       goldMultiplier,
-      disableAlliances: isAlliancesDisabled ? true : undefined,
       difficulty:
         isHardNations || playerTeams === HumansVsNations
           ? Difficulty.Hard
@@ -838,7 +830,6 @@ export class MapPlaylist {
             ? 1_000_000
             : undefined,
       goldMultiplier: selected.has("goldMultiplier") ? 2 : undefined,
-      isAlliancesDisabled: selected.has("isAlliancesDisabled") || undefined,
       isNukesDisabled: selected.has("isNukesDisabled") || undefined,
       isSAMsDisabled: selected.has("isSAMsDisabled") || undefined,
       isPeaceTime: selected.has("isPeaceTime") || undefined,

@@ -651,7 +651,6 @@ export class HelpModal extends BaseModal {
                     ${translateText("help_modal.ui_events_desc")}
                   </p>
                   <ul class="space-y-2 list-disc ps-4 text-white/60">
-                    <li>${translateText("help_modal.ui_events_alliance")}</li>
                     <li>${translateText("help_modal.ui_events_attack")}</li>
                     <li>${translateText("help_modal.ui_events_quickchat")}</li>
                   </ul>
@@ -787,20 +786,6 @@ export class HelpModal extends BaseModal {
                   </li>
                   <li class="flex items-center gap-3">
                     <img
-                      src=${assetUrl("images/AllianceIconWhite.svg")}
-                      class="w-8 h-8 scale-75 origin-left"
-                    />
-                    <span>${translateText("help_modal.info_alliance")}</span>
-                  </li>
-                  <li class="flex items-center gap-3">
-                    <img
-                      src=${assetUrl("images/TraitorIconWhite.svg")}
-                      class="w-8 h-8 scale-75 origin-left"
-                    />
-                    <span>${translateText("help_modal.ally_betray")}</span>
-                  </li>
-                  <li class="flex items-center gap-3">
-                    <img
                       src=${assetUrl("images/DonateTroopIconWhite.svg")}
                       class="w-8 h-8 scale-75 origin-left"
                     />
@@ -890,77 +875,15 @@ export class HelpModal extends BaseModal {
                     </li>
                     <li class="flex items-center gap-3">
                       <img
-                        src=${assetUrl("images/AllianceIconWhite.svg")}
-                        class="w-8 h-8 scale-75 origin-left"
-                      />
-                      <span>${translateText("help_modal.info_alliance")}</span>
-                    </li>
-                    <li class="flex items-center gap-3">
-                      <img
                         src=${assetUrl("images/EmojiIconWhite.svg")}
                         class="w-8 h-8 scale-75 origin-left"
                       />
                       <span>${translateText("help_modal.info_emoji")}</span>
                     </li>
-                    <li class="flex items-center gap-3">
-                      <img
-                        src=${assetUrl("images/StopIconWhite.svg")}
-                        class="w-8 h-8 scale-75 origin-left"
-                        loading="lazy"
-                      />
-                      <span>${translateText("help_modal.info_trade")}</span>
-                    </li>
                   </ul>
                 </div>
               </div>
 
-              <!-- Ally Info -->
-              <div
-                class="bg-black/20 rounded-xl border border-white/10 p-6 flex flex-col gap-6 hover:bg-white/5 transition-colors"
-              >
-                <div class="flex flex-col items-center gap-3">
-                  <span
-                    class="text-xs font-bold uppercase tracking-wider text-blue-300"
-                    >${translateText("help_modal.info_ally_panel")}</span
-                  >
-                  <img
-                    src=${assetUrl("images/helpModal/infoMenu2Ally.webp")}
-                    alt="Ally Info"
-                    class="rounded-lg shadow-lg border border-white/20 max-w-[240px]"
-                    loading="lazy"
-                  />
-                </div>
-                <div class="text-white/70 text-sm">
-                  <p class="mb-4 leading-relaxed">
-                    ${translateText("help_modal.info_ally_desc")}
-                  </p>
-                  <ul class="space-y-3">
-                    <li class="flex items-center gap-3">
-                      <img
-                        src=${assetUrl("images/TraitorIconWhite.svg")}
-                        class="w-8 h-8 scale-75 origin-left"
-                      />
-                      <span>${translateText("help_modal.ally_betray")}</span>
-                    </li>
-                    <li class="flex items-center gap-3">
-                      <img
-                        src=${assetUrl("images/DonateTroopIconWhite.svg")}
-                        class="w-8 h-8 scale-75 origin-left"
-                      />
-                      <span>${translateText("help_modal.ally_donate")}</span>
-                    </li>
-                    <li class="flex items-center gap-3">
-                      <img
-                        src=${assetUrl("images/DonateGoldIconWhite.svg")}
-                        class="w-8 h-8 scale-75 origin-left"
-                      />
-                      <span
-                        >${translateText("help_modal.ally_donate_gold")}</span
-                      >
-                    </li>
-                  </ul>
-                </div>
-              </div>
             </div>
           </section>
 
@@ -1236,73 +1159,6 @@ export class HelpModal extends BaseModal {
                 </span>
               </div>
 
-              <!-- Traitor -->
-              <div
-                class="bg-black/20 rounded-xl border border-white/10 p-4 flex flex-col items-center gap-3 hover:bg-white/5 transition-colors"
-              >
-                <img
-                  src=${assetUrl("images/helpModal/traitor2.webp")}
-                  alt="Traitor"
-                  class="rounded shadow-lg border border-white/10 h-24 w-auto object-contain"
-                  loading="lazy"
-                />
-                <span
-                  class="text-xs font-bold uppercase tracking-wider text-white text-center"
-                >
-                  ${translateText("help_modal.icon_traitor")}
-                </span>
-              </div>
-
-              <!-- Ally -->
-              <div
-                class="bg-black/20 rounded-xl border border-white/10 p-4 flex flex-col items-center gap-3 hover:bg-white/5 transition-colors"
-              >
-                <img
-                  src=${assetUrl("images/helpModal/ally2.webp")}
-                  alt="Ally"
-                  class="rounded shadow-lg border border-white/10 h-24 w-auto object-contain"
-                  loading="lazy"
-                />
-                <span
-                  class="text-xs font-bold uppercase tracking-wider text-white text-center"
-                >
-                  ${translateText("help_modal.icon_ally")}
-                </span>
-              </div>
-
-              <!-- Embargo -->
-              <div
-                class="bg-black/20 rounded-xl border border-white/10 p-4 flex flex-col items-center gap-3 hover:bg-white/5 transition-colors"
-              >
-                <img
-                  src=${assetUrl("images/helpModal/embargo.webp")}
-                  alt="Embargo"
-                  class="rounded shadow-lg border border-white/10 h-24 w-auto object-contain"
-                  loading="lazy"
-                />
-                <span
-                  class="text-xs font-bold uppercase tracking-wider text-white text-center"
-                >
-                  ${translateText("help_modal.icon_embargo")}
-                </span>
-              </div>
-
-              <!-- Alliance Request -->
-              <div
-                class="bg-black/20 rounded-xl border border-white/10 p-4 flex flex-col items-center gap-3 hover:bg-white/5 transition-colors"
-              >
-                <img
-                  src=${assetUrl("images/helpModal/allianceRequest.webp")}
-                  alt="Request"
-                  class="rounded shadow-lg border border-white/10 h-24 w-auto object-contain"
-                  loading="lazy"
-                />
-                <span
-                  class="text-xs font-bold uppercase tracking-wider text-white text-center"
-                >
-                  ${translateText("help_modal.icon_request")}
-                </span>
-              </div>
             </div>
           </section>
         </div>
