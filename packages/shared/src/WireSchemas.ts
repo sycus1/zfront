@@ -175,10 +175,6 @@ export const MIN_HOSTED_LOBBY_PLAYERS = 10;
 
 export const MAX_HOSTED_LOBBY_PLAYERS = 100;
 
-// A listed lobby this close to its auto-start can no longer be queued, so a
-// host can't pay for a queue spot the lobby starts before it reaches.
-export const LOBBY_QUEUE_CUTOFF_MS = 30 * 1000;
-
 // Featured lobbies get a longer window. A scheduled event announced ahead of
 // time needs the listing to still be up when its audience arrives, and unlike a
 // subscriber sitting on a listing the host is an authenticated admin bot. Only
@@ -258,9 +254,6 @@ export const GameInfoSchema = z.object({
   label: LobbyLabelSchema.optional(),
   accent: LobbyAccentSchema.optional(),
   featured: z.boolean().optional(),
-  // Listed lobbies only: the host paid to put it in the public Special
-  // queue, so the queue's countdown starts it.
-  queued: z.boolean().optional(),
 });
 
 // Browser-facing lobby info. Master/worker-internal fields (the creator hash

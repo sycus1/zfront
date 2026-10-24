@@ -78,7 +78,6 @@ export class GameManager {
     startsAt?: number,
     publicGameType?: PublicGameType,
     matchmakingTeams?: string[][],
-    matchmakingClanTags?: string[],
   ): GameServer | null {
     if (this.games.has(id)) {
       this.log.warn("cannot create game, id already exists", { gameID: id });
@@ -112,7 +111,6 @@ export class GameManager {
         startsAt,
         publicGameType,
         matchmakingTeams,
-        matchmakingClanTags,
       },
       {
         gatekeeper: this.gatekeeper,
@@ -181,9 +179,7 @@ export class GameManager {
         game.maybeAutoStartListed();
       }
       if (phase === GamePhase.Active) {
-        // A matchmade game missing a player at the start deadline is
-        // cancelled instead of started short-handed.
-        if (!game.hasStarted() && !game.cancelShortHandedMatch()) {
+        if (!game.hasStarted()) {
           // Never start a game nobody is connected to. A lobby that filled up
           // and then emptied reports Active (reaching maxPlayers takes it out
           // of the Lobby phase), and the reap in phase() holds off until the

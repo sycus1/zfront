@@ -53,9 +53,7 @@ export class WorkerLobbyService {
   private lastFullGameIds: string | null = null;
   // Deployment-active flag from the master's broadcast (see
   // MasterLobbiesBroadcastSchema.active). Stamped onto every full snapshot so
-  // pinned tabs on a draining deployment get told to reload, and read by the
-  // ranked check-in loop so a draining server stops offering matches too
-  // (RankedCheckin.ts, OPE-469).
+  // pinned tabs on a draining deployment get told to reload.
   private deploymentActive = true;
 
   constructor(
@@ -71,15 +69,6 @@ export class WorkerLobbyService {
     this.setupUpgradeHandler();
     this.setupLobbiesWebSocket();
     this.setupIPCListener();
-  }
-
-  /**
-   * Whether the master last said this deployment may take new games. True
-   * until the first broadcast arrives, so a worker that has not yet heard
-   * from its master behaves as it always has.
-   */
-  isDeploymentActive(): boolean {
-    return this.deploymentActive;
   }
 
   /** Browsers currently connected to this worker's /lobbies socket. */
@@ -198,9 +187,7 @@ export class WorkerLobbyService {
     // Subscriber-listed private lobbies. creatorID (a hash of the creator's
     // persistentID) rides along for the one-listed-lobby-per-creator check;
     // sanitizeGames strips it before anything reaches browsers. The config is
-    // reduced to the publicLobbyGameConfig allowlist. A lobby the host paid
-    // to queue is reported as Special with its queuedAt, which puts it right
-    // behind the counting-down Special lobby.
+    // reduced to the publicLobbyGameConfig allowlist.
     const hostedLobbies = this.gm.listedLobbies().map((g) => {
       const gi = g.gameInfo();
       return {
@@ -208,8 +195,7 @@ export class WorkerLobbyService {
         numClients: gi.clients?.length ?? 0,
         startsAt: gi.startsAt,
         gameConfig: gi.gameConfig && publicLobbyGameConfig(gi.gameConfig),
-        publicGameType: g.isQueued() ? "special" : "hosted",
-        queuedAt: g.queuedAt(),
+        publicGameType: "hosted",
         creatorID: g.hashedCreatorID(),
         createdAt: g.createdAt,
         // Already sanitised on the way in (GameServer.setFeatured), so nothing
@@ -231,16 +217,12 @@ export class WorkerLobbyService {
   // Whether the creator (hashed persistentID) already has a listed lobby
   // other than `excludeGameID`. Checks the cluster-wide view from the last
   // master broadcast plus this worker's own lobbies (fresher than the
-  // broadcast interval). A lobby the host paid to queue is broadcast under
-  // special, and still counts as their one listing.
+  // broadcast interval).
   public creatorHasListedLobby(
     hashedCreatorID: string,
     excludeGameID: string,
   ): boolean {
-    const broadcast = [
-      ...(this.lastPublicGames?.games["hosted"] ?? []),
-      ...(this.lastPublicGames?.games["special"] ?? []),
-    ];
+    const broadcast = this.lastPublicGames?.games["hosted"] ?? [];
     if (
       broadcast.some((l) => {
         if (l.gameID === excludeGameID || l.creatorID !== hashedCreatorID) {
@@ -272,11 +254,11 @@ export class WorkerLobbyService {
     const broadcastIds = new Set(broadcast.map((l) => l.gameID));
     const localExtra = this.gm
       .listedLobbies()
-      .filter((g) => !g.isQueued() && !broadcastIds.has(g.id)).length;
+      .filter((g) => !broadcastIds.has(g.id)).length;
     return broadcast.length + localExtra;
   }
 
-  // Strips worker/master-internal fields (creatorID, createdAt, queuedAt)
+  // Strips worker/master-internal fields (creatorID, createdAt)
   // before lobby info is sent to browser clients, converting
   // InternalGameInfo to the browser-facing PublicGameInfo.
   private sanitizeGames(
@@ -291,7 +273,6 @@ export class WorkerLobbyService {
         ({
           creatorID: _creatorID,
           createdAt: _createdAt,
-          queuedAt: _queuedAt,
           ...rest
         }): PublicGameInfo => rest,
       );

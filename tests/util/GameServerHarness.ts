@@ -160,7 +160,6 @@ export interface GameOpts {
   startsAt?: number;
   publicGameType?: PublicGameType;
   matchmakingTeams?: string[][];
-  matchmakingClanTags?: string[];
   // Overrides for what the game reaches outside itself for. By default the
   // archive upload and the tribe fetch are inert spies: pass your own
   // `archive` to read the record a game produced.
@@ -189,7 +188,6 @@ export function makeGame(opts: GameOpts = {}): GameServer {
       startsAt: opts.startsAt,
       publicGameType: opts.publicGameType,
       matchmakingTeams: opts.matchmakingTeams,
-      matchmakingClanTags: opts.matchmakingClanTags,
     },
     deps,
   );

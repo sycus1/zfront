@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GameType, RankedType } from "@openfront/engine-api/game/GameTypes";
+import { GameType } from "@openfront/engine-api/game/GameTypes";
 import { ClientMessage } from "@openfront/shared/WireSchemas";
 import { createGameWireContext } from "@openfront/shared/ZbinWire";
 import { Client } from "../../src/server/Client";
@@ -98,22 +98,6 @@ describe("GameServer - spectators", () => {
     });
     expect(game.joinClient(makeClient("cast", true))).toBe("not_allowlisted");
     expect(game.joinClient(makeClient("p1", true))).toBe("joined");
-  });
-
-  it("does not keep a ranked match alive on its own", () => {
-    // 1v1 with one player and one spectator is a one-player game, so the
-    // short-handed cancel has to see through the spectator.
-    const game = harnessGame({
-      log: logger,
-      config: {
-        gameType: GameType.Private,
-        maxPlayers: 2,
-        rankedType: RankedType.OneVOne,
-      },
-    });
-    game.joinClient(makeClient("p1"));
-    game.joinClient(makeClient("cast", true));
-    expect(game.cancelShortHandedMatch()).toBe(true);
   });
 
   it.each(["intent", "winner", "live_stats", "hash", "report"])(

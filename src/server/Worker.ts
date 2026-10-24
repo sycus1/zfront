@@ -40,7 +40,7 @@ import { Client } from "./Client";
 import { gameApiCors } from "./GameApiCors";
 import { GameManager } from "./GameManager";
 import { registerGamePreviewRoute } from "./GamePreviewRoute";
-import { GamePhase, type GameServer } from "./GameServer";
+import { type GameServer } from "./GameServer";
 import {
   isSteamAuthenticated,
   type JoinVerifyResponse,
@@ -49,16 +49,13 @@ import {
 } from "./JoinVerify";
 import { getUserMe, userMeFailureClose, verifyClientToken } from "./jwt";
 import { levelBadgeForPlayer } from "./LevelBadge";
-import { payForLobbyQueue, queueListedLobby } from "./LobbyQueuePayment";
 import { logger } from "./Logger";
 import { registerPlayerProfileRoute } from "./PlayerProfileRoute";
 import { resolveVerifiedJoin } from "./Privilege";
 
 import { loadGatekeeper } from "./Gatekeeper";
-import { MapPlaylist } from "./MapPlaylist";
 import { setNoStoreHeaders } from "./NoStoreHeaders";
 import { PrivilegeRefresher } from "./PrivilegeRefresher";
-import { startRankedCheckinLoops } from "./RankedCheckin";
 import { rejoinOrClose } from "./Rejoin";
 import { ServerEnv } from "./ServerEnv";
 import { SingleplayerPresence } from "./SingleplayerPresence";
@@ -72,7 +69,6 @@ const log = logger.child({ comp: `w_${workerId}` });
 
 // The WebSocket server's max payload.
 const MAX_WEBSOCKET_PAYLOAD_BYTES = 1024 * 1024;
-const playlist = new MapPlaylist();
 
 export function clampApprovedUsername(username: string): string {
   return username.length > MAX_USERNAME_LENGTH
@@ -301,22 +297,6 @@ export async function startWorker() {
   const lobbyService = new WorkerLobbyService(server, wss, gm, log);
   const singleplayerPresence = new SingleplayerPresence();
 
-  setTimeout(
-    () => {
-      // The ranked loop follows the deployment-active flag the master pushes
-      // to this worker (OPE-469): a draining, standby or fenced server keeps
-      // the games it has but stops offering new matches.
-      startRankedCheckinLoops({
-        gm,
-        playlist,
-        workerId,
-        log,
-        isActive: () => lobbyService.isDeploymentActive(),
-      });
-    },
-    1000 + Math.random() * 2000,
-  );
-
   if (ServerEnv.otelEnabled()) {
     initWorkerMetrics(gm, lobbyService, singleplayerPresence);
   }
@@ -484,50 +464,6 @@ export async function startWorker() {
   });
 
   registerListingRoute({ app, gm, lobbyService, log });
-
-  // The host of a listed lobby pays (plutonium, charged by the API with the
-  // host's token) to put it in the public Special queue, right behind the
-  // lobby that's counting down.
-  app.post("/api/game/:id/queue", async (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith("Bearer ")) {
-      return res.status(400).json({ error: "Authorization header required" });
-    }
-    const token = authHeader.substring("Bearer ".length);
-    const auth = await verifyClientToken(token);
-    if (auth.type !== "success") {
-      return res.status(401).json({ error: "Invalid token" });
-    }
-
-    const game = gm.game(req.params.id);
-    if (game === null) {
-      return res.status(404).json({ error: "Game not found" });
-    }
-    const outcome = await queueListedLobby(
-      {
-        isCreator: (id) => game.isCreator(id),
-        isPublic: () => game.isPublic(),
-        isListed: () => game.isListed(),
-        isQueued: () => game.isQueued(),
-        inLobby: () => game.phase() === GamePhase.Lobby && !game.hasStarted(),
-        startsAt: () => game.gameInfo().startsAt,
-        autoStartAt: () => game.autoStartAt(),
-        queueForPublic: () => game.queueForPublic(),
-      },
-      auth.persistentId,
-      // Dev has no payment backend; skip the charge so the feature is
-      // testable locally (same precedent as the listing subscription check).
-      ServerEnv.env() === GameEnv.Dev
-        ? async () => ({ type: "success" })
-        : () => payForLobbyQueue(token, game.id),
-    );
-    if (outcome.status === 502) {
-      log.warn("lobby queue payment failed", { gameID: game.id });
-    } else if (outcome.status === 200) {
-      log.info("lobby queued for public play", { gameID: game.id });
-    }
-    res.status(outcome.status).json(outcome.body);
-  });
 
   // Singleplayer games run in the browser; the client beats here once a
   // minute so the worker can export how many are in progress (see

@@ -127,10 +127,6 @@ describe("PlayerStatsTreeSchema", () => {
             Medium: { games: 100, wins: 66 },
           },
         },
-        Ranked: {
-          all: { games: 100, wins: 67 },
-          "1v1": { games: 100, wins: 68 },
-        },
       },
     });
 
@@ -142,10 +138,6 @@ describe("PlayerStatsTreeSchema", () => {
     expect(result.recent?.Public?.["Free For All"]?.all).toEqual({
       games: 100,
       wins: 66,
-    });
-    expect(result.recent?.Ranked?.["1v1"]).toEqual({
-      games: 100,
-      wins: 68,
     });
   });
 
@@ -163,16 +155,6 @@ describe("PlayerStatsTreeSchema", () => {
         recent: { all: { games: 100, wins: 64 }, Public: { Medium: {} } },
       }),
     ).toThrow();
-  });
-
-  test("accepts a ranked type this build does not know", () => {
-    const leaf = { wins: "1", losses: "2", total: "3", stats: {} };
-    const result = PlayerStatsTreeSchema.parse({
-      Ranked: { "1v1": leaf, ffa: leaf },
-    });
-
-    expect(result.Ranked?.["1v1"]?.total).toBe(3n);
-    expect(result.Ranked?.ffa?.total).toBe(3n);
   });
 
   test("accepts Humans Vs Nations as a separate profile stats mode", () => {

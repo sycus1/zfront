@@ -133,19 +133,6 @@ export enum GameMode {
   Team = "Team",
 }
 
-export enum RankedType {
-  OneVOne = "1v1",
-  TwoVTwo = "2v2",
-  FreeForAll = "ffa",
-  ClanWars = "clanwars",
-}
-
-// Ranked FFA lobby size. The API's matcher assigns between these many players
-// and only rates a game whose roster is in this range, so a match that ends
-// up with fewer is cancelled before it starts.
-export const RANKED_FFA_MIN_PLAYERS = 4;
-export const RANKED_FFA_MAX_PLAYERS = 10;
-
 export const isGameMode = (value: unknown): value is GameMode =>
   isEnumValue(GameMode, value);
 

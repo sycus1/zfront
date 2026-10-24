@@ -12,7 +12,6 @@ import {
   HumansVsNations,
   MAX_UPGRADE_AMOUNT,
   Quads,
-  RankedType,
   Trios,
   UnitType,
 } from "./game/GameTypes";
@@ -248,7 +247,6 @@ export const GameConfigSchema = z.object({
   donateTroops: z.boolean(), // Configures donations to humans only
   gameType: z.enum(GameType),
   gameMode: z.enum(GameMode),
-  rankedType: z.enum(RankedType).optional(), // Only set for ranked games.
   gameMapSize: z.enum(GameMapSize),
   doomsdayClock: DoomsdayClockConfigSchema.optional(),
   overtime: OvertimeConfigSchema.optional(),

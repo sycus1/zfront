@@ -4,8 +4,6 @@ import {
   HumansVsNations,
   PlayerInfo,
   PlayerType,
-  RANKED_FFA_MIN_PLAYERS,
-  RankedType,
 } from "@openfront/engine-api/game/GameTypes";
 import { maps } from "@openfront/engine-api/game/Maps.gen";
 import {
@@ -140,7 +138,6 @@ const KICK_REASON_DUPLICATE_SESSION = "kick_reason.duplicate_session";
 const KICK_REASON_LOBBY_CREATOR = "kick_reason.lobby_creator";
 const KICK_REASON_ADMIN = "kick_reason.admin";
 const KICK_REASON_HOST_LEFT = "kick_reason.host_left";
-const KICK_REASON_MATCH_CANCELLED = "kick_reason.match_cancelled";
 
 export interface GameServerOptions {
   id: string;
@@ -153,8 +150,6 @@ export interface GameServerOptions {
   // Matchmade team split from the matchmaking assignment: publicIds per
   // team. At start each client is stamped with its team's index.
   matchmakingTeams?: string[][];
-  // Clan wars: the clan each matchmade team plays for, in team order.
-  matchmakingClanTags?: string[];
 }
 
 // Everything a GameServer reaches outside itself for. Production takes the
@@ -309,7 +304,6 @@ export class GameServer {
   // Matchmade team split from the matchmaking assignment: publicIds per
   // team. At start each client is stamped with its team's index.
   private matchmakingTeams?: string[][];
-  private matchmakingClanTags?: string[];
   private readonly deps: GameServerDeps;
   // Who may see whose real identity (anonymizeNames / pinned teams / admin
   // clan-tag reveal); shapes the per-viewer lobby roster and start message.
@@ -323,7 +317,6 @@ export class GameServer {
     this.startsAt = opts.startsAt;
     this.publicGameType = opts.publicGameType;
     this.matchmakingTeams = opts.matchmakingTeams;
-    this.matchmakingClanTags = opts.matchmakingClanTags;
     this.deps = { ...defaultGameServerDeps(), ...deps };
     this.groupToken = this.deps.mintGroupToken();
     this.gatekeeper = this.deps.gatekeeper.matchOpened({ gameID: opts.id });
@@ -408,7 +401,6 @@ export class GameServer {
     const denied = authorizeIntent(intent, actor, {
       isPublic: this.isPublic(),
       isListed: this.isListed(),
-      isQueued: this.listing.isQueued(),
       hasStarted: this.hasStarted(),
     });
     if (denied !== null) {
@@ -897,45 +889,6 @@ export class GameServer {
     return this.desync.count();
   }
 
-  // Matchmade ranked games (1v1/2v2/clan wars) must start with full
-  // attendance: the roster freezes at start(), so a game missing a player
-  // would run short-handed only to be voided by the sim (2v2, clan wars) or
-  // hand out a walkover the absent player never contested (1v1). Ranked FFA
-  // starts without the missing players as long as RANKED_FFA_MIN_PLAYERS
-  // showed up, the fewest the API rates. Called at the start deadline;
-  // cancels the game and returns true when too few matched players connected.
-  public cancelShortHandedMatch(): boolean {
-    // Explicitly 1v1/2v2/FFA/clan wars only — a future ranked type must opt
-    // in rather than inherit pre-start cancellation.
-    const rankedType = this.gameConfig.rankedType;
-    let expected: number | undefined;
-    if (
-      rankedType === RankedType.OneVOne ||
-      rankedType === RankedType.TwoVTwo ||
-      rankedType === RankedType.ClanWars
-    ) {
-      expected = this.gameConfig.maxPlayers;
-    } else if (rankedType === RankedType.FreeForAll) {
-      expected = RANKED_FFA_MIN_PLAYERS;
-    } else {
-      return false;
-    }
-    if (expected === undefined || this.playerCount() >= expected) {
-      return false;
-    }
-    this.log.info("cancelling matchmade game, missing players at deadline", {
-      gameID: this.id,
-      connected: this.playerCount(),
-      expected,
-    });
-    for (const c of [...this.clients.active()]) {
-      this.kickClient(c.clientID, KICK_REASON_MATCH_CANCELLED);
-    }
-    // phase() reports Finished once ended, so GameManager's next tick prunes.
-    this.ended = true;
-    return true;
-  }
-
   // Nobody was connected when the delayed start came due. An empty roster at
   // that moment is not proof the game is abandoned: handleClientDisconnect
   // drops a client the instant its socket closes, blip or not, and the client
@@ -1137,7 +1090,7 @@ export class GameServer {
       config,
       players: this.clients.players().map((c) => ({
         username: c.username,
-        clanTag: this.startClanTag(c),
+        clanTag: c.clanTag ?? null,
         clientID: c.clientID,
         cosmetics: c.cosmetics,
         isLobbyCreator: this.lobbyCreatorID === c.clientID,
@@ -1194,7 +1147,6 @@ export class GameServer {
       this.gameConfig.playerTeams === undefined ||
       this.gameConfig.playerTeams === HumansVsNations ||
       this.matchmakingTeams !== undefined ||
-      this.gameConfig.rankedType !== undefined ||
       this.gameConfig.disableClanTags === true ||
       this.gameConfig.anonymizeNames === true
     ) {
@@ -1407,16 +1359,6 @@ export class GameServer {
       team.includes(publicId),
     );
     return idx === -1 ? undefined : idx;
-  }
-
-  // The clan tag a player starts with. In clan wars it is their team's clan
-  // from the assignment, whatever tag they joined with: the API rates the
-  // clans by the tags in the game record.
-  private startClanTag(c: Client): string | null {
-    const team = this.matchmakingTeamIndex(c);
-    const matchmade =
-      team === undefined ? undefined : this.matchmakingClanTags?.[team];
-    return matchmade ?? c.clanTag ?? null;
   }
 
   private addIntent(intent: StampedIntent) {
@@ -1700,7 +1642,6 @@ export class GameServer {
       label: this.listing.lobbyLabel(),
       accent: this.listing.lobbyAccent(),
       featured: this.listing.isFeatured() ? true : undefined,
-      queued: this.listing.isQueued() ? true : undefined,
     };
   }
 
@@ -1750,21 +1691,6 @@ export class GameServer {
         this.hasReachedMaxPlayerCount = true;
       }
     }
-  }
-
-  public isQueued(): boolean {
-    return this.listing.isQueued();
-  }
-
-  public queuedAt(): number | undefined {
-    return this.listing.queuedAtTime();
-  }
-
-  // The host paid to put this listed lobby in the public Special queue. The
-  // worker then reports it as a Special lobby and the queue's countdown
-  // starts it; the listing deadline no longer applies.
-  public queueForPublic(): void {
-    this.listing.queue();
   }
 
   // Players (not spectators) currently seated in the lobby.
