@@ -250,6 +250,7 @@ export class LangSelector extends LitElement {
       "leaderboard-player-list",
       "build-menu",
       "win-modal",
+      "horde-hud",
       "game-starting-modal",
       "top-bar",
       "player-panel",

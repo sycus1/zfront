@@ -166,14 +166,16 @@ export const DERIVED_FIELDS = new Set<string>([
   "reachableStationsCache",
   // NationStructureBehavior: only read in the tick it was computed in
   "mirvWorthSavingMemo",
-  // zfront HordeExecution: rebuilt from the units on the first tick after a
-  // restore (hordeStructureSig starts at -1), plus perf-harness timings
+  // zfront HordeExecution: the obstacle map and targets are rebuilt from the
+  // units on the first tick after a restore (hordeObstaclesStale), the flow
+  // field from the saved flow cells; plus perf-harness timings
   "hordeFlow",
   "hordeStructureAt",
   "hordeTurrets",
   "hordeHqAt",
+  "hordeTargetCells",
+  "hordeObstaclesStale",
   "moveCost", // the live cost: terrain plus structure cells, rebuilt on scan
-  "hordeStructureSig",
   "hordeProfile",
   "obstacle",
   // zfront HordeField / Elites: double buffer and per-cell scratch

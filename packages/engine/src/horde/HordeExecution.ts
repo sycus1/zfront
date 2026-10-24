@@ -1,6 +1,9 @@
 import { TileRef } from "@openfront/engine-api/game/GameMap";
 import { PlayerType, UnitType } from "@openfront/engine-api/game/GameTypes";
-import { HordeFrame } from "@openfront/engine-api/game/GameUpdates";
+import {
+  HordeFrame,
+  HordeOutcome,
+} from "@openfront/engine-api/game/GameUpdates";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import {
   zInt,
@@ -21,6 +24,10 @@ import { buildCostField, HordeField } from "./HordeField";
  * coarse map that flows toward player structures; elites are discrete
  * agents on the same flow field. Structures are obstacles: blocked zombies
  * press on them until they fall. Defense Posts stand in for turrets.
+ *
+ * The player wins by keeping their HQ standing until the wave after
+ * `wavesToWin` would arrive, and loses when every human HQ has fallen.
+ * Either way the horde then stops.
  *
  * Deterministic: integer state, a seeded PRNG for spawn points, and a fixed
  * scan order everywhere. Timings are recorded for the perf harness only and
@@ -55,6 +62,15 @@ export interface HordeOptions {
   structureHp: number;
   /** HQ health. When it falls, the player loses. */
   hqHp: number;
+  /** Waves to survive to win; 0 means endless. */
+  wavesToWin: number;
+  /**
+   * Ticks the structure set must stay unchanged before the flow field is
+   * recomputed, so placing a row of walls costs one recompute, not one each.
+   */
+  flowDebounce: number;
+  /** Longest a recompute may wait while structures keep changing. */
+  flowMaxDelay: number;
 }
 
 // Spike defaults, sized to show a big horde in a solo game within minutes:
@@ -79,6 +95,9 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   pressureShift: 6,
   structureHp: 3_000,
   hqHp: 50_000,
+  wavesToWin: 10,
+  flowDebounce: 10,
+  flowMaxDelay: 50,
 };
 
 const TARGET_TYPES: readonly UnitType[] = [
@@ -99,6 +118,7 @@ export interface HordeStats {
   /** The first human player's HQ health, or 0 when none is alive. */
   hqHp: number;
   hqsFallen: number;
+  outcome: HordeOutcome;
   recomputes: number;
   lastRecomputeMs: number;
   maxRecomputeMs: number;
@@ -133,6 +153,17 @@ export class HordeExecution implements Execution {
   /** HQ health by player smallID. */
   private hqHp = new Map<number, number>();
   private hqsFallen = 0;
+  private outcome: HordeOutcome = "playing";
+
+  /** Target cells (structures and HQs) from the latest scan. */
+  private hordeTargetCells: number[] = [];
+  /** Target cells the flow field was last computed from; null before the first. */
+  private flowCells: number[] | null = null;
+  /** Ticks of the latest and the first structure change since the last recompute. */
+  private lastChangeTick = -1;
+  private firstPendingTick = -1;
+  /** Set on restore: the obstacle map must be rebuilt without counting as a change. */
+  private hordeObstaclesStale = false;
 
   private killed = 0;
   private structuresDestroyed = 0;
@@ -191,12 +222,16 @@ export class HordeExecution implements Execution {
   }
 
   tick(ticks: number): void {
-    if (this.mg === null) return;
+    if (this.mg === null || this.outcome !== "playing") return;
     if (this.nextWaveTick < 0) {
       this.nextWaveTick = ticks + this.opts.firstWaveDelay;
     }
-    this.scanStructures();
+    this.scanStructures(ticks);
     if (ticks >= this.nextWaveTick) {
+      if (this.opts.wavesToWin > 0 && this.wave >= this.opts.wavesToWin) {
+        this.win();
+        return;
+      }
       this.startWave();
       this.nextWaveTick = ticks + this.opts.waveInterval;
     }
@@ -216,6 +251,7 @@ export class HordeExecution implements Execution {
       structuresDestroyed: this.structuresDestroyed,
       hqHp: this.firstHqHp(),
       hqsFallen: this.hqsFallen,
+      outcome: this.outcome,
       ...this.hordeProfile,
     };
   }
@@ -248,6 +284,10 @@ export class HordeExecution implements Execution {
       alive: this.field.total(),
       elites: this.elites.count,
       wave: this.wave,
+      wavesToWin: this.opts.wavesToWin,
+      killed: this.killed,
+      structuresDestroyed: this.structuresDestroyed,
+      outcome: this.outcome,
       hqHp: this.firstHqHp(),
       hqMaxHp: this.opts.hqHp,
       encodeMs: 0,
@@ -275,6 +315,7 @@ export class HordeExecution implements Execution {
     mix(this.wave);
     mix(this.killed);
     mix(this.structuresDestroyed);
+    mix(OUTCOMES.indexOf(this.outcome));
     for (const [id, hp] of this.hqHp) {
       mix(id);
       mix(hp);
@@ -297,12 +338,17 @@ export class HordeExecution implements Execution {
   }
 
   /**
-   * Runs every tick but only rebuilds the obstacle map and flow field when
-   * the structure set changed. Scanning every tick (rather than on an
-   * interval) keeps snapshot restore exact: the first tick after a restore
-   * rebuilds from the same units the original game would.
+   * Runs every tick. The obstacle map is rebuilt as soon as the structure set
+   * changes, so new structures block the horde at once. The flow field (the
+   * expensive part) is debounced: it is recomputed once the set has been
+   * stable for `flowDebounce` ticks, or `flowMaxDelay` ticks after the first
+   * change, whichever comes first. The first computation is immediate.
+   *
+   * Snapshots carry the cells the flow field was computed from and the
+   * pending change ticks, so a restored game recomputes exactly when the
+   * original does.
    */
-  private scanStructures(): void {
+  private scanStructures(ticks: number): void {
     const units = this.mg!.units(TARGET_TYPES);
     // Each human player's spawn tile is their HQ: always a target, and an
     // obstacle the horde presses on. When it falls the player loses.
@@ -323,9 +369,32 @@ export class HordeExecution implements Execution {
       sig = Math.imul(sig ^ t, 16777619);
     }
     sig = Math.imul(sig ^ (units.length + hqs.length), 16777619) >>> 0;
-    if (sig === this.hordeStructureSig) return;
-    this.hordeStructureSig = sig;
+    const changed = sig !== this.hordeStructureSig;
+    if (changed || this.hordeObstaclesStale) {
+      this.rebuildObstacles(units, hqs, hqOwners);
+      this.hordeObstaclesStale = false;
+    }
+    if (changed) {
+      this.hordeStructureSig = sig;
+      this.lastChangeTick = ticks;
+      if (this.firstPendingTick < 0) this.firstPendingTick = ticks;
+    }
+    if (this.firstPendingTick < 0) return;
+    if (
+      this.flowCells === null ||
+      ticks - this.lastChangeTick >= this.opts.flowDebounce ||
+      ticks - this.firstPendingTick >= this.opts.flowMaxDelay
+    ) {
+      this.computeFlow(this.hordeTargetCells);
+      this.firstPendingTick = -1;
+    }
+  }
 
+  private rebuildObstacles(
+    units: readonly Unit[],
+    hqs: readonly TileRef[],
+    hqOwners: readonly Player[],
+  ): void {
     const obstacle = this.field.obstacle;
     obstacle.fill(0);
     this.hordeStructureAt.clear();
@@ -349,6 +418,11 @@ export class HordeExecution implements Execution {
       }
       if (!this.hordeHqAt.has(cell)) this.hordeHqAt.set(cell, hqOwners[k]);
     });
+    this.hordeTargetCells = cells;
+  }
+
+  /** Recomputes the flow field toward `cells`, which become enterable. */
+  private computeFlow(cells: readonly number[]): void {
     const cost = this.hordeFlow.cost;
     cost.set(this.terrainCost);
     for (const c of cells) {
@@ -356,6 +430,7 @@ export class HordeExecution implements Execution {
     }
     const start = performance.now();
     this.hordeFlow.compute(cells);
+    this.flowCells = [...cells];
     const ms = performance.now() - start;
     const prof = this.hordeProfile;
     prof.recomputes++;
@@ -483,8 +558,18 @@ export class HordeExecution implements Execution {
       (p) => p.type() === PlayerType.Human && p.isAlive(),
     );
     if (!humansLeft) {
+      this.outcome = "lost";
       this.mg!.setWinner(null, this.mg!.stats().stats());
     }
+  }
+
+  /** Every wave survived: the first human still standing wins. */
+  private win(): void {
+    this.outcome = "won";
+    const survivor = this.mg!.players().find(
+      (p) => p.type() === PlayerType.Human && p.isAlive(),
+    );
+    this.mg!.setWinner(survivor ?? null, this.mg!.stats().stats());
   }
 
   snapshot(): ExecRecord {
@@ -508,6 +593,11 @@ export class HordeExecution implements Execution {
       hqIds: [...this.hqHp.keys()],
       hqValues: [...this.hqHp.values()],
       hqsFallen: this.hqsFallen,
+      outcome: OUTCOMES.indexOf(this.outcome),
+      structureSig: this.hordeStructureSig,
+      flowCells: this.flowCells === null ? null : [...this.flowCells],
+      lastChangeTick: this.lastChangeTick,
+      firstPendingTick: this.firstPendingTick,
       killed: this.killed,
       structuresDestroyed: this.structuresDestroyed,
     });
@@ -523,8 +613,15 @@ export class HordeExecution implements Execution {
     this.killed = s.killed;
     this.structuresDestroyed = s.structuresDestroyed;
     this.hqsFallen = s.hqsFallen;
+    this.outcome = OUTCOMES[s.outcome];
     this.hordeProfile = newProfile();
-    this.hordeStructureSig = -1;
+    this.hordeStructureSig = s.structureSig;
+    this.hordeTargetCells = [];
+    this.flowCells = null;
+    this.lastChangeTick = s.lastChangeTick;
+    this.firstPendingTick = s.firstPendingTick;
+    // Rebuilt on the next scan from the same units the original game has.
+    this.hordeObstaclesStale = true;
     if (!s.initialized) {
       this.random = PseudoRandom.fromState(s.random);
       return;
@@ -541,7 +638,7 @@ export class HordeExecution implements Execution {
       s.hpTiles.map((t, i) => [t as TileRef, s.hpValues[i]]),
     );
     this.hqHp = new Map(s.hqIds.map((id, i) => [id, s.hqValues[i]]));
-    // hordeStructureSig is -1, so the next tick rescans and rebuilds the flow field.
+    if (s.flowCells !== null) this.computeFlow(s.flowCells);
   }
 }
 
@@ -622,6 +719,9 @@ const HordeOptionsSchema = z.object({
   pressureShift: zInt(),
   structureHp: zInt(),
   hqHp: zInt(),
+  wavesToWin: zInt(),
+  flowDebounce: zInt(),
+  flowMaxDelay: zInt(),
 });
 
 const HordeStateSchema = z.object({
@@ -642,14 +742,42 @@ const HordeStateSchema = z.object({
   hqIds: z.array(zInt()),
   hqValues: z.array(zInt()),
   hqsFallen: zInt(),
+  /** Index into OUTCOMES. */
+  outcome: zInt(),
+  structureSig: zInt(),
+  flowCells: z.array(zInt()).nullable(),
+  lastChangeTick: zInt(),
+  firstPendingTick: zInt(),
   killed: zInt(),
   structuresDestroyed: zInt(),
 });
 type HordeState = z.infer<typeof HordeStateSchema>;
 
+const OUTCOMES: readonly HordeOutcome[] = ["playing", "won", "lost"];
+
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 1,
+  version: 2,
   schema: HordeStateSchema,
+  migrations: {
+    // 1 -> 2: win after N waves and the debounced flow field. A version 1
+    // game rebuilt its flow field on the first tick after a restore; no
+    // flow cells and no pending change gives the same, as the first scan
+    // sees a changed structure set.
+    1: (d) => ({
+      ...d,
+      options: {
+        ...d.options,
+        wavesToWin: 0,
+        flowDebounce: 0,
+        flowMaxDelay: 0,
+      },
+      outcome: 0,
+      structureSig: -1,
+      flowCells: null,
+      lastChangeTick: -1,
+      firstPendingTick: -1,
+    }),
+  },
   cls: () => HordeExecution,
 });

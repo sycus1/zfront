@@ -33,6 +33,7 @@ import { EventsDisplay } from "./layers/EventsDisplay";
 import { GameLeftSidebar } from "./layers/GameLeftSidebar";
 import { GameRightSidebar } from "./layers/GameRightSidebar";
 import { HeadsUpMessage } from "./layers/HeadsUpMessage";
+import { HordeHud } from "./layers/HordeHud";
 import { ImmunityTimer } from "./layers/ImmunityTimer";
 import { MainRadialMenu } from "./layers/MainRadialMenu";
 import { MultiTabModal } from "./layers/MultiTabModal";
@@ -272,6 +273,12 @@ export function createRenderer(
   spawnTimer.eventBus = eventBus;
   spawnTimer.transformHandler = transformHandler;
 
+  const hordeHud = document.querySelector("horde-hud") as HordeHud;
+  if (!(hordeHud instanceof HordeHud)) {
+    console.error("horde hud not found");
+  }
+  hordeHud.game = game;
+
   const immunityTimer = document.querySelector(
     "immunity-timer",
   ) as ImmunityTimer;
@@ -325,6 +332,7 @@ export function createRenderer(
     ),
     spawnTimer,
     immunityTimer,
+    hordeHud,
     gameLeftSidebar,
     unitDisplay,
     gameRightSidebar,

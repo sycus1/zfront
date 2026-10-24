@@ -18,6 +18,9 @@ import {
   WarshipState,
 } from "./GameTypes";
 
+/** zfront: where a horde game stands. */
+export type HordeOutcome = "playing" | "won" | "lost";
+
 /**
  * zfront: the horde as the renderer sees it. The worker attaches one to the
  * last update of each batch, and its buffer is transferred, not copied.
@@ -34,6 +37,12 @@ export interface HordeFrame {
   alive: number;
   elites: number;
   wave: number;
+  /** Waves to survive to win; 0 means endless. */
+  wavesToWin: number;
+  /** Zombies and elites killed so far. */
+  killed: number;
+  structuresDestroyed: number;
+  outcome: HordeOutcome;
   /** The first human player's HQ health (0 once it has fallen). */
   hqHp: number;
   hqMaxHp: number;

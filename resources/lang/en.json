@@ -564,6 +564,21 @@
     "video_tutorial": "Video Tutorial",
     "video_tutorial_title": "zFront Tutorial"
   },
+  "horde_hud": {
+    "alive": "{count} zombies",
+    "hq": "HQ",
+    "wave": "Wave {wave}",
+    "wave_of": "Wave {wave} / {total}"
+  },
+  "horde_result": {
+    "killed": "Zombies killed",
+    "lost_summary": "The horde broke through on wave {wave}.",
+    "lost_title": "Your HQ has fallen",
+    "structures_lost": "Structures lost",
+    "waves": "Waves",
+    "won_summary": "You survived all {total} waves.",
+    "won_title": "You held out!"
+  },
   "host_modal": {
     "anonymous_players": "Anonymous players",
     "crowded": "Crowded modifier",

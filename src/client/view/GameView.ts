@@ -13,6 +13,7 @@ import {
 import {
   GameUpdateType,
   GameUpdateViewData,
+  HordeFrame,
   SpawnPhaseEndUpdate,
 } from "@openfront/engine-api/game/GameUpdates";
 import { GameLike, UnitPredicate } from "@openfront/engine-api/game/ReadViews";
@@ -93,6 +94,8 @@ export class GameView implements GameLike {
    * tick by update(). Renderer reads this each frame via frameData().
    */
   private _frame: FrameData;
+  /** zfront: the latest horde frame, kept across ticks for the HUD. */
+  private _lastHordeFrame: HordeFrame | null = null;
   private _structuresDirty = false;
   /** True until first populateFrame() — controls full-vs-delta tile upload. */
   private _firstPopulate = true;
@@ -468,6 +471,7 @@ export class GameView implements GameLike {
     f.tick = gu.tick;
     f.inSpawnPhase = this.startTick === null;
     f.hordeFrame = gu.hordeFrame ?? null;
+    if (gu.hordeFrame) this._lastHordeFrame = gu.hordeFrame;
     f.railroadDirty = this.railroadCache.railroadDirty;
     f.trailDirtyRowMin = this.trailManager.dirtyRowMin;
     f.trailDirtyRowMax = this.trailManager.dirtyRowMax;
@@ -580,6 +584,14 @@ export class GameView implements GameLike {
   /** Public accessor: the renderer reads this and uploads to the GPU. */
   frameData(): FrameData {
     return this._frame;
+  }
+
+  /**
+   * zfront: the latest horde frame (waves, kills, HQ health), or null before
+   * the first one or outside horde mode.
+   */
+  hordeStatus(): HordeFrame | null {
+    return this._lastHordeFrame;
   }
 
   /**

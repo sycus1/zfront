@@ -2,6 +2,7 @@ import { PlayerType, UnitType } from "@openfront/engine-api/game/GameTypes";
 import { Game } from "@openfront/engine/game/Game";
 import {
   HordeExecution,
+  HordeExecutionSnapshot,
   HordeOptions,
 } from "@openfront/engine/horde/HordeExecution";
 import { playerInfo, setup } from "../util/Setup";
@@ -105,5 +106,136 @@ describe("HordeExecution", () => {
     game.player("survivor").setSpawnTile(game.ref(50, 52));
     run(game, 40);
     await expectSnapshotRoundTrip(game, "plains", 30);
+  });
+
+  test("surviving every wave wins the game and stops the horde", async () => {
+    const { game, horde } = await hordeGame({
+      ...SMALL_WAVES,
+      wavesToWin: 2,
+      hqHp: 10_000_000,
+    });
+    const survivor = game.player("survivor");
+    survivor.setSpawnTile(game.ref(50, 48));
+    run(game, 380);
+    expect(horde.stats().wave).toBe(2);
+    expect(horde.stats().outcome).toBe("playing");
+    expect(game.getWinner()).toBeNull();
+    run(game, 40);
+    expect(horde.stats().outcome).toBe("won");
+    expect(game.getWinner()).toBe(survivor);
+    // No third wave, and the horde is frozen.
+    const hash = horde.stateHash();
+    run(game, 250);
+    expect(horde.stats().wave).toBe(2);
+    expect(horde.stateHash()).toBe(hash);
+  });
+
+  test("losing the last HQ marks the game lost", async () => {
+    const { game, horde } = await hordeGame({ ...SMALL_WAVES, hqHp: 2_000 });
+    game.player("survivor").setSpawnTile(game.ref(50, 48));
+    run(game, 400);
+    expect(horde.stats().outcome).toBe("lost");
+    expect(horde.encodeFrame()?.outcome).toBe("lost");
+    expect(game.getWinner()).toBeNull();
+  });
+
+  test("the frame carries wave progress and kills for the HUD", async () => {
+    const { game, horde } = await hordeGame({ ...SMALL_WAVES, wavesToWin: 7 }, [
+      [50, 44],
+    ]);
+    run(game, 60);
+    const frame = horde.encodeFrame()!;
+    expect(frame.wave).toBe(1);
+    expect(frame.wavesToWin).toBe(7);
+    expect(frame.killed).toBe(horde.stats().killed);
+    expect(frame.killed).toBeGreaterThan(0);
+    expect(frame.outcome).toBe("playing");
+  });
+
+  describe("flow-field debounce", () => {
+    // No waves, so nothing destroys what the test builds.
+    const QUIET: Partial<HordeOptions> = {
+      firstWaveDelay: 10_000,
+      flowDebounce: 10,
+      flowMaxDelay: 50,
+    };
+
+    function build(game: Game, x: number, y: number): void {
+      game.player("survivor").buildUnit(UnitType.City, game.ref(x, y), {});
+    }
+
+    test("a burst of structures costs one recompute once it settles", async () => {
+      const { game, horde } = await hordeGame(QUIET);
+      run(game, 3);
+      expect(horde.stats().recomputes).toBe(1);
+      for (let k = 0; k < 5; k++) {
+        build(game, 42 + 3 * k, 42);
+        run(game, 1);
+      }
+      // Still inside the debounce window of the last placement.
+      run(game, 5);
+      expect(horde.stats().recomputes).toBe(1);
+      run(game, 10);
+      expect(horde.stats().recomputes).toBe(2);
+      run(game, 30);
+      expect(horde.stats().recomputes).toBe(2);
+    });
+
+    test("structures that keep changing still recompute after the max delay", async () => {
+      const { game, horde } = await hordeGame(QUIET);
+      run(game, 3);
+      for (let k = 0; k < 60; k++) {
+        build(game, 41 + (k % 18), 41 + Math.floor(k / 18) * 3);
+        run(game, 1);
+        if (k === 48) expect(horde.stats().recomputes).toBe(1);
+      }
+      expect(horde.stats().recomputes).toBe(2);
+    });
+
+    test("new structures block the horde before the flow field catches up", async () => {
+      const { game, horde } = await hordeGame(QUIET);
+      run(game, 3);
+      build(game, 44, 44);
+      run(game, 1);
+      expect(horde.stats().recomputes).toBe(1);
+      // The obstacle map already holds the new city.
+      const field = (horde as unknown as { field: { obstacle: Uint8Array } })
+        .field;
+      const mini = game.miniMap();
+      expect(field.obstacle[22 * mini.width() + 22]).toBe(1);
+    });
+
+    test("a snapshot with a recompute pending restores identically", async () => {
+      const { game, horde } = await hordeGame(SMALL_WAVES, [[50, 44]]);
+      game.player("survivor").setSpawnTile(game.ref(50, 52));
+      run(game, 40);
+      build(game, 46, 50);
+      run(game, 2);
+      const before = horde.stats().recomputes;
+      await expectSnapshotRoundTrip(game, "plains", 30);
+      expect(horde.stats().recomputes).toBe(before + 1);
+    });
+
+    test("a version 1 snapshot migrates to endless waves and an immediate rebuild", () => {
+      const v1 = {
+        initialized: true,
+        options: { hqHp: 1 },
+        wave: 3,
+      };
+      const v2 = HordeExecutionSnapshot.migrations[1](v1);
+      expect(v2.options).toMatchObject({
+        hqHp: 1,
+        wavesToWin: 0,
+        flowDebounce: 0,
+        flowMaxDelay: 0,
+      });
+      expect(v2).toMatchObject({
+        wave: 3,
+        outcome: 0,
+        structureSig: -1,
+        flowCells: null,
+        firstPendingTick: -1,
+      });
+    });
   });
 });
