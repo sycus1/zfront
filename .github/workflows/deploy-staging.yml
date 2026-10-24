@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment:
-      name: staging
+      name: cloudflare
       url: https://staging.zfront.app
     steps:
       - name: Checkout repository
