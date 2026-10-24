@@ -42,7 +42,6 @@ import { GameManager } from "./GameManager";
 import { registerGamePreviewRoute } from "./GamePreviewRoute";
 import { type GameServer } from "./GameServer";
 import {
-  isSteamAuthenticated,
   type JoinVerifyResponse,
   planJoinVerify,
   verifyJoin,
@@ -660,27 +659,16 @@ export async function startWorker() {
         );
         if (ServerEnv.env() !== GameEnv.Dev) {
           const stored = game?.storedIdentity(persistentId) ?? null;
-          const steamAuthed = isSteamAuthenticated(claims);
           // SECURITY: the reject/skip/verify split (first joins must
           // present a token, only re-admits may omit it) lives in
-          // planJoinVerify — see its doc comment. Steam-authenticated first
-          // joins are the one sanctioned null-token first join: Steam
-          // ownership (a signed, unforgeable provider="steam" claim) stands
-          // in for the bot check, and the name check still runs.
+          // planJoinVerify — see its doc comment.
           const plan = planJoinVerify({
             isReadmit,
             gameStarted: game?.hasStarted() ?? false,
             turnstileToken: clientMsg.turnstileToken ?? null,
             identityUnchanged:
               stored !== null && stored.username === clientMsg.username,
-            steamAuthed,
           });
-          if (steamAuthed && !isReadmit) {
-            log.info(
-              "Steam-authed join: skipping Turnstile siteverify (name check still runs)",
-              { persistentID: persistentId, gameID: clientMsg.gameID },
-            );
-          }
           if (plan.action === "reject") {
             log.warn("Unauthorized: missing Turnstile token", {
               persistentID: persistentId,

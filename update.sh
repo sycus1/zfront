@@ -288,14 +288,11 @@ else
 
     # --- Per-version publish (multi-server v2) -------------------------------
     #
-    # Three more objects, keyed by SITE and the short commit rather than by this
-    # container. Together they are everything a player of this version needs
-    # that is not already a hashed asset: the page, and the desktop shell's
-    # release descriptor plus its cheap poll pointer.
+    # One more object, keyed by SITE and the short commit rather than by this
+    # container: the page, the one thing a player of this version needs that
+    # is not already a hashed asset.
     #
     #   game_assets/sites/<site>/v/<short>/index.html
-    #   game_assets/sites/<site>/v/<short>/desktop/release.json
-    #   game_assets/sites/<site>/v/<short>/desktop/version.json
     #
     # (The upload endpoint prefixes game_assets/ itself.) Nothing serves these
     # until the static Worker exists, so this is additive and harmless today —
@@ -354,37 +351,7 @@ else
         fi
     done
 
-    DESKTOP_RELEASE="$EXTRACT_DIR/desktop-release.json"
-    DESKTOP_VERSION="$EXTRACT_DIR/desktop-version.json"
-    if ! docker run --rm --env-file "$ENV_FILE" --entrypoint npx \
-        "${GHCR_IMAGE}" tsx src/server/RenderDesktopDescriptor.ts \
-        > "$DESKTOP_RELEASE"; then
-        echo "❌ Failed to build the desktop release descriptor"
-        exit 1
-    fi
-    if ! docker run --rm --env-file "$ENV_FILE" --entrypoint npx \
-        "${GHCR_IMAGE}" tsx src/server/RenderDesktopDescriptor.ts --version-pointer \
-        > "$DESKTOP_VERSION"; then
-        echo "❌ Failed to build the desktop version pointer"
-        exit 1
-    fi
-    # The shell refuses a descriptor it cannot parse, so publishing a truncated
-    # one strands every Steam client on this version.
-    if ! jq -e '.schemaVersion and .clientVersion and .template.sha256' \
-        "$DESKTOP_RELEASE" > /dev/null; then
-        echo "❌ The desktop release descriptor is missing required fields"
-        exit 1
-    fi
-    if ! jq -e '.clientVersion and .coreVersion' "$DESKTOP_VERSION" > /dev/null; then
-        echo "❌ The desktop version pointer is missing required fields"
-        exit 1
-    fi
-
     upload_versioned "${VERSION_PREFIX}/index.html" "$ENV_INDEX" "text/html" || exit 1
-    upload_versioned "${VERSION_PREFIX}/desktop/release.json" \
-        "$DESKTOP_RELEASE" "application/json" || exit 1
-    upload_versioned "${VERSION_PREFIX}/desktop/version.json" \
-        "$DESKTOP_VERSION" "application/json" || exit 1
 
     # resources/public/ (policy pages, robots.txt, press/, .well-known/): the
     # site has no origin behind the Worker, so it serves these from here, by
@@ -551,7 +518,7 @@ fi
 # Tell the API which commit new players of this site should get. This is the
 # single switch of multi-server v2 (docs/MultiServer.md): servers running
 # `latest` are `open` and take new games, everything else drains, and the
-# static Worker serves `latest`'s page at <site>/ and its /desktop/*.json.
+# static Worker serves `latest`'s page at <site>/.
 #
 # It runs LAST, after the new container is up, because the API refuses to flag
 # a version no server has checked in for — that refusal (409) is the interlock

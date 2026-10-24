@@ -8,7 +8,6 @@ import {
   GameID,
   Intent,
   StampedIntent,
-  Tribe,
   Turn,
   Winner,
 } from "@openfront/engine-api/Schemas";
@@ -55,7 +54,6 @@ import { archive, finalizeGameRecord } from "./Archive";
 import { Client } from "./Client";
 import { applyGameConfigPatch, hostCheatsEnabled } from "./ConfigPatch";
 import { LiveStatsVote, voteKey, WinnerVote } from "./Consensus";
-import { fetchCustomTribes } from "./CustomTribes";
 import { DesyncDetector } from "./DesyncDetector";
 import { Gatekeeper, MatchGatekeeper, noopGatekeeper } from "./Gatekeeper";
 import {
@@ -156,7 +154,6 @@ export interface GameServerDeps {
   replayWinner: WinnerReplayer;
   // Replays waiting or running on this worker, against LONE_VOTER_REPLAY_CAP.
   replayPending: () => number;
-  fetchTribes: typeof fetchCustomTribes;
   env: () => GameEnv;
   turnIntervalMs: () => number;
   gatekeeper: Gatekeeper;
@@ -180,7 +177,6 @@ export function defaultGameServerDeps(): GameServerDeps {
     archive: (record) => archive(finalizeGameRecord(record)),
     replayWinner: replayWinnerInChild,
     replayPending: () => winnerReplayMetrics.pending,
-    fetchTribes: fetchCustomTribes,
     env: () => ServerEnv.env(),
     turnIntervalMs: () => ServerEnv.turnIntervalMs(),
     gatekeeper: noopGatekeeper,
@@ -245,7 +241,6 @@ export class GameServer {
 
   // Purchased bot tribe names drawn for this game, set when the prestart
   // fetch lands (undefined until then / on fetch failure / non-public games).
-  private tribes?: Tribe[];
 
   // The end-of-game winner vote and the running live-stats vote: both
   // IP-weighted majorities among the players (see Consensus.ts).
@@ -909,7 +904,6 @@ export class GameServer {
       return;
     }
     this.stage = "prestart";
-    this.fetchTribes();
 
     const prestartMsg = ServerPrestartMessageSchema.safeParse({
       type: "prestart",
@@ -934,37 +928,6 @@ export class GameServer {
         c.ws.send(msg);
       }
     });
-  }
-
-  // Public games draw purchased bot tribe names from the API at prestart —
-  // its 1.5s timeout fits the 2s prestart->start gap, so the pool is
-  // normally in hand when start() builds the game start info. Best effort:
-  // on timeout/error the game starts with organic bot names.
-  private fetchTribes(): void {
-    if (!this.isPublic() || this.gameConfig.bots === 0) {
-      return;
-    }
-    // Logged-in humans only — guests can't own tribe names.
-    const players = this.clients
-      .active()
-      .flatMap((c) =>
-        c.publicId !== undefined
-          ? [{ clientId: c.clientID, publicId: c.publicId }]
-          : [],
-      );
-    this.deps
-      .fetchTribes(players)
-      .then((tribes) => {
-        // One tribe per bot: with fewer bots than tribes, drop from the
-        // tail (the global-pool slice).
-        const used = tribes.slice(0, this.gameConfig.bots);
-        if (used.length > 0) {
-          this.tribes = used;
-        }
-      })
-      .catch((error) => {
-        this.log.warn(`failed to fetch custom tribes: ${error}`);
-      });
   }
 
   private startLobbyInfoBroadcast() {
@@ -1080,7 +1043,6 @@ export class GameServer {
         friends: friendsFor(c),
         teamIndex: this.matchmakingTeamIndex(c),
       })),
-      tribes: this.tribes,
     });
     if (!result.success) {
       const error = z.prettifyError(result.error);
@@ -1931,7 +1893,6 @@ export class GameServer {
         winner?.winner,
         this.createdAt,
         this.visibleAt,
-        this.gameStartInfo.tribes,
         [...this.reports.values()],
         this.publicGameType,
         statsAgreed,

@@ -563,17 +563,6 @@ export const PlayerSchema = z.object({
   teamIndex: zb.uint().optional(),
 });
 
-// A purchased bot tribe name in use this game (active names are globally
-// unique, so the name alone identifies the tribe). Loose to mirror infra's
-// analytics-ingest schema — a field the API adds later flows through to the
-// record without a game-side change, instead of being silently stripped.
-export const TribeSchema = z
-  .object({
-    name: SafeString.min(1).max(64),
-  })
-  .loose();
-export type Tribe = z.infer<typeof TribeSchema>;
-
 export const GameStartInfoSchema = z.object({
   gameID: ID,
   lobbyCreatedAt: zb.uint(),
@@ -581,11 +570,6 @@ export const GameStartInfoSchema = z.object({
   listed: z.boolean().optional(),
   config: GameConfigSchema,
   players: PlayerSchema.array(),
-  // Purchased bot tribe names in use this game (public games only). Rides
-  // the analytics record to infra at game end for owner appearance stats.
-  // zb.json: TribeSchema is `.loose()`, and a positional binary layout would
-  // silently drop the passthrough keys that looseness exists to preserve.
-  tribes: z.array(zb.json(TribeSchema)).max(100).optional(),
 });
 
 export const WinnerSchema = z

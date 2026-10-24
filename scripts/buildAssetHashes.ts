@@ -22,12 +22,6 @@ export interface AssetHash {
 // exclusion list has to enumerate all of those correctly forever; an allowlist
 // only has to name the two roots the overlay can actually serve.
 //
-// Note asset-manifest.json is NOT "superseded by the descriptor": the
-// descriptor carries the download SET (keyed by emitted path), while
-// asset-manifest.json carries the semantic MAPPING the client resolves names
-// through (semantic name -> hashed url). The descriptor carries it as its own
-// top-level `assetManifest` field -- see buildDescriptor in
-// src/server/DesktopRelease.ts -- rather than as a hashed asset.
 const ALLOWED_ROOTS = ["assets/", "_assets/"];
 
 function isOverlayServable(rel: string): boolean {

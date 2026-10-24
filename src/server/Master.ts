@@ -14,7 +14,6 @@ import {
   registeredSite,
   sendCheckin,
 } from "./ClusterCheckin";
-import { getDescriptor } from "./DesktopRelease";
 import {
   coordinatorUrl,
   LobbyCoordinatorClient,
@@ -59,45 +58,6 @@ app.use(async (req, res, next) => {
   }
 });
 
-// Desktop (Steam) shell release descriptor. See openfront-desktop's
-// docs/superpowers/specs/2026-08-20-runtime-asset-updating-design.md.
-//
-// version.json is polled once a minute by every running desktop client, so it
-// is deliberately tiny and separately cacheable; release.json is fetched only
-// when that pointer changes. Both must be reachable without a bot challenge --
-// see OPE-192.
-const staticDir = path.join(__dirname, "../../static");
-const descriptorOpts = () => ({
-  clientVersion: ServerEnv.gitCommit(),
-  cdnBase: ServerEnv.cdnBase(),
-  // Production must have a CDN: without one this descriptor would point every
-  // Steam client at this app server for ~570MB of assets. Dev and preprod have
-  // no CDN, and same-origin is what the web client already does there.
-  requireCdnBase: ServerEnv.env() === GameEnv.Prod,
-});
-
-app.get("/desktop/version.json", async (_req, res) => {
-  try {
-    const d = await getDescriptor(staticDir, descriptorOpts());
-    res.setHeader("Cache-Control", "public, max-age=0, s-maxage=30");
-    res.json({ clientVersion: d.clientVersion, coreVersion: d.coreVersion });
-  } catch (error) {
-    log.error("Error building desktop version pointer:", error);
-    res.status(500).json({ error: "unavailable" });
-  }
-});
-
-app.get("/desktop/release.json", async (_req, res) => {
-  try {
-    const d = await getDescriptor(staticDir, descriptorOpts());
-    res.setHeader("Cache-Control", "public, max-age=0, s-maxage=30");
-    res.json(d);
-  } catch (error) {
-    log.error("Error building desktop release descriptor:", error);
-    res.status(500).json({ error: "unavailable" });
-  }
-});
-
 app.use(
   express.static(path.join(__dirname, "../../static"), {
     maxAge: "1y", // Set max-age to 1 year for all static assets
@@ -116,35 +76,6 @@ app.use(
     windowMs: 1000, // 1 second
     max: 20, // 20 requests per IP per second
   }),
-);
-
-// Apple Pay domain verification (Stripe's universal association file,
-// vendored in resources/public/). Apple fetches this exact path over HTTPS when the
-// domain is registered in the Stripe dashboard, and it must get the raw file:
-// express.static above ignores dotfile paths (so it falls through to here)
-// and the SPA fallback below would answer with the app shell, which makes
-// registration fail with no error anywhere we can see. Registered after the
-// rate limiter so the file read is covered by it. Verify with
-// `curl https://<domain>/.well-known/apple-developer-merchantid-domain-association`.
-app.get(
-  "/.well-known/apple-developer-merchantid-domain-association",
-  (_req, res) => {
-    res.type("text/plain");
-    res.sendFile(
-      path.join(
-        __dirname,
-        "../../resources/public/.well-known/apple-developer-merchantid-domain-association",
-      ),
-      // sendFile refuses dotfile path segments (".well-known") by default.
-      // maxAge matters beyond browsers: nginx's proxy cache honours the
-      // upstream Cache-Control, and sendFile's default max-age=0 would veto
-      // the nginx.conf location block that shields this route.
-      { dotfiles: "allow", maxAge: "1d" },
-      (err) => {
-        if (err && !res.headersSent) res.status(404).end();
-      },
-    );
-  },
 );
 
 app.use("/api", (_req, res, next) => {

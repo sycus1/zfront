@@ -174,7 +174,6 @@ export function makeGame(opts: GameOpts = {}): GameServer {
     replayWinner: vi.fn(async () => null),
     // An empty replay queue, whatever other tests left in the real one.
     replayPending: () => 0,
-    fetchTribes: vi.fn(async () => []),
   };
   Object.assign(deps, opts.deps);
   return new GameServer(

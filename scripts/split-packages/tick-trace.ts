@@ -80,7 +80,6 @@ function recordGame(name: string, gameID: string): TraceGame {
         lobbyCreatedAt: info.lobbyCreatedAt,
         config: info.config,
         players: info.players,
-        tribes: info.tribes,
       });
       return { gameStart, turns: record.turns };
     },

@@ -13,12 +13,6 @@ import {
 // What the game writes into the record it archives, driven through real
 // joins and starts and read off the injected archive.
 
-// Lets the fetchTribes .then/.catch chain settle.
-async function flushMicrotasks() {
-  await Promise.resolve();
-  await Promise.resolve();
-}
-
 describe("archived game records", () => {
   let archive: ReturnType<
     typeof vi.fn<(r: PartialGameRecord) => Promise<void>>
@@ -148,44 +142,6 @@ describe("archived game records", () => {
     expect(log.debug).toHaveBeenCalledWith(
       expect.stringContaining(`Unable to find stats for clientID ${BOB}`),
     );
-  });
-
-  it("carries custom tribe names into the archived record for infra ingest and replays", async () => {
-    const fetchTribes = vi.fn(async () => [
-      { name: "Dragon Riders" },
-      { name: "Night Wolves" },
-    ]);
-    const game = makeGame({
-      config: { gameType: GameType.Public, bots: 2 },
-      deps: { archive, fetchTribes },
-    });
-    game.joinClient(makeClient({ publicId: "someone-pub" }));
-
-    game.prestart();
-    await flushMicrotasks();
-    game.start();
-    // Ending an unfinished game archives it as it stands.
-    await game.end();
-
-    expect(archive).toHaveBeenCalledTimes(1);
-    expect(archived().info.tribes).toEqual([
-      { name: "Dragon Riders" },
-      { name: "Night Wolves" },
-    ]);
-  });
-
-  it("omits tribes from the archived record when none were fetched", async () => {
-    const game = makeGame({
-      config: { gameType: GameType.Public, bots: 2 },
-      deps: { archive },
-    });
-    game.joinClient(makeClient());
-
-    startGame(game);
-    await game.end();
-
-    expect(archive).toHaveBeenCalledTimes(1);
-    expect(archived().info.tribes).toBeUndefined();
   });
 
   it("records the public lobby type for infra's per-type join rates", async () => {

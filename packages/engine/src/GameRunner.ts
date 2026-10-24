@@ -85,12 +85,7 @@ export async function createGameRunner(
 
   const gr = new GameRunner(
     game,
-    new Executor(
-      game,
-      gameStart.gameID,
-      clientID,
-      gameStart.tribes?.map((t) => t.name),
-    ),
+    new Executor(game, gameStart.gameID, clientID),
     callBack,
   );
   gr.init();
@@ -135,12 +130,7 @@ export async function createGameRunnerFromSnapshot(
   // No init(): the snapshot already holds every execution init() adds.
   return new GameRunner(
     game,
-    new Executor(
-      game,
-      gameStart.gameID,
-      clientID,
-      gameStart.tribes?.map((t) => t.name),
-    ),
+    new Executor(game, gameStart.gameID, clientID),
     callBack,
   );
 }

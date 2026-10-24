@@ -144,7 +144,6 @@ const SERVER_MESSAGES: ServerMessage[] = [
         },
         { clientID: P3, username: "charlie" },
       ],
-      tribes: [{ name: "Wolves" }],
     },
   },
   {

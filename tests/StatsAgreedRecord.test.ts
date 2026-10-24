@@ -41,7 +41,6 @@ describe("GameEndInfo.statsAgreed", () => {
       undefined,
       undefined,
       undefined,
-      undefined,
       statsAgreed,
     );
 
