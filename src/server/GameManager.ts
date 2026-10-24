@@ -92,7 +92,7 @@ export class GameManager {
         gameConfig: {
           donateGold: false,
           donateTroops: false,
-          gameMap: GameMapType.World,
+          gameMap: GameMapType.Britannia,
           gameType: GameType.Private,
           gameMapSize: GameMapSize.Normal,
           difficulty: Difficulty.Easy,

@@ -15,16 +15,16 @@ describe("FetchGameMapLoader", () => {
     const loader = new FetchGameMapLoader(
       (path) => `/_assets/maps/${path}.hashed`,
     );
-    const mapData = loader.getMapData(GameMapType.BritanniaClassic);
+    const mapData = loader.getMapData(GameMapType.Britannia);
 
     expect(mapData.webpPath).toBe(
-      "/_assets/maps/britanniaclassic/thumbnail.webp.hashed",
+      "/_assets/maps/britannia/thumbnail.webp.hashed",
     );
 
     await mapData.manifest();
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "/_assets/maps/britanniaclassic/manifest.json.hashed",
+      "/_assets/maps/britannia/manifest.json.hashed",
     );
   });
 
@@ -42,12 +42,12 @@ describe("FetchGameMapLoader", () => {
     );
 
     const loader = new FetchGameMapLoader("/maps");
-    const mapData = loader.getMapData(GameMapType.China);
+    const mapData = loader.getMapData(GameMapType.Britannia);
 
     await expect(mapData.layerImage("label", false)).resolves.toBe(bitmap);
-    expect(fetchMock).toHaveBeenLastCalledWith("/maps/china/label.webp");
+    expect(fetchMock).toHaveBeenLastCalledWith("/maps/britannia/label.webp");
 
     await expect(mapData.layerImage("label", true)).resolves.toBe(bitmap);
-    expect(fetchMock).toHaveBeenLastCalledWith("/maps/china/label.4x.webp");
+    expect(fetchMock).toHaveBeenLastCalledWith("/maps/britannia/label.4x.webp");
   });
 });

@@ -52,7 +52,7 @@ vi.mock("../../../src/client/TerrainMapFileLoader", () => ({
 
 const start = {
   gameID: "initTest1",
-  config: { gameMap: GameMapType.Onion, gameMapSize: GameMapSize.Normal },
+  config: { gameMap: GameMapType.Britannia, gameMapSize: GameMapSize.Normal },
 } as unknown as GameStartInfo;
 
 beforeEach(() => {
@@ -71,7 +71,7 @@ describe("WorkerClient.initialize", () => {
     const { msg, transfer } = worker.posted[0];
     expect(msg).toMatchObject({
       type: "init",
-      map: { map: GameMapType.Onion, mapSize: GameMapSize.Normal },
+      map: { map: GameMapType.Britannia, mapSize: GameMapSize.Normal },
     });
     expect(msg).not.toHaveProperty("cdnBase");
     expect(transfer).toHaveLength(2);

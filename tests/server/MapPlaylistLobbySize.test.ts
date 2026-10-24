@@ -35,24 +35,24 @@ describe("MapPlaylist lobby sizes", () => {
     for (const r of [0.1, 0.4, 0.9]) {
       random.mockReturnValue(r);
       sizes.push(
-        await playlist().lobbyMaxPlayers(GameMapType.TheBox, GameMode.FFA),
+        await playlist().lobbyMaxPlayers(GameMapType.Britannia, GameMode.FFA),
       );
     }
     expect(sizes).toEqual([210, 160, 105]);
 
     random.mockReturnValue(0.9);
     expect(
-      await playlist().lobbyMaxPlayers(GameMapType.TheBox, GameMode.Team),
+      await playlist().lobbyMaxPlayers(GameMapType.Britannia, GameMode.Team),
     ).toBe(158);
   });
 
   it("keeps the crowded modifier at 125 / 60 players on small maps", async () => {
     land.tiles = 1_000_000;
     expect(
-      await playlist().getCrowdedMaxPlayers(GameMapType.World, false),
+      await playlist().getCrowdedMaxPlayers(GameMapType.Britannia, false),
     ).toBe(125);
-    expect(await playlist().getCrowdedMaxPlayers(GameMapType.World, true)).toBe(
-      60,
-    );
+    expect(
+      await playlist().getCrowdedMaxPlayers(GameMapType.Britannia, true),
+    ).toBe(60);
   });
 });

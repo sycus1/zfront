@@ -76,7 +76,7 @@ export function scriptedGameStart(
     gameID: "SNAPTEST1",
     lobbyCreatedAt: 0,
     config: {
-      gameMap: GameMapType.World,
+      gameMap: GameMapType.Britannia,
       gameMapSize: GameMapSize.Compact,
       gameMode: GameMode.FFA,
       gameType: GameType.Private,

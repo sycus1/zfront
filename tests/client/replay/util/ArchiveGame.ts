@@ -150,7 +150,7 @@ export function spawnOnLand(
 /** A public-game config; Pangaea FFA with 20 bots unless overridden. */
 export function config(overrides: Partial<GameConfig> = {}): GameConfig {
   return {
-    gameMap: GameMapType.Pangaea,
+    gameMap: GameMapType.Britannia,
     difficulty: Difficulty.Medium,
     donateGold: false,
     donateTroops: false,

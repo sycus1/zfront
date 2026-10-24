@@ -49,7 +49,7 @@ function ctxPair() {
 }
 
 const CONFIG: GameConfig = {
-  gameMap: GameMapType.World,
+  gameMap: GameMapType.Britannia,
   difficulty: Difficulty.Medium,
   donateGold: true,
   donateTroops: true,
@@ -120,7 +120,7 @@ const SERVER_MESSAGES: ServerMessage[] = [
   },
   {
     type: "prestart",
-    gameMap: GameMapType.Europe,
+    gameMap: GameMapType.Britannia,
     gameMapSize: GameMapSize.Compact,
   },
   {

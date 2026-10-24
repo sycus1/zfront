@@ -186,12 +186,14 @@ Build zfront on the forked OpenFront engine.
 
 ## After the spike: Phase 0 (strip and rebrand) checklist
 
-- [ ] **Remove** alliances, embargoes, trade and transport ships, warships, trains and rail, clans, ranked play, Steam, Stripe and payments, Poki and CrazyGames SDKs, ads, the cosmetics store, and the closed-API calls (`api.openfront.io`).
-- [ ] **Remove maps** other than the zfront ones, plus their entries in `Maps.gen.ts` and `en.json`. That cuts about 600 MB from the deploy.
+- [x] **Remove** alliances, embargoes and traitors, clans, ranked play and the paid lobby queue, the Steam desktop release and Steam joins, Stripe and Apple Pay, and paid bot tribe names. Poki, CrazyGames, ads and the cosmetics store went in the first UI cleanup (PR #1). **Kept on purpose:** trade and transport ships, warships, trains and rail, which zfront may reuse.
+- [ ] **Closed-API calls** (`api.openfront.io`): still wired into auth, join verification, lobby coordination and archiving. The MVP is single-player only, so these go when the multiplayer server is dropped or replaced.
+- [x] **Remove maps** other than Britannia, plus their entries in `Maps.gen.ts` and `en.json`. `resources/maps` went from 616 MB to 4 MB.
 - [ ] **Rebrand** the UI with the zfront name, logo, favicon and font, and add an AGPL "Source" link to the footer. Keep "© OpenFront and Contributors".
 - [ ] **Static deploy to Cloudflare Workers** (`staging.zfront.app`). Build the client with Vite, render the app shell with `src/server/RenderStaticIndex.ts --environment-only` (which OpenFront already uses for its static Worker), and serve `out/` plus `resources/` as Workers Static Assets.
 - [ ] **England map:** a heightmap script from OS Terrain 50 to PNG, then `npm run gen-maps` (needs Go).
-- [ ] **Docs:** rewrite `CONTRIBUTING.md` for zfront and enable GitHub Actions on the fork, which has them off by default. Keep only `ci.yml`.
+- [x] **Docs:** rewrite `CONTRIBUTING.md` for zfront.
+- [ ] **CI:** enable GitHub Actions on the fork, which has them off by default. Keep only `ci.yml`. (Handled with the staging deploy.)
 
 ## Prerequisites
 

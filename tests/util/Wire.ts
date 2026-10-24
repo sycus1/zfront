@@ -71,7 +71,7 @@ export function testGameConfig(
   overrides: Partial<GameConfig> = {},
 ): GameConfig {
   return {
-    gameMap: GameMapType.World,
+    gameMap: GameMapType.Britannia,
     gameMapSize: GameMapSize.Normal,
     difficulty: Difficulty.Medium,
     gameType: GameType.Private,

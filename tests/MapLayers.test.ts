@@ -351,7 +351,7 @@ describe("Map layer feature", () => {
         vi.fn(async (id: string) => ({ id }) as unknown as ImageBitmap),
       );
       const images = await loadLayerImages(
-        GameMapType.China,
+        GameMapType.Britannia,
         GameMapSize.Normal,
         loader,
         layers,
@@ -366,7 +366,7 @@ describe("Map layer feature", () => {
         vi.fn(async (id: string) => ({ id }) as unknown as ImageBitmap),
       );
       const images = await loadLayerImages(
-        GameMapType.China,
+        GameMapType.Britannia,
         GameMapSize.Compact,
         loader,
         layers,
@@ -383,7 +383,7 @@ describe("Map layer feature", () => {
         return { id } as unknown as ImageBitmap;
       });
       const images = await loadLayerImages(
-        GameMapType.China,
+        GameMapType.Britannia,
         GameMapSize.Normal,
         loader,
         layers,
@@ -399,7 +399,7 @@ describe("Map layer feature", () => {
   describe("loadTerrainMap alpha validation", () => {
     function makeFiles(
       layers: MapLayer[],
-      map = GameMapType.World,
+      map = GameMapType.Britannia,
       width = 2,
       height = 2,
     ): MapFiles {
@@ -451,7 +451,7 @@ describe("Map layer feature", () => {
     test("accepts layers without alpha (undefined)", async () => {
       const files = makeFiles(
         [{ id: "noalpha", placement: "land" }],
-        GameMapType.Europe,
+        GameMapType.Britannia,
       );
       const data = await loadTerrainMap(files);
       expect(data.layers).toHaveLength(1);

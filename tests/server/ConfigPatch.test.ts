@@ -17,7 +17,7 @@ import { testGameConfig } from "../util/Wire";
 // One value per key the host may edit, each different from testGameConfig's
 // default so a copy is observable.
 const EDITABLE: { [K in keyof GameConfig]?: GameConfig[K] } = {
-  gameMap: GameMapType.Europe,
+  gameMap: GameMapType.Britannia,
   gameMapSize: GameMapSize.Compact,
   difficulty: Difficulty.Hard,
   nations: "disabled",

@@ -60,7 +60,7 @@ function mockRes() {
   return res;
 }
 
-const BASE = { gameMap: "World", gameMode: "Free For All" };
+const BASE = { gameMap: "Britannia", gameMode: "Free For All" };
 const LISTED_DEADLINE = 1_700_000_300_000;
 
 // Ids are minted one at a time; hand out a distinct one per call.

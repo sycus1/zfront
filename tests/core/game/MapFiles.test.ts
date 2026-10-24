@@ -21,7 +21,7 @@ describe("MapFiles", () => {
   test("only the bins the size reads are loaded and moved", async () => {
     const normal = await loadMapFiles(
       maps,
-      GameMapType.Onion,
+      GameMapType.Britannia,
       GameMapSize.Normal,
     );
     expect(normal.map16xBin).toBeUndefined();
@@ -31,7 +31,7 @@ describe("MapFiles", () => {
     ]);
     const compact = await loadMapFiles(
       maps,
-      GameMapType.Onion,
+      GameMapType.Britannia,
       GameMapSize.Compact,
     );
     expect(compact.mapBin).toBeUndefined();
@@ -44,7 +44,7 @@ describe("MapFiles", () => {
   test("each size builds its maps from its own bins", async () => {
     const normal = await loadMapFiles(
       maps,
-      GameMapType.Onion,
+      GameMapType.Britannia,
       GameMapSize.Normal,
     );
     const { map, map4x, map16x } = normal.manifest;
@@ -61,7 +61,7 @@ describe("MapFiles", () => {
     expect(n.nations).toEqual(normalNations);
 
     const c = await loadTerrainMap(
-      await loadMapFiles(maps, GameMapType.Onion, GameMapSize.Compact),
+      await loadMapFiles(maps, GameMapType.Britannia, GameMapSize.Compact),
     );
     expect([c.gameMap.width(), c.gameMap.height()]).toEqual([
       map4x.width,
@@ -82,7 +82,7 @@ describe("MapFiles", () => {
   test("a bin the size reads but wasn't passed fails", async () => {
     const files = await loadMapFiles(
       maps,
-      GameMapType.Onion,
+      GameMapType.Britannia,
       GameMapSize.Normal,
     );
     await expect(
@@ -92,22 +92,21 @@ describe("MapFiles", () => {
 
   test("a game doesn't start on another map's files", async () => {
     const start = scriptedGameStart({
-      gameMap: GameMapType.Onion,
+      gameMap: GameMapType.Britannia,
       gameMapSize: GameMapSize.Compact,
     });
     const otherSize = await loadMapFiles(
       maps,
-      GameMapType.Onion,
+      GameMapType.Britannia,
       GameMapSize.Normal,
     );
     await expect(
       createGameRunner(start, undefined, otherSize, () => {}),
     ).rejects.toThrow(/the files passed are/);
-    const otherMap = await loadMapFiles(
-      maps,
-      GameMapType.Pangaea,
-      GameMapSize.Compact,
-    );
+    const otherMap = {
+      ...(await loadMapFiles(maps, GameMapType.Britannia, GameMapSize.Compact)),
+      map: "Elsewhere" as GameMapType,
+    };
     await expect(
       createGameRunner(start, undefined, otherMap, () => {}),
     ).rejects.toThrow(/the files passed are/);

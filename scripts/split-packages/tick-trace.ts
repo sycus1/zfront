@@ -123,8 +123,7 @@ const GAMES: TraceGame[] = [
   recordGame("1v1", "dYgXAeSUug"),
   recordGame("team", "dEKTPuqCtD"),
   recordGame("ffa", "dFHzwiiARh"),
-  nationsOnlyGame("nations-europe", GameMapType.Europe),
-  nationsOnlyGame("nations-world", GameMapType.World),
+  nationsOnlyGame("nations-britannia", GameMapType.Britannia),
 ];
 
 interface TraceLine {

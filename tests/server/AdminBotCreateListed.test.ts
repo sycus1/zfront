@@ -41,7 +41,7 @@ function mockRes() {
   return res;
 }
 
-const BASE = { gameMap: "World", gameMode: "Free For All" };
+const BASE = { gameMap: "Britannia", gameMode: "Free For All" };
 
 beforeEach(() => {
   // Minting an id derives the worker count from the environment; the other

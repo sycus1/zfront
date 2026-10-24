@@ -256,11 +256,6 @@ export class MapPlaylist {
       excludedModifiers.push("isRandomSpawn");
     }
 
-    // No gold multi on FourIslands team games - Too high chance of 3h long stalemates
-    if (map === GameMapType.FourIslands && mode === GameMode.Team) {
-      excludedModifiers.push("goldMultiplier");
-    }
-
     // Hard nations modifier only applies when nations are present (not HvN, which is always hard)
     if (mode === GameMode.Team) {
       excludedModifiers.push("isHardNations");
