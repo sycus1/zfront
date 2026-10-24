@@ -276,7 +276,6 @@ export class Transport {
       type: "join",
       gameID: this.lobbyConfig.gameID,
       username: this.lobbyConfig.playerName,
-      clanTag: this.lobbyConfig.playerClanTag ?? null,
       cosmetics: this.lobbyConfig.cosmetics,
       turnstileToken: null,
       token: "",

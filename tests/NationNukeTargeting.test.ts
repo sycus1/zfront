@@ -249,7 +249,6 @@ describe("Nation nuke targets in team games", () => {
             null,
             id,
             false,
-            null,
             [],
             teams[id],
           ),

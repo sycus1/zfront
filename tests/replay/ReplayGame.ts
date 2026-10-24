@@ -181,7 +181,6 @@ async function main(): Promise<void> {
         p.clientID,
         random.nextID(),
         p.isLobbyCreator ?? false,
-        p.clanTag,
         p.friends ?? [],
         p.teamIndex ?? null,
       ),

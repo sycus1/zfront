@@ -68,20 +68,6 @@ describe("diffPlayerUpdate", () => {
     expect(diff.hasSpawned).toBeUndefined();
   });
 
-  it("carries a changed clanTag and stays quiet when it is unchanged", () => {
-    expect(
-      diffPlayerUpdate(
-        makePlayerUpdate({ clanTag: "ABCDE" }),
-        makePlayerUpdate({ clanTag: "ABCDE" }),
-      ),
-    ).toBeNull();
-    const diff = diffPlayerUpdate(
-      makePlayerUpdate({ clanTag: null }),
-      makePlayerUpdate({ clanTag: "ABCDE" }),
-    )!;
-    expect(diff.clanTag).toBe("ABCDE");
-  });
-
   it("carries a changed nationFlag and stays quiet when it is unchanged", () => {
     expect(
       diffPlayerUpdate(

@@ -160,11 +160,6 @@ export const JoinUsernameSchema = z
   .min(MIN_USERNAME_LENGTH)
   .max(MAX_USERNAME_LENGTH);
 
-export const ClanTagSchema = z
-  .string()
-  .regex(/^[a-zA-Z0-9]{2,5}$/)
-  .nullable();
-
 //
 // Utility types
 //
@@ -277,7 +272,6 @@ export const GameConfigSchema = z.object({
   infiniteTroops: z.boolean(),
   instantBuild: z.boolean(),
   disableNavMesh: z.boolean().optional(),
-  disableClanTags: z.boolean().optional(),
   // Opt-in live game stats reporting for the admin bot. Off by default and has
   // no UI — the admin bot sets it when creating tournament games, since it adds
   // per-client traffic. See LiveStatsController / GameServer.handleLiveStats.
@@ -561,12 +555,11 @@ export const TurnSchema = z.object({
 export const PlayerSchema = z.object({
   clientID: ID,
   username: UsernameSchema,
-  clanTag: ClanTagSchema,
   isLobbyCreator: z.boolean().optional(),
   friends: z.array(ID).optional(),
   // Server-stamped team slot for matchmade team games (index into the
   // game's team list). Feeds deterministic team assignment, so it must be
-  // identical for every client (like clanTag/friends).
+  // identical for every client (like friends).
   teamIndex: zb.uint().optional(),
 });
 

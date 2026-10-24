@@ -14,7 +14,6 @@ import { makeGameView, makePlayerView, stubConfig } from "./util/viewStubs";
 const emptyRow = {
   position: 1,
   name: "alice",
-  clanTag: null,
   value: 0,
 };
 
@@ -35,7 +34,6 @@ describe("Stats column registry", () => {
       expect(def.isOrderable).toBe(def.value !== undefined);
     }
     expect(columnById("rank").isOrderable).toBe(false);
-    expect(columnById("clan").isOrderable).toBe(false);
     expect(columnById("player").isOrderable).toBe(false);
     expect(columnById("tiles").isOrderable).toBe(true);
   });
@@ -55,7 +53,6 @@ describe("Stats column registry", () => {
     expect(columnById("rank").isHideable).toBe(false);
     expect(columnById("player").isHideable).toBe(false);
     expect(columnById("team").isHideable).toBe(false);
-    expect(columnById("clan").isHideable).toBe(true);
     expect(columnById("gold").isHideable).toBe(true);
   });
 
@@ -65,19 +62,18 @@ describe("Stats column registry", () => {
     }
   });
 
-  it("splits the tables on clan and the identity column", () => {
+  it("splits the tables on the identity column", () => {
     expect(columnsFor("player").map((column) => column.id)).toEqual([
       "rank",
-      "clan",
       "player",
       "playerType",
-      ...COLUMN_IDS.slice(5),
+      ...COLUMN_IDS.slice(4),
     ]);
-    // The team table has no clan and no player type (a team has no type).
+    // The team table has no player type (a team has no type).
     expect(columnsFor("team").map((column) => column.id)).toEqual([
       "rank",
       "team",
-      ...COLUMN_IDS.slice(5),
+      ...COLUMN_IDS.slice(4),
     ]);
   });
 
@@ -88,8 +84,6 @@ describe("Stats column registry", () => {
         expect(columnById(id).kinds).toContain(kind);
       }
     }
-    expect(DEFAULT_STATS_COLUMNS.player).toContain("clan");
-    expect(DEFAULT_STATS_COLUMNS.team).not.toContain("clan");
   });
 
   it("renders a cell for every column", () => {
@@ -108,13 +102,11 @@ describe("Stats column registry", () => {
 
   it("reads identity cells off the row, not the value map", () => {
     const game = makeGameView();
-    const row = { ...emptyRow, position: 7, clanTag: "ABCDE" };
+    const row = { ...emptyRow, position: 7 };
 
     expect(columnById("rank").cell(row, game)).toBe("7");
-    expect(columnById("clan").cell(row, game)).toBe("ABCDE");
     expect(columnById("player").cell(row, game)).toBe("alice");
     expect(columnById("team").cell(row, game)).toBe("alice");
-    expect(columnById("clan").cell(emptyRow, game)).toBe("");
   });
 
   it("renders zero owned percentage when no valid land remains", () => {

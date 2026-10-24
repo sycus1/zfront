@@ -362,7 +362,6 @@ async function main(): Promise<void> {
     clientMapData,
     undefined, // no local client — bots-only game, myPlayer stays null
     "perf-harness",
-    null,
     gameStart.gameID,
     gameStart.players,
   );

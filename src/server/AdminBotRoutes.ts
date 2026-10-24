@@ -131,7 +131,7 @@ function parseCreateGameRequest(reqBody: unknown): ParsedCreateGame {
   // can never be smuggled in through update_game_config after the fact.
   //
   // Entries are publicIds. assignTeams honours a pinned slot unconditionally —
-  // before and regardless of clan/friend grouping — so this is how a tournament
+  // before and regardless of friend grouping — so this is how a tournament
   // bot says who plays with whom instead of letting the balancer decide.
   const teamsParsed = z
     .object({

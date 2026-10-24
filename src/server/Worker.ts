@@ -85,18 +85,17 @@ export function isSocketClosed(
 }
 
 export type JoinOutcome =
-  | { action: "admit"; username: string; clanTag: string | null }
+  | { action: "admit"; username: string }
   | { action: "reject"; reason: string; errorCodes?: string[] };
 
 export function resolveJoinVerdict(
   verdict: JoinVerifyResponse,
-  fallback: { username: string; clanTag: string | null },
+  fallback: { username: string },
 ): JoinOutcome {
   if (verdict.status === "approved") {
     return {
       action: "admit",
       username: clampApprovedUsername(verdict.username),
-      clanTag: verdict.clanTag,
     };
   }
   if (verdict.status === "rejected") {
@@ -113,7 +112,6 @@ export function resolveJoinVerdict(
     username: verdict.identity
       ? clampApprovedUsername(verdict.identity.username)
       : fallback.username,
-    clanTag: verdict.identity ? verdict.identity.clanTag : fallback.clanTag,
   };
 }
 
@@ -304,7 +302,6 @@ export async function startWorker() {
   const privilegeRefresher = new PrivilegeRefresher(
     ServerEnv.jwtIssuer() + "/cosmetics.json",
     ServerEnv.apiKey(),
-    ServerEnv.jwtIssuer() + "/reserved_clan_tags",
     log,
   );
   void privilegeRefresher.start();
@@ -638,14 +635,11 @@ export async function startWorker() {
         // join_verify doesn't cover: Dev and API failure (fail-open joins).
         // An approved join_verify overwrites it with the API's display-ready
         // pair below.
-        let { username, clanTag } = censorPlayer(
-          clientMsg.username,
-          clientMsg.clanTag ?? null,
-        );
+        let { username } = censorPlayer(clientMsg.username);
 
         // Gate the join and screen the display name in one API call: status
         // is the Turnstile verdict, and the response carries the
-        // display-ready (username, clanTag) pair, so a banned name is never
+        // display-ready username, so a banned name is never
         // visible — not even in the lobby. Turnstile gates the FIRST join
         // only: an already-admitted player who reconnects or refreshes must
         // not be re-challenged — their original token is single-use and was
@@ -678,9 +672,7 @@ export async function startWorker() {
             gameStarted: game?.hasStarted() ?? false,
             turnstileToken: clientMsg.turnstileToken ?? null,
             identityUnchanged:
-              stored !== null &&
-              stored.username === clientMsg.username &&
-              stored.clanTag === (clientMsg.clanTag ?? null),
+              stored !== null && stored.username === clientMsg.username,
             steamAuthed,
           });
           if (steamAuthed && !isReadmit) {
@@ -702,7 +694,6 @@ export async function startWorker() {
               ip,
               plan.token,
               clientMsg.username,
-              clientMsg.clanTag ?? null,
               persistentId,
             );
             if (verdict.status === "approved" || verdict.status === "error") {
@@ -711,10 +702,7 @@ export async function startWorker() {
             if (isSocketClosed(ws)) {
               return;
             }
-            const resolved = resolveJoinVerdict(verdict, {
-              username,
-              clanTag,
-            });
+            const resolved = resolveJoinVerdict(verdict, { username });
             if (resolved.action === "reject") {
               log.warn("Unauthorized: Turnstile token rejected", {
                 persistentID: persistentId,
@@ -728,7 +716,6 @@ export async function startWorker() {
               return;
             }
             username = resolved.username;
-            clanTag = resolved.clanTag;
 
             if (verdict.status === "error") {
               const fields = {
@@ -760,7 +747,7 @@ export async function startWorker() {
             persistentId,
             clientMsg.gameID,
             0,
-            verifySkipped ? undefined : { username, clanTag },
+            verifySkipped ? undefined : { username },
           )
         ) {
           return;
@@ -769,7 +756,6 @@ export async function startWorker() {
         let flares: string[] | undefined;
         let publicId: string | undefined;
         let friends: string[] = [];
-        let ownedClanTags: string[] = [];
         let trusted = false;
         let levelBadge: LevelBadge | undefined;
         let accountUsername:
@@ -807,7 +793,6 @@ export async function startWorker() {
           flares = result.response.player.flares;
           publicId = result.response.player.publicId;
           friends = result.response.player.friends;
-          ownedClanTags = result.response.player.clans?.map((c) => c.tag) ?? [];
           accountUsername = result.response.player;
           trusted = result.response.player.trustTier === "trusted";
           // Display-only: the roster badge comes from this lookup alone, never
@@ -828,21 +813,6 @@ export async function startWorker() {
             }
           }
         }
-
-        // Enforce clan tag ownership: a player can wear a tag only if they're
-        // a member; a real clan they're not in (or an unverifiable tag) is
-        // dropped to prevent impersonation. Fictional tags pass through.
-        const resolution = privilegeRefresher
-          .get()
-          .resolveClanTag(clanTag, ownedClanTags);
-        if (resolution.dropped) {
-          log.warn("Dropped clan tag: player is not a member", {
-            persistentID: persistentId,
-            gameID: clientMsg.gameID,
-            clanTag,
-          });
-        }
-        const resolvedClanTag = resolution.tag;
 
         const cosmeticResult = privilegeRefresher
           .get()
@@ -891,7 +861,6 @@ export async function startWorker() {
           flares,
           ip,
           username,
-          resolvedClanTag,
           ws,
           cosmeticResult.cosmetics,
           publicId,

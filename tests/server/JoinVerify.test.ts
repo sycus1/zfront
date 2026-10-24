@@ -28,24 +28,21 @@ describe("verifyJoin", () => {
       jsonResponse({
         status: "approved",
         username: "SnugglePuppy",
-        clanTag: "COOL",
       }),
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const verdict = await verifyJoin("1.2.3.4", "tok", "xXblackxX", "CoOl");
+    const verdict = await verifyJoin("1.2.3.4", "tok", "xXblackxX");
 
     expect(verdict).toEqual({
       status: "approved",
       username: "SnugglePuppy",
-      clanTag: "COOL",
     });
     const [, init] = fetchMock.mock.calls[0];
     expect(JSON.parse(init.body)).toEqual({
       ip: "1.2.3.4",
       token: "tok",
       username: "xXblackxX",
-      clanTag: "CoOl",
     });
   });
 
@@ -58,10 +55,9 @@ describe("verifyJoin", () => {
           jsonResponse({ status: "approved", username: "Alice" }),
         ),
     );
-    expect(await verifyJoin("ip", "tok", "Alice", null)).toEqual({
+    expect(await verifyJoin("ip", "tok", "Alice")).toEqual({
       status: "approved",
       username: "Alice",
-      clanTag: null,
     });
   });
 
@@ -73,11 +69,10 @@ describe("verifyJoin", () => {
           status: "rejected",
           reason: "token invalid",
           username: "SnugglePuppy",
-          clanTag: null,
         }),
       ),
     );
-    expect(await verifyJoin("ip", "tok", "xXblackxX", null)).toEqual({
+    expect(await verifyJoin("ip", "tok", "xXblackxX")).toEqual({
       status: "rejected",
       reason: "token invalid",
     });
@@ -94,7 +89,7 @@ describe("verifyJoin", () => {
         }),
       ),
     );
-    expect(await verifyJoin("ip", "tok-dup", "xXblackxX", null)).toEqual({
+    expect(await verifyJoin("ip", "tok-dup", "xXblackxX")).toEqual({
       status: "rejected",
       reason: "duplicate",
       errorCodes: ["timeout-or-duplicate"],
@@ -109,8 +104,8 @@ describe("verifyJoin", () => {
     const fetchMock = vi.fn().mockImplementation(() => fetchPromise);
     vi.stubGlobal("fetch", fetchMock);
 
-    const call1 = verifyJoin("ip1", "shared-tok", "User1", null);
-    const call2 = verifyJoin("ip2", "shared-tok", "User1", null);
+    const call1 = verifyJoin("ip1", "shared-tok", "User1");
+    const call2 = verifyJoin("ip2", "shared-tok", "User1");
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
@@ -118,7 +113,6 @@ describe("verifyJoin", () => {
       jsonResponse({
         status: "approved",
         username: "User1",
-        clanTag: null,
       }),
     );
 
@@ -126,7 +120,6 @@ describe("verifyJoin", () => {
     expect(v1).toEqual({
       status: "approved",
       username: "User1",
-      clanTag: null,
     });
     expect(v2).toEqual(v1);
     expect(_inFlightTokenCount()).toBe(0);
@@ -137,20 +130,19 @@ describe("verifyJoin", () => {
       jsonResponse({
         status: "approved",
         username: "User1",
-        clanTag: null,
       }),
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const first = await verifyJoin("ip1", "shared-tok", "User1", null);
-    const second = await verifyJoin("ip2", "shared-tok", "User1", null);
+    const first = await verifyJoin("ip1", "shared-tok", "User1");
+    const second = await verifyJoin("ip2", "shared-tok", "User1");
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(first.status).toBe("approved");
     expect(second.status).toBe("approved");
     expect(_inFlightTokenCount()).toBe(0);
   });
 
-  it("does not coalesce concurrent calls with the same token but different username or clanTag", async () => {
+  it("does not coalesce concurrent calls with the same token but a different username", async () => {
     let resolveFetch: (val: unknown) => void;
     const fetchPromise = new Promise((resolve) => {
       resolveFetch = resolve;
@@ -158,32 +150,23 @@ describe("verifyJoin", () => {
     const fetchMock = vi.fn().mockImplementation(() => fetchPromise);
     vi.stubGlobal("fetch", fetchMock);
 
-    const c1 = verifyJoin("ip1", "shared-tok", "Alice", "TAG");
-    const c2 = verifyJoin("ip2", "shared-tok", "Bob", "TAG");
-    const c3 = verifyJoin("ip3", "shared-tok", "Alice", "OTHER");
-    const c4 = verifyJoin("ip4", "shared-tok", "Alice", null);
-    const c1Retry = verifyJoin("ip5", "shared-tok", "Alice", "TAG");
+    const c1 = verifyJoin("ip1", "shared-tok", "Alice");
+    const c2 = verifyJoin("ip2", "shared-tok", "Bob");
+    const c1Retry = verifyJoin("ip5", "shared-tok", "Alice");
 
-    expect(fetchMock).toHaveBeenCalledTimes(4);
-    expect(_inFlightTokenCount()).toBe(4);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(_inFlightTokenCount()).toBe(2);
 
     resolveFetch!(
       jsonResponse({
         status: "approved",
         username: "Mocked",
-        clanTag: null,
       }),
     );
 
-    const [r1, r2, r3, r4, rRetry] = await Promise.all([
-      c1,
-      c2,
-      c3,
-      c4,
-      c1Retry,
-    ]);
+    const [r1, r2, rRetry] = await Promise.all([c1, c2, c1Retry]);
     expect(rRetry).toBe(r1);
-    expect([r1, r2, r3, r4].every((r) => r.status === "approved")).toBe(true);
+    expect([r1, r2].every((r) => r.status === "approved")).toBe(true);
     expect(_inFlightTokenCount()).toBe(0);
   });
 
@@ -195,9 +178,9 @@ describe("verifyJoin", () => {
     const fetchMock = vi.fn().mockImplementation(() => fetchPromise);
     vi.stubGlobal("fetch", fetchMock);
 
-    const call1 = verifyJoin("ip1", "shared-tok", "User1", null, "pid-1");
-    const call2 = verifyJoin("ip2", "shared-tok", "User1", null, "pid-2");
-    const call1Dup = verifyJoin("ip3", "shared-tok", "User1", null, "pid-1");
+    const call1 = verifyJoin("ip1", "shared-tok", "User1", "pid-1");
+    const call2 = verifyJoin("ip2", "shared-tok", "User1", "pid-2");
+    const call1Dup = verifyJoin("ip3", "shared-tok", "User1", "pid-1");
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(_inFlightTokenCount()).toBe(2);
@@ -206,7 +189,6 @@ describe("verifyJoin", () => {
       jsonResponse({
         status: "approved",
         username: "User1",
-        clanTag: null,
       }),
     );
 
@@ -225,9 +207,9 @@ describe("verifyJoin", () => {
     const fetchMock = vi.fn().mockImplementation(() => fetchPromise);
     vi.stubGlobal("fetch", fetchMock);
 
-    const call1 = verifyJoin("ip1", "shared-tok", "User1", null);
-    const call2 = verifyJoin("ip2", "shared-tok", "User1", null, "pid-1");
-    const call1Dup = verifyJoin("ip3", "shared-tok", "User1", null);
+    const call1 = verifyJoin("ip1", "shared-tok", "User1");
+    const call2 = verifyJoin("ip2", "shared-tok", "User1", "pid-1");
+    const call1Dup = verifyJoin("ip3", "shared-tok", "User1");
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(_inFlightTokenCount()).toBe(2);
@@ -236,7 +218,6 @@ describe("verifyJoin", () => {
       jsonResponse({
         status: "approved",
         username: "User1",
-        clanTag: null,
       }),
     );
 
@@ -255,8 +236,8 @@ describe("verifyJoin", () => {
     const fetchMock = vi.fn().mockImplementation(() => fetchPromise);
     vi.stubGlobal("fetch", fetchMock);
 
-    const call1 = verifyJoin("ip1", "failing-tok", "User1", null);
-    const call2 = verifyJoin("ip2", "failing-tok", "User1", null);
+    const call1 = verifyJoin("ip1", "failing-tok", "User1");
+    const call2 = verifyJoin("ip2", "failing-tok", "User1");
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(_inFlightTokenCount()).toBe(1);
@@ -275,13 +256,12 @@ describe("verifyJoin", () => {
       jsonResponse({
         status: "approved",
         username: "User",
-        clanTag: null,
       }),
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const call1 = verifyJoin("ip1", "", "User1", null);
-    const call2 = verifyJoin("ip2", "", "User2", null);
+    const call1 = verifyJoin("ip1", "", "User1");
+    const call2 = verifyJoin("ip2", "", "User2");
 
     await Promise.all([call1, call2]);
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -293,17 +273,15 @@ describe("verifyJoin", () => {
       jsonResponse({
         status: "approved",
         username: "SnugglePuppy",
-        clanTag: null,
       }),
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const verdict = await verifyJoin("ip", null, "xXblackxX", null);
+    const verdict = await verifyJoin("ip", null, "xXblackxX");
 
     expect(verdict).toEqual({
       status: "approved",
       username: "SnugglePuppy",
-      clanTag: null,
     });
     const [, init] = fetchMock.mock.calls[0];
     expect(JSON.parse(init.body).token).toBeNull();
@@ -320,15 +298,14 @@ describe("verifyJoin", () => {
           status: "error",
           reason: "turnstile timed out",
           username: "SnugglePuppy",
-          clanTag: "COOL",
         }),
       ),
     );
-    expect(await verifyJoin("ip", "tok", "xXblackxX", "CoOl")).toEqual({
+    expect(await verifyJoin("ip", "tok", "xXblackxX")).toEqual({
       status: "error",
       reason: "turnstile timed out",
       degraded: true,
-      identity: { username: "SnugglePuppy", clanTag: "COOL" },
+      identity: { username: "SnugglePuppy" },
     });
   });
 
@@ -343,11 +320,11 @@ describe("verifyJoin", () => {
         }),
       ),
     );
-    expect(await verifyJoin("ip", "tok", "Alice", null)).toEqual({
+    expect(await verifyJoin("ip", "tok", "Alice")).toEqual({
       status: "error",
       reason: "turnstile failed (TimeoutError)",
       degraded: true,
-      identity: { username: "Alice", clanTag: null },
+      identity: { username: "Alice" },
     });
   });
 
@@ -359,7 +336,7 @@ describe("verifyJoin", () => {
       );
     vi.stubGlobal("fetch", fetchMock);
 
-    expect(await verifyJoin("ip", "tok", "Alice", null)).toEqual({
+    expect(await verifyJoin("ip", "tok", "Alice")).toEqual({
       status: "error",
       reason: "name check timed out",
       degraded: true,
@@ -373,7 +350,7 @@ describe("verifyJoin", () => {
       .mockResolvedValue(jsonResponse({ message: "bad payload" }, 400));
     vi.stubGlobal("fetch", fetchMock);
 
-    expect(await verifyJoin("ip", "tok", "Alice", null)).toMatchObject({
+    expect(await verifyJoin("ip", "tok", "Alice")).toMatchObject({
       status: "error",
       degraded: false,
     });
@@ -389,7 +366,7 @@ describe("verifyJoin", () => {
       .mockResolvedValue(jsonResponse({ message: "boom" }, 500));
     vi.stubGlobal("fetch", fetchMock);
 
-    expect(await verifyJoin("ip", "tok", "Alice", null)).toMatchObject({
+    expect(await verifyJoin("ip", "tok", "Alice")).toMatchObject({
       status: "error",
       degraded: false,
     });
@@ -400,7 +377,7 @@ describe("verifyJoin", () => {
     const fetchMock = vi.fn().mockRejectedValue(new Error("network down"));
     vi.stubGlobal("fetch", fetchMock);
 
-    expect(await verifyJoin("ip", "tok", "Alice", null)).toMatchObject({
+    expect(await verifyJoin("ip", "tok", "Alice")).toMatchObject({
       status: "error",
       degraded: false,
     });
@@ -413,7 +390,7 @@ describe("verifyJoin", () => {
       .mockResolvedValue(jsonResponse({ approved: true }));
     vi.stubGlobal("fetch", fetchMock);
 
-    expect(await verifyJoin("ip", "tok", "Alice", null)).toMatchObject({
+    expect(await verifyJoin("ip", "tok", "Alice")).toMatchObject({
       status: "error",
       degraded: false,
     });

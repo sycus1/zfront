@@ -219,7 +219,6 @@ export class MapPlaylist {
       bots: isCompact ? 100 : 400,
       spawnImmunityDuration: this.getSpawnImmunityDuration(playerTeams),
       disabledUnits: [],
-      disableClanTags: mode === GameMode.FFA ? true : undefined,
       // Overtime (the win threshold sinking after 30 minutes) is the default
       // for every public FFA game, so it carries no lobby modifier badge.
       overtime: mode === GameMode.FFA ? { enabled: true } : undefined,
@@ -488,7 +487,6 @@ export class MapPlaylist {
         this.getSpawnImmunityDuration(playerTeams, startingGold),
       disabledUnits,
       waterNukes: isWaterNukes ? true : undefined,
-      disableClanTags: mode === GameMode.FFA ? true : undefined,
     } satisfies GameConfig;
   }
 

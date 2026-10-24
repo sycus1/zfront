@@ -48,7 +48,6 @@ function makeGameStartInfo(): GameStartInfo {
       {
         clientID: CLIENT_ID,
         username: "TestUser",
-        clanTag: null,
       },
     ],
   } as GameStartInfo;

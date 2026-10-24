@@ -6,7 +6,6 @@ const JoinVerifyVerdictSchema = z.discriminatedUnion("status", [
   z.object({
     status: z.literal("approved"),
     username: z.string(),
-    clanTag: z.string().nullable().optional(),
   }),
   z.object({
     status: z.literal("rejected"),
@@ -20,12 +19,11 @@ const JoinVerifyVerdictSchema = z.discriminatedUnion("status", [
     status: z.literal("error"),
     reason: z.string(),
     username: z.string().optional(),
-    clanTag: z.string().nullable().optional(),
   }),
 ]);
 
 export type JoinVerifyResponse =
-  | { status: "approved"; username: string; clanTag: string | null }
+  | { status: "approved"; username: string }
   | { status: "rejected"; reason: string; errorCodes?: string[] }
   | {
       status: "error";
@@ -35,7 +33,7 @@ export type JoinVerifyResponse =
       // answered with something unusable.
       degraded: boolean;
       // The API's display-ready identity, when its name check finished.
-      identity?: { username: string; clanTag: string | null };
+      identity?: { username: string };
     };
 
 export type JoinVerifyPlan =
@@ -111,7 +109,7 @@ export function planJoinVerify(args: {
   return { action: "verify", token: null };
 }
 
-// In-flight verifyJoin requests coalesced by (token, persistentId, username, clanTag).
+// In-flight verifyJoin requests coalesced by (token, persistentId, username).
 const inFlightByToken = new Map<string, Promise<JoinVerifyResponse>>();
 
 function parseJoinVerifyResponse(data: unknown): JoinVerifyResponse {
@@ -127,17 +125,16 @@ function parseJoinVerifyResponse(data: unknown): JoinVerifyResponse {
     return {
       status: "approved",
       username: parsed.data.username,
-      clanTag: parsed.data.clanTag ?? null,
     };
   }
   if (parsed.data.status === "error") {
-    const { reason, username, clanTag } = parsed.data;
+    const { reason, username } = parsed.data;
     return {
       status: "error",
       reason,
       degraded: true,
       ...(username !== undefined && {
-        identity: { username, clanTag: clanTag ?? null },
+        identity: { username },
       }),
     };
   }
@@ -148,7 +145,6 @@ async function fetchJoinVerify(
   ip: string,
   token: string | null,
   username: string,
-  clanTag: string | null,
 ): Promise<Response> {
   return fetch(`${ServerEnv.jwtIssuer()}/join_verify`, {
     method: "POST",
@@ -159,7 +155,7 @@ async function fetchJoinVerify(
       "Content-Type": "application/json",
       "x-api-key": ServerEnv.apiKey(),
     },
-    body: JSON.stringify({ ip, token, username, clanTag }),
+    body: JSON.stringify({ ip, token, username }),
   });
 }
 
@@ -167,15 +163,9 @@ async function verifyJoinRequest(
   ip: string,
   turnstileToken: string | null,
   username: string,
-  clanTag: string | null,
 ): Promise<JoinVerifyResponse> {
   try {
-    const response = await fetchJoinVerify(
-      ip,
-      turnstileToken,
-      username,
-      clanTag,
-    );
+    const response = await fetchJoinVerify(ip, turnstileToken, username);
     if (!response.ok) {
       return {
         status: "error",
@@ -196,10 +186,9 @@ async function verifyJoinRequest(
 /**
  * Verify a joining player against the API's join_verify endpoint, which runs
  * the Turnstile check and name censoring concurrently: `status` is the
- * Turnstile verdict, and on approval the (username, clanTag) pair is the
- * display-ready identity for the session — a banned username as its
- * deterministic shadow name, a banned tag as null, a surviving tag
- * uppercased.
+ * Turnstile verdict, and on approval the username is the display-ready
+ * identity for the session — a banned username as its deterministic shadow
+ * name.
  *
  * SECURITY: a null token SKIPS siteverify — the API trusts the game server
  * to omit the token only for already-admitted reconnects (whose single-use
@@ -219,27 +208,23 @@ export async function verifyJoin(
   ip: string,
   turnstileToken: string | null,
   username: string,
-  clanTag: string | null,
   persistentId?: string,
 ): Promise<JoinVerifyResponse> {
   if (turnstileToken !== null && turnstileToken.length > 0) {
-    const key = `${turnstileToken}\0${persistentId ?? ""}\0${username}\0${clanTag ?? ""}`;
+    const key = `${turnstileToken}\0${persistentId ?? ""}\0${username}`;
     const inFlight = inFlightByToken.get(key);
     if (inFlight) {
       return inFlight;
     }
-    const promise = verifyJoinRequest(
-      ip,
-      turnstileToken,
-      username,
-      clanTag,
-    ).finally(() => {
-      inFlightByToken.delete(key);
-    });
+    const promise = verifyJoinRequest(ip, turnstileToken, username).finally(
+      () => {
+        inFlightByToken.delete(key);
+      },
+    );
     inFlightByToken.set(key, promise);
     return promise;
   }
-  return verifyJoinRequest(ip, turnstileToken, username, clanTag);
+  return verifyJoinRequest(ip, turnstileToken, username);
 }
 
 export function _inFlightTokenCount(): number {

@@ -84,10 +84,6 @@ import { WorkerClient } from "./WorkerClient";
 export interface LobbyConfig {
   cosmetics: PlayerCosmeticRefs;
   playerName: string;
-  playerClanTag: string | null;
-  // In-flight clan-tag ownership check; resolves to the tag to submit (null if
-  // it failed). Runs parallel to the WS handshake — only the join waits on it.
-  clanTagCheck?: Promise<string | null>;
   playerRole: string | null;
   gameID: GameID;
   turnstileToken: string | null;
@@ -525,7 +521,6 @@ async function createClientGame(
     gameMap,
     clientID,
     lobbyConfig.playerName,
-    lobbyConfig.playerClanTag,
     lobbyConfig.gameStartInfo.gameID,
     lobbyConfig.gameStartInfo.players,
     lobbyConfig.snapshot !== undefined,
@@ -585,7 +580,6 @@ async function createClientGame(
       `${USER_SETTINGS_CHANGED_EVENT}:settings.anonymousNames`,
       () => {
         webglBuilder.refreshNames(gameView);
-        gameView.invalidateTeamClanTags();
       },
       { signal: graphicsListenerAbort.signal },
     );

@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 // Bytes a packed badge adds to a roster entry (its presence bit is in the
 // header byte the entry has anyway).
 const Entry = zb.object(ClientInfoSchema.shape);
-const BASE = { clientID: "aB3dEf7h", username: "alpha", clanTag: null };
+const BASE = { clientID: "aB3dEf7h", username: "alpha" };
 const varintBytes = (levelBadge: number) =>
   Entry.serialize({ ...BASE, levelBadge }).byteLength -
   Entry.serialize(BASE).byteLength;

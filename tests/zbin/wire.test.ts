@@ -133,17 +133,16 @@ const SERVER_MESSAGES: ServerMessage[] = [
       lobbyCreatedAt: 1_700_000_000_000,
       config: CONFIG,
       players: [
-        { clientID: P1, username: "alpha", clanTag: "ABC" },
+        { clientID: P1, username: "alpha" },
         {
           clientID: P2,
           username: "bravo",
-          clanTag: null,
           isLobbyCreator: true,
           teamIndex: 1,
           friends: [P1],
           cosmetics: { flag: "flag:mars", verified: true },
         },
-        { clientID: P3, username: "charlie", clanTag: null },
+        { clientID: P3, username: "charlie" },
       ],
       tribes: [{ name: "Wolves" }],
     },
@@ -167,8 +166,8 @@ const SERVER_MESSAGES: ServerMessage[] = [
       startsAt: 1_700_000_030_000,
       gameConfig: CONFIG,
       clients: [
-        { clientID: P1, username: "alpha", clanTag: null, teamIndex: 0 },
-        { clientID: P2, username: "bravo", clanTag: "XY", verified: true },
+        { clientID: P1, username: "alpha", teamIndex: 0 },
+        { clientID: P2, username: "bravo", verified: true },
       ],
       lobbyCreatorClientID: P1,
     },
@@ -191,7 +190,6 @@ const CLIENT_MESSAGES: ClientMessage[] = [
     token: TOKEN,
     gameID: "gM3xQ1zR",
     username: "alpha",
-    clanTag: "ABC",
     turnstileToken: null,
     cosmetics: {
       flag: "country:us",

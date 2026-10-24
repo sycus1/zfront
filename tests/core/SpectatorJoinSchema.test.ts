@@ -6,7 +6,7 @@ const JOIN = {
   token: "9f0f4b3a-0d2e-4a1f-8f0b-1c2d3e4f5a6b",
   gameID: "AbCd1234",
   username: "caster",
-  clanTag: null,
+
   turnstileToken: null,
 };
 

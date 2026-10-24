@@ -61,7 +61,7 @@ describe("GameServer wire transcript", () => {
       clientID: HOST,
       persistentID: "host-pid",
       username: "HostName",
-      clanTag: "HST",
+
       ip: "1.1.1.1",
       publicId: "host-pub",
       friends: ["p2-pub"],
@@ -78,7 +78,7 @@ describe("GameServer wire transcript", () => {
       clientID: P3,
       persistentID: "p3-pid",
       username: "ThirdOne",
-      clanTag: "TRD",
+
       ip: "3.3.3.3",
     });
     const cast = makeClient({

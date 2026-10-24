@@ -28,8 +28,8 @@ describe("Aftergame teammate nuking", () => {
         instantBuild: true,
       },
       [
-        new PlayerInfo("p1", PlayerType.Human, "c1", "p1", false, null, [], 0),
-        new PlayerInfo("p2", PlayerType.Human, "c2", "p2", false, null, [], 0),
+        new PlayerInfo("p1", PlayerType.Human, "c1", "p1", false, [], 0),
+        new PlayerInfo("p2", PlayerType.Human, "c2", "p2", false, [], 0),
       ],
     );
 

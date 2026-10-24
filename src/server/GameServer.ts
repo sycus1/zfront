@@ -1,11 +1,5 @@
-import {
-  GameMode,
-  GameType,
-  HumansVsNations,
-  PlayerInfo,
-  PlayerType,
-} from "@openfront/engine-api/game/GameTypes";
-import { maps } from "@openfront/engine-api/game/Maps.gen";
+import { GameType } from "@openfront/engine-api/game/GameTypes";
+
 import {
   AllPlayersStats,
   ClientID,
@@ -14,15 +8,11 @@ import {
   GameID,
   Intent,
   StampedIntent,
-  TeamCountConfig,
   Tribe,
   Turn,
   Winner,
 } from "@openfront/engine-api/Schemas";
-import {
-  assignTeamsLobbyPreview,
-  resolveTeamsList,
-} from "@openfront/engine-lib/game/TeamAssignment";
+
 import { isAdminRole } from "@openfront/shared/ApiSchemas";
 import { CloseCode, CloseReason } from "@openfront/shared/CloseCodes";
 import { GameEnv } from "@openfront/shared/configuration/Env";
@@ -241,9 +231,8 @@ export class GameServer {
 
   // Note: This can be undefined if accessed before the game starts.
   private gameStartInfo!: WireGameStartInfo;
-  // Wire-only copy of gameStartInfo sent to clients. Identical to
-  // gameStartInfo unless disableClanTags is set, in which case clan tags
-  // are stripped from players. Archive uses the original gameStartInfo.
+  // Wire-only copy of gameStartInfo sent to clients, plus the listing flag.
+  // Archive uses the original gameStartInfo.
   private wireGameStartInfo!: WireGameStartInfo;
 
   // clientID dictionary for the binary wire, seeded from gameStartInfo.players
@@ -305,8 +294,8 @@ export class GameServer {
   // team. At start each client is stamped with its team's index.
   private matchmakingTeams?: string[][];
   private readonly deps: GameServerDeps;
-  // Who may see whose real identity (anonymizeNames / pinned teams / admin
-  // clan-tag reveal); shapes the per-viewer lobby roster and start message.
+  // Who may see whose real identity (anonymizeNames / pinned teams); shapes
+  // the per-viewer lobby roster and start message.
   private readonly names: NameVisibility;
 
   constructor(opts: GameServerOptions, deps: Partial<GameServerDeps> = {}) {
@@ -519,14 +508,12 @@ export class GameServer {
   // Screened identity stored for this player's client record, or null if
   // the record (or its reconnect mapping) is gone. Lets the join path skip
   // re-screening a reconnect whose submitted identity is unchanged.
-  public storedIdentity(
-    persistentID: string,
-  ): { username: string; clanTag: string | null } | null {
+  public storedIdentity(persistentID: string): { username: string } | null {
     const clientID = this.getClientIdForPersistentId(persistentID);
     if (clientID === null) return null;
     const client = this.clients.get(clientID);
     if (client === undefined) return null;
-    return { username: client.username, clanTag: client.clanTag };
+    return { username: client.username };
   }
 
   public joinClient(client: Client): JoinResult {
@@ -717,7 +704,7 @@ export class GameServer {
     ws: WebSocket,
     persistentID: string,
     lastTurn: number = 0,
-    identityUpdate?: { username: string; clanTag: string | null },
+    identityUpdate?: { username: string },
   ): boolean {
     // As in joinClient: an ended game may still be in GameManager until its
     // next tick, and the roster still holds the reconnect mapping.
@@ -742,7 +729,6 @@ export class GameServer {
         delete client.cosmetics.verified;
       }
       client.username = identityUpdate.username;
-      client.clanTag = identityUpdate.clanTag;
     }
     client.lastPing = Date.now();
     this.markClientDisconnected(client.clientID, false);
@@ -1073,8 +1059,6 @@ export class GameServer {
     // if no client connects/pings.
     this.lastPingUpdate = Date.now();
 
-    this.convertClanOverflowToSpectators();
-
     const friendsFor = friendsLookup(this.clients.active());
 
     // allowedPublicIds / nameRevealPublicIds hold account publicIds and are
@@ -1090,7 +1074,6 @@ export class GameServer {
       config,
       players: this.clients.players().map((c) => ({
         username: c.username,
-        clanTag: c.clanTag ?? null,
         clientID: c.clientID,
         cosmetics: c.cosmetics,
         isLobbyCreator: this.lobbyCreatorID === c.clientID,
@@ -1109,15 +1092,7 @@ export class GameServer {
       ...this.gameStartInfo,
       listed: this.listing.isListed(),
     };
-    this.wireGameStartInfo = this.gameConfig.disableClanTags
-      ? {
-          ...wireGameStartInfo,
-          players: this.gameStartInfo.players.map((p) => ({
-            ...p,
-            clanTag: null,
-          })),
-        }
-      : wireGameStartInfo;
+    this.wireGameStartInfo = wireGameStartInfo;
     // Seed the dictionary from the same players array, in the same order,
     // every client receives in the start message.
     this.zbinCtx = createGameWireContext(this.gameStartInfo.players);
@@ -1139,90 +1114,6 @@ export class GameServer {
   // everywhere a "player" is meant: the lobby cap, and gameStartInfo.
   private playerCount(): number {
     return this.clients.players().length;
-  }
-
-  private convertClanOverflowToSpectators(): void {
-    if (
-      this.gameConfig.gameMode !== GameMode.Team ||
-      this.gameConfig.playerTeams === undefined ||
-      this.gameConfig.playerTeams === HumansVsNations ||
-      this.matchmakingTeams !== undefined ||
-      this.gameConfig.disableClanTags === true ||
-      this.gameConfig.anonymizeNames === true
-    ) {
-      return;
-    }
-    const playerTeams = this.gameConfig.playerTeams;
-    const nationCount = this.resolveDefaultNationCount();
-    const convertedClientIDs = new Set<ClientID>();
-    let kickedClients = this.findClanOverflowKicks(playerTeams, nationCount);
-    while (kickedClients.length > 0) {
-      for (const client of kickedClients) {
-        client.spectator = true;
-        convertedClientIDs.add(client.clientID);
-        this.log.info("Converted clan overflow player to spectator", {
-          clientID: client.clientID,
-          clanTag: client.clanTag,
-        });
-      }
-      kickedClients = this.findClanOverflowKicks(playerTeams, nationCount);
-    }
-    if (convertedClientIDs.size > 0) {
-      this.intents = this.intents.filter(
-        (i) => !convertedClientIDs.has(i.clientID),
-      );
-    }
-  }
-
-  private resolveDefaultNationCount(): number {
-    if (typeof this.gameConfig.nations === "number") {
-      return this.gameConfig.nations;
-    }
-    if (this.gameConfig.nations === "default") {
-      const mapInfo = maps.find((m) => m.type === this.gameConfig.gameMap);
-      return mapInfo?.defaultNationCount ?? 0;
-    }
-    return 0;
-  }
-
-  private findClanOverflowKicks(
-    playerTeams: TeamCountConfig,
-    nationCount: number,
-  ): Client[] {
-    const playingClients = this.clients
-      .players()
-      .filter((c) => this.matchmakingTeamIndex(c) === undefined);
-    const totalPlayers = playingClients.length + nationCount;
-    let teams;
-    try {
-      teams = resolveTeamsList(playerTeams, totalPlayers);
-    } catch {
-      return [];
-    }
-    const playerInfos = playingClients.map(
-      (c) =>
-        new PlayerInfo(
-          c.username,
-          PlayerType.Human,
-          c.clientID,
-          c.clientID,
-          false,
-          c.clanTag ?? null,
-        ),
-    );
-    const preview = assignTeamsLobbyPreview(
-      playerInfos,
-      teams,
-      playerTeams,
-      nationCount,
-    );
-    const kickedIDs = new Set<ClientID>();
-    for (const [info, assignment] of preview.entries()) {
-      if (assignment === "kicked" && info.clanTag && info.clientID !== null) {
-        kickedIDs.add(info.clientID);
-      }
-    }
-    return playingClients.filter((c) => kickedIDs.has(c.clientID));
   }
 
   // ONE definition of who the allowlist admits, shared by every path that can
@@ -1394,8 +1285,6 @@ export class GameServer {
             turns: this.turns.slice(lastTurn),
             gameStartInfo: this.names.startInfoFor(
               client.clientID,
-              isAdminRole(client.role),
-              this.gameStartInfo,
               this.wireGameStartInfo,
             ),
             lobbyCreatedAt: this.createdAt,
@@ -2018,7 +1907,6 @@ export class GameServer {
         return {
           clientID: player.clientID,
           username: player.username,
-          clanTag: player.clanTag,
           persistentID: this.clients.get(player.clientID)?.persistentID ?? "",
           stats,
           cosmetics: player.cosmetics,

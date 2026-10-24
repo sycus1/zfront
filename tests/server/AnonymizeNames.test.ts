@@ -13,7 +13,6 @@ function makeClient(
   clientID: string,
   persistentID: string,
   username: string,
-  clanTag: string | null,
   role: string | null = null,
   publicId: string | undefined = undefined,
   friends: string[] = [],
@@ -23,7 +22,6 @@ function makeClient(
     clientID,
     persistentID,
     username,
-    clanTag,
     role,
     publicId,
     friends,
@@ -34,26 +32,24 @@ function makeClient(
 // creator = lobby host, admin = admin role, alice + bob = regular players.
 function roster(): Client[] {
   return [
-    makeClient("creator", "creator-pid", "CreatorReal", "HOST"),
-    makeClient("admin", "admin-pid", "AdminReal", "ADM", "admin"),
+    makeClient("creator", "creator-pid", "CreatorReal"),
+    makeClient("admin", "admin-pid", "AdminReal", "admin"),
     makeClient(
       "alice",
       "alice-pid",
       "AliceReal",
-      "AAA",
       null,
       "alice-pub",
       ["bob-pub"],
       // Join-time resolved cosmetics (resolveVerifiedJoin already ran).
       { verified: true },
     ),
-    makeClient("bob", "bob-pid", "BobReal", "BBB", null, "bob-pub"),
+    makeClient("bob", "bob-pid", "BobReal", null, "bob-pub"),
   ];
 }
 
 function makeGame(
   anonymizeNames: boolean,
-  disableClanTags = false,
   nameReveals: string[] = [],
   nameRevealPublicIds: string[] = [],
 ) {
@@ -65,7 +61,6 @@ function makeGame(
     gameConfig: testGameConfig({
       gameType: GameType.Private,
       anonymizeNames,
-      disableClanTags,
       nameReveals,
       nameRevealPublicIds,
     }),
@@ -89,7 +84,6 @@ describe("anonymizeNames: gameInfo (lobby / HTTP / preview)", () => {
   it("off: everyone sees real names and clan tags", () => {
     const info = makeGame(false).gameInfo("alice");
     expect(byId(info, "bob").username).toBe("BobReal");
-    expect(byId(info, "creator").clanTag).toBe("HOST");
   });
 
   it("on: a regular player sees themselves but not others", () => {
@@ -98,7 +92,6 @@ describe("anonymizeNames: gameInfo (lobby / HTTP / preview)", () => {
     const bob = byId(info, "bob");
     expect(bob.username).not.toBe("BobReal");
     expect(REAL_NAMES).not.toContain(bob.username);
-    expect(bob.clanTag).toBeNull();
     expect(bob.friends).toBeUndefined();
     expect(UsernameSchema.safeParse(bob.username).success).toBe(true);
   });
@@ -112,14 +105,14 @@ describe("anonymizeNames: gameInfo (lobby / HTTP / preview)", () => {
   });
 
   it("on: a granted viewer (nameReveals) sees everyone's real names", () => {
-    const info = makeGame(true, false, ["alice"]).gameInfo("alice");
+    const info = makeGame(true, ["alice"]).gameInfo("alice");
     for (const id of ["creator", "admin", "bob"]) {
       expect(REAL_NAMES).toContain(byId(info, id).username);
     }
   });
 
   it("on: a non-granted viewer still sees only themselves", () => {
-    const info = makeGame(true, false, ["alice"]).gameInfo("bob");
+    const info = makeGame(true, ["alice"]).gameInfo("bob");
     expect(byId(info, "bob").username).toBe("BobReal"); // self
     expect(REAL_NAMES).not.toContain(byId(info, "alice").username);
   });
@@ -127,14 +120,14 @@ describe("anonymizeNames: gameInfo (lobby / HTTP / preview)", () => {
   it("on: a viewer granted by account (nameRevealPublicIds) sees everyone's real names", () => {
     // alice's clientID is "alice", her account publicId is "alice-pub" — the grant
     // is keyed by publicId and resolved back to her clientID at lookup.
-    const info = makeGame(true, false, [], ["alice-pub"]).gameInfo("alice");
+    const info = makeGame(true, [], ["alice-pub"]).gameInfo("alice");
     for (const id of ["creator", "admin", "bob"]) {
       expect(REAL_NAMES).toContain(byId(info, id).username);
     }
   });
 
   it("on: a viewer NOT in nameRevealPublicIds still sees only themselves", () => {
-    const info = makeGame(true, false, [], ["alice-pub"]).gameInfo("bob");
+    const info = makeGame(true, [], ["alice-pub"]).gameInfo("bob");
     expect(byId(info, "bob").username).toBe("BobReal"); // self
     expect(REAL_NAMES).not.toContain(byId(info, "alice").username);
   });
@@ -143,7 +136,6 @@ describe("anonymizeNames: gameInfo (lobby / HTTP / preview)", () => {
     const info = makeGame(true).gameInfo();
     for (const id of ["creator", "admin", "alice", "bob"]) {
       expect(REAL_NAMES).not.toContain(byId(info, id).username);
-      expect(byId(info, id).clanTag).toBeNull();
     }
   });
 
@@ -193,7 +185,7 @@ describe("anonymizeNames: config updates propagate", () => {
   });
 
   it("clearing nameReveals revokes the grant", () => {
-    const game = makeGame(true, false, ["alice"]);
+    const game = makeGame(true, ["alice"]);
     expect(byId(game.gameInfo("alice"), "bob").username).toBe("BobReal"); // granted
     game.updateGameConfig({ nameReveals: [] });
     expect(byId(game.gameInfo("alice"), "bob").username).not.toBe("BobReal"); // revoked
@@ -232,18 +224,16 @@ describe("anonymizeNames: startInfoFor (in-game start payload)", () => {
       {
         clientID: "creator",
         username: "CreatorReal",
-        clanTag: "HOST",
         isLobbyCreator: true,
         friends: [],
       },
       {
         clientID: "alice",
         username: "AliceReal",
-        clanTag: "AAA",
         cosmetics: { flag: "fr" },
         friends: ["bob"],
       },
-      { clientID: "bob", username: "BobReal", clanTag: "BBB", friends: [] },
+      { clientID: "bob", username: "BobReal", friends: [] },
     ];
     const startInfo = {
       gameID: "g1",
@@ -252,8 +242,7 @@ describe("anonymizeNames: startInfoFor (in-game start payload)", () => {
       players,
     } as unknown as GameStartInfo;
     const wire = JSON.parse(JSON.stringify(startInfo)) as GameStartInfo;
-    const startInfoFor = (viewer: string) =>
-      names.startInfoFor(viewer, false, startInfo, wire);
+    const startInfoFor = (viewer: string) => names.startInfoFor(viewer, wire);
     return { game, startInfo, wire, startInfoFor };
   }
 
@@ -266,7 +255,6 @@ describe("anonymizeNames: startInfoFor (in-game start payload)", () => {
     const alice = player(info, "alice");
     expect(alice.username).not.toBe("AliceReal");
     expect(UsernameSchema.safeParse(alice.username).success).toBe(true);
-    expect(alice.clanTag).toBeNull();
     expect(alice.cosmetics).toBeUndefined();
     expect(alice.friends).toBeUndefined();
   });
@@ -282,7 +270,6 @@ describe("anonymizeNames: startInfoFor (in-game start payload)", () => {
     startInfoFor("bob");
     const rec = player(startInfo, "alice");
     expect(rec.username).toBe("AliceReal");
-    expect(rec.clanTag).toBe("AAA");
     expect(rec.cosmetics).toEqual({ flag: "fr" });
   });
 

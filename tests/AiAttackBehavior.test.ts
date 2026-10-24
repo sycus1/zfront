@@ -994,7 +994,6 @@ describe("Troop donations to teammates", () => {
             null,
             id,
             false,
-            null,
             [],
             id === "enemy" ? 1 : 0,
           ),

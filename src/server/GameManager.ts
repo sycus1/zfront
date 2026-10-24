@@ -64,7 +64,7 @@ export class GameManager {
     persistentID: string,
     gameID: GameID,
     lastTurn: number = 0,
-    identityUpdate?: { username: string; clanTag: string | null },
+    identityUpdate?: { username: string },
   ): boolean {
     const game = this.games.get(gameID);
     if (!game) return false;

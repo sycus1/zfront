@@ -277,7 +277,6 @@ export interface Player extends PlayerLike {
   info(): PlayerInfo;
   name(): string;
   displayName(): string;
-  clanTag(): string | null;
   clientID(): ClientID | null;
   id(): PlayerID;
   type(): PlayerType;

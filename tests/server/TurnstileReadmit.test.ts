@@ -70,7 +70,6 @@ describe("GameServer - wasAdmitted (Turnstile re-admission)", () => {
     expect(game.joinClient(makeClient(C1, "p1", makeMockWs()))).toBe("joined");
     expect(game.storedIdentity("p1")).toEqual({
       username: "TestUser",
-      clanTag: null,
     });
     expect(game.storedIdentity("nobody")).toBeNull();
   });

@@ -184,7 +184,6 @@ export function human(
   return {
     clientID: `client00${n}`,
     username: `Human ${n}`,
-    clanTag: null,
     ...overrides,
   };
 }

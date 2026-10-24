@@ -1,4 +1,4 @@
-import { ClanTagSchema, UsernameSchema } from "@openfront/engine-api/Schemas";
+import { UsernameSchema } from "@openfront/engine-api/Schemas";
 import {
   LevelBadge,
   packLevelBadge,
@@ -34,7 +34,6 @@ const NewClientInfo = zb.object(ClientInfoSchema.shape);
 const PreBadgeClientInfo = zb.object({
   clientID: z.string(),
   username: UsernameSchema,
-  clanTag: ClanTagSchema,
   friends: z.array(z.string()).optional(),
   verified: z.boolean().optional(),
   spectator: z.boolean().optional(),
@@ -44,14 +43,12 @@ const PreBadgeClientInfo = zb.object({
 const PLAIN: ClientInfo = {
   clientID: "aB3dEf7h",
   username: "alpha",
-  clanTag: null,
 };
 // Every other optional/nullable/boolean field set, so all seven pre-badge
 // header bits are in play.
 const FULL: ClientInfo = {
   clientID: "Xk9mNp2q",
   username: "bravo",
-  clanTag: "XY",
   friends: ["aB3dEf7h"],
   verified: true,
   spectator: true,
@@ -154,7 +151,6 @@ describe("ClientInfo.levelBadge on the wire", () => {
           {
             clientID: "Zz8wVu5t",
             username: "charlie",
-            clanTag: null,
             levelBadge: pack({ level: 100, prestige: 10, legend: true }),
           },
         ],
@@ -174,7 +170,6 @@ describe("a client cannot send itself a level", () => {
     token: "9f0f4b3a-0d2e-4a1f-8f0b-1c2d3e4f5a6b",
     gameID: "AbCd1234",
     username: "caster",
-    clanTag: null,
     turnstileToken: null,
   };
   const spoofed = {

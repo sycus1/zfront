@@ -15,17 +15,14 @@ describe("Worker join username clamping", () => {
     const verdict: JoinVerifyResponse = {
       status: "approved",
       username: "a".repeat(21),
-      clanTag: "TAG",
     };
     const outcome = resolveJoinVerdict(verdict, {
       username: "fallback",
-      clanTag: null,
     });
     expect(outcome.action).toBe("admit");
     if (outcome.action === "admit") {
       expect(outcome.username).toHaveLength(MAX_USERNAME_LENGTH);
       expect(outcome.username).toBe("a".repeat(MAX_USERNAME_LENGTH));
-      expect(outcome.clanTag).toBe("TAG");
 
       const client = makeClient({
         clientID: cid("cappr"),
@@ -48,18 +45,15 @@ describe("Worker join username clamping", () => {
       degraded: true,
       identity: {
         username: "x".repeat(25),
-        clanTag: "CLAN",
       },
     };
     const outcome = resolveJoinVerdict(verdict, {
       username: "fallback_user",
-      clanTag: null,
     });
     expect(outcome.action).toBe("admit");
     if (outcome.action === "admit") {
       expect(outcome.username).toHaveLength(MAX_USERNAME_LENGTH);
       expect(outcome.username).toBe("x".repeat(MAX_USERNAME_LENGTH));
-      expect(outcome.clanTag).toBe("CLAN");
 
       const client = makeClient({
         clientID: cid("cerr"),
@@ -102,7 +96,6 @@ describe("Worker join username clamping", () => {
     };
     const outcome = resolveJoinVerdict(verdict, {
       username: "user",
-      clanTag: null,
     });
     expect(outcome).toEqual({
       action: "reject",
@@ -118,7 +111,6 @@ describe("Worker join username clamping", () => {
     };
     const outcome = resolveJoinVerdict(verdict, {
       username: "user",
-      clanTag: null,
     });
     expect(outcome).toEqual({
       action: "reject",

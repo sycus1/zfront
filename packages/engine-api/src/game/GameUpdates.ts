@@ -255,7 +255,6 @@ export interface PlayerUpdate {
   clientID?: ClientID | null;
   name?: string;
   displayName?: string;
-  clanTag?: string | null;
   nationFlag?: string | null;
   team?: Team;
   smallID?: number;

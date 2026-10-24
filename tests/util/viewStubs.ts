@@ -103,7 +103,6 @@ export function makeGameView(opts: GameViewStubOptions = {}): GameView {
     stubTerrainMap(opts.width ?? 10, opts.height ?? 10),
     opts.myClientID,
     opts.myUsername ?? "tester",
-    opts.myClanTag ?? null,
     "test-game",
     opts.humans ?? [],
   );
@@ -119,7 +118,6 @@ export function makePlayerUpdate(
     clientID: "client-a",
     name: "Alice",
     displayName: "Alice",
-    clanTag: null,
     nationFlag: null,
     id: "player-a",
     smallID: 1,

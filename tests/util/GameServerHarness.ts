@@ -136,7 +136,6 @@ export function makeClient(opts: ClientOpts = {}): Client {
     undefined,
     opts.ip ?? `10.0.${Math.floor(n / 256)}.${n % 256}`,
     opts.username ?? `user_${clientID}`,
-    opts.clanTag ?? null,
     (opts.ws ?? makeMockWs()) as any,
     opts.cosmetics,
     opts.publicId,

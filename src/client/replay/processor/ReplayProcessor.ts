@@ -5,8 +5,8 @@
  *
  * The game is set up the same way a client watching the record sets it up
  * (Main.ts, LocalServer, Worker). The server's wire blanking is applied to
- * the record's GameStartInfo again (toWireGameStartInfo). Clan tags and
- * friends feed into team assignment, so skipping that desyncs team games.
+ * the record's GameStartInfo again (toWireGameStartInfo). Friends feed
+ * into team assignment, so skipping that desyncs team games.
  * The engine (in the browser, its worker: WorkerReplayEngine) starts the
  * game with no local clientID and runs the turns in order.
  *

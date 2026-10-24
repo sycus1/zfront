@@ -488,13 +488,11 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
         playerType = translateText("player_type.player");
         break;
     }
-    const clanTag = this.game.teamClanTag(player.team());
-    const playerTeam = getTranslatedPlayerTeamLabel(player.team(), clanTag);
+    const playerTeam = getTranslatedPlayerTeamLabel(player.team());
 
     const typeLen = playerType.length;
     const hasTeam = playerTeam !== "" && player.type() !== PlayerType.Bot;
-    const teamStr = clanTag ?? playerTeam;
-    const teamLen = hasTeam ? teamStr.length + 2 : 0; // +2 for brackets
+    const teamLen = hasTeam ? playerTeam.length + 2 : 0; // +2 for brackets
 
     // The column width is determined by the longest string in the flex-col
     const typeAndTeamLen = Math.max(typeLen, teamLen);
@@ -610,7 +608,7 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
                           .current()
                           .teamColor(player.team()!)
                           .toHex()}"
-                        >${clanTag ?? playerTeam}</span
+                        >${playerTeam}</span
                       >]</span
                     >
                   </div>`

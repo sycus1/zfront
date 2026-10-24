@@ -4,7 +4,6 @@ import {
   GameType,
   HumansVsNations,
 } from "@openfront/engine-api/game/GameTypes";
-import { ClanTagSchema } from "@openfront/engine-api/Schemas";
 import {
   BigIntStringSchema,
   PlayerStatsSchema,
@@ -15,8 +14,6 @@ import {
   LEVEL_BADGE_MAX_LEVEL,
   LEVEL_BADGE_MAX_PRESTIGE,
 } from "./LevelBadgeWire";
-
-const RequiredClanTagSchema = ClanTagSchema.unwrap();
 
 export const TokenPayloadSchema = z.object({
   jti: z.string(),
@@ -179,8 +176,8 @@ export const XpRulesSchema = z.object({
 });
 export type XpRules = z.infer<typeof XpRulesSchema>;
 
-// A player's level as stamped onto rows in other players' lists (the ranked
-// leaderboard, clan member lists), for drawing a level badge. Sent together
+// A player's level as stamped onto rows in other players' lists (leaderboards
+// and member lists), for drawing a level badge. Sent together
 // for a player with progress; absent for one without, while progression is
 // off, and from an API that predates them. Display-only, so a malformed or
 // out-of-range value reads as absent (that row shows no badge) rather than
@@ -437,30 +434,6 @@ export const UserMeResponseSchema = z.object({
     // older API without the setting still parses — absent hides the row in
     // account settings. A malformed value reads as hidden, like levelHidden.
     searchHidden: z.boolean().optional().catch(true),
-    clans: z
-      .array(
-        z.object({
-          tag: RequiredClanTagSchema,
-          name: z.string(),
-          role: z.enum(["leader", "officer", "member"]),
-          joinedAt: z.iso.datetime(),
-          memberCount: z.number().int().min(1),
-          // Clan currency — see ClanInfoSchema in ClanApiSchemas.ts for the
-          // format. Decimal bigint strings; optional for older responses.
-          softBalance: z.string().optional(),
-          hardBalance: z.string().optional(),
-        }),
-      )
-      .optional(),
-    clanRequests: z
-      .array(
-        z.object({
-          tag: RequiredClanTagSchema,
-          name: z.string(),
-          createdAt: z.iso.datetime(),
-        }),
-      )
-      .optional(),
     friends: z.array(z.string()),
     subscription: z
       .object({
@@ -680,27 +653,5 @@ export const PlayerProfileSchema = z.object({
   // an API without the field still parse.
   username: z.string().nullable().optional(),
   stats: PlayerStatsTreeSchema,
-  // Clans this player belongs to, tag-ordered. Optional so responses from an
-  // API without the field still parse (→ no clans shown).
-  clans: z
-    .array(
-      z.object({
-        tag: RequiredClanTagSchema,
-        name: z.string(),
-        role: z.enum(["leader", "officer", "member"]),
-        joinedAt: z.iso.datetime(),
-        memberCount: z.number().int().min(1),
-        // Clan currency — see ClanInfoSchema in ClanApiSchemas.ts for the
-        // format. Decimal bigint strings; optional for older responses.
-        softBalance: z.string().optional(),
-        hardBalance: z.string().optional(),
-      }),
-    )
-    .optional(),
-  // The tag to show beside the player's name: the one from their latest game
-  // played under a clan they still belong to. null when none of their recent
-  // games has one. Optional so responses from an API without the field still
-  // parse (→ no tag shown).
-  displayClanTag: z.string().nullable().optional(),
 });
 export type PlayerProfile = z.infer<typeof PlayerProfileSchema>;

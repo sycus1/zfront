@@ -139,7 +139,6 @@ export function playerStaticFromUpdate(pu: PlayerUpdate): PlayerStatic {
     id: pu.id,
     name: pu.name!,
     displayName: pu.displayName!,
-    clanTag: pu.clanTag ?? null,
     clientID: pu.clientID ?? null,
     playerType: gamePlayerTypeToEnum(pu.playerType!),
     team: pu.team ?? null,

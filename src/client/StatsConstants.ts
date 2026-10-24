@@ -1,7 +1,6 @@
 export const COLUMN_IDS = [
-  // Identity (only clan is hideable; rank/player/team are not).
+  // Identity (not hideable).
   "rank",
-  "clan",
   "player",
   "playerType",
   "team",
@@ -28,7 +27,7 @@ export const COLUMN_IDS = [
 export type ColumnId = (typeof COLUMN_IDS)[number];
 
 export const DEFAULT_STATS_COLUMNS = {
-  player: ["clan", "tiles", "gold", "maxtroops"],
+  player: ["tiles", "gold", "maxtroops"],
   team: ["tiles", "gold", "maxtroops"],
 } as const satisfies Record<StatsTableKind, readonly ColumnId[]>;
 

@@ -404,8 +404,6 @@ class Client {
       cosmetics: {},
       turnstileToken: null,
       playerName: resolvedName.name,
-      playerClanTag: this.usernameInput?.getClanTag() ?? null,
-      clanTagCheck: this.usernameInput?.getClanCheck(),
       playerRole: null,
       gameStartInfo:
         lobby.gameStartInfo ??

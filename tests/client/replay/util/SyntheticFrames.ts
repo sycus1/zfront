@@ -49,7 +49,6 @@ export function fullPlayer(
     clientID: `client${smallID}`,
     name: `Player ${smallID}`,
     displayName: `Player ${smallID}`,
-    clanTag: null,
     nationFlag: null,
     team: undefined,
     smallID,

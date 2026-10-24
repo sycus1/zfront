@@ -54,7 +54,7 @@ describe("archived game records", () => {
       clientID: ALICE,
       persistentID: "alice-pid",
       username: "alice",
-      clanTag: "AA",
+
       publicId: "alice-pub",
       friends: ["bob-pub"],
       ip: "1.1.1.1",
@@ -84,7 +84,7 @@ describe("archived game records", () => {
     expect(a).toMatchObject({
       clientID: ALICE,
       username: "alice",
-      clanTag: "AA",
+
       persistentID: "alice-pid",
       teamIndex: 0,
       friends: [BOB],

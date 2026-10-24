@@ -359,11 +359,6 @@ export class PlayerView implements PlayerLike {
       ? this.anonymousName
       : this.static.displayName;
   }
-  clanTag(): string | null {
-    return this.anonymousName !== null && userSettings.anonymousNames()
-      ? null
-      : this.static.clanTag;
-  }
   clientID(): ClientID | null {
     return this.static.clientID;
   }

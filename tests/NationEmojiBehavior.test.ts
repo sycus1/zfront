@@ -140,7 +140,7 @@ describe("Nation emojis when the game ends", () => {
 
   it("in team games every nation congratulates the winning team", async () => {
     const info = (id: string, type: PlayerType, team: number) =>
-      new PlayerInfo(id, type, null, id, false, null, [], team);
+      new PlayerInfo(id, type, null, id, false, [], team);
     const game = await setup(
       "big_plains",
       { gameMode: GameMode.Team, playerTeams: 2 },

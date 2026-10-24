@@ -23,7 +23,7 @@ export function assignTeams(
 
   // Matchmade games arrive with a server-pinned team slot (teamIndex). The
   // matchmaker already balanced those teams, so pins are honored
-  // unconditionally — before and regardless of clan/friend grouping and
+  // unconditionally — before and regardless of friend grouping and
   // maxTeamSize — and seed the counts the balancing below sees.
   const unpinned: PlayerInfo[] = [];
   for (const p of players) {
@@ -34,44 +34,6 @@ export function assignTeams(
     }
     result.set(p, pinnedTeam);
     teamPlayerCount.set(pinnedTeam, (teamPlayerCount.get(pinnedTeam) ?? 0) + 1);
-  }
-
-  // Clans are strict: a clan goes to one team together, and any overflow
-  // members get kicked. (You opted into the clan, so we honor "all or
-  // nothing" for placement.)
-  const clanGroups = new Map<string, PlayerInfo[]>();
-  const nonClanPlayers: PlayerInfo[] = [];
-  for (const p of unpinned) {
-    if (p.clanTag) {
-      if (!clanGroups.has(p.clanTag)) clanGroups.set(p.clanTag, []);
-      clanGroups.get(p.clanTag)!.push(p);
-    } else {
-      nonClanPlayers.push(p);
-    }
-  }
-
-  const sortedClans = Array.from(clanGroups.values()).sort(
-    (a, b) => b.length - a.length,
-  );
-  for (const clan of sortedClans) {
-    let team: Team | null = null;
-    let teamSize = 0;
-    for (const t of teams) {
-      const p = teamPlayerCount.get(t) ?? 0;
-      if (team !== null && teamSize <= p) continue;
-      teamSize = p;
-      team = t;
-    }
-    if (team === null) continue;
-    for (const player of clan) {
-      if (teamSize < maxTeamSize) {
-        teamSize++;
-        result.set(player, team);
-      } else {
-        result.set(player, "kicked");
-      }
-    }
-    teamPlayerCount.set(team, teamSize);
   }
 
   // Friend edges are a soft preference: when placing a player, prefer the
@@ -142,14 +104,14 @@ export function assignTeams(
     if (p.clientID !== null) teamByClientID.set(p.clientID, bestTeam);
   };
 
-  let nationPlayers = nonClanPlayers.filter(
+  let nationPlayers = unpinned.filter(
     (p) => p.playerType === PlayerType.Nation,
   );
   if (nationPlayers.length > 0) {
     const random = new PseudoRandom(simpleHash(nationPlayers[0].id));
     nationPlayers = random.shuffleArray(nationPlayers);
   }
-  const otherPlayers = nonClanPlayers.filter(
+  const otherPlayers = unpinned.filter(
     (p) => p.playerType !== PlayerType.Nation,
   );
 
@@ -199,7 +161,7 @@ export function resolveTeamsList(
     // At least 2, even when attendance can't fill two teams: public lobbies
     // start on their countdown no matter how few players are seated (or none,
     // when only spectators remain), and a private Duos lobby can start with a
-    // single clan packed onto one team. Throwing here ("Too few teams") killed
+    // single player. Throwing here ("Too few teams") killed
     // game construction on every client — the game ran server-side while
     // everyone hung on the loading screen. The lobby preview already clamps
     // the same way (LobbyPlayerView.getTeamList), so this keeps them in step.

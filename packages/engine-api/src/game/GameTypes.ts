@@ -304,7 +304,6 @@ export class PlayerInfo {
     // TODO: make player id the small id
     public readonly id: PlayerID,
     public readonly isLobbyCreator: boolean = false,
-    public readonly clanTag: string | null = null,
     public readonly friends: ClientID[] = [],
     // Server-pinned team slot (index into the game's team list) for
     // matchmade team games; null = assign normally.
@@ -315,7 +314,7 @@ export class PlayerInfo {
     // name (e.g. India's and Pakistan's "Punjab").
     public readonly nationFlag: string | null = null,
   ) {
-    this.displayName = formatPlayerDisplayName(this.name, this.clanTag);
+    this.displayName = this.name;
   }
 }
 
@@ -483,11 +482,4 @@ export interface NameViewData {
   x: number;
   y: number;
   size: number;
-}
-
-export function formatPlayerDisplayName(
-  username: string,
-  clanTag?: string | null,
-): string {
-  return clanTag ? `[${clanTag}] ${username}` : username;
 }

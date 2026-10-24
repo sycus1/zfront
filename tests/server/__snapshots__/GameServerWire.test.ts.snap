@@ -29,7 +29,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
       "num_turns": 21,
       "players": [
         {
-          "clanTag": "HST",
           "clientID": "host0000",
           "cosmetics": undefined,
           "friends": [
@@ -42,7 +41,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
           "username": "HostName",
         },
         {
-          "clanTag": null,
           "clientID": "p2000000",
           "cosmetics": {
             "verified": true,
@@ -55,7 +53,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
           "username": "SecondOne",
         },
         {
-          "clanTag": "TRD",
           "clientID": "p3000000",
           "cosmetics": undefined,
           "friends": undefined,
@@ -173,7 +170,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
         "lobby": {
           "clients": [
             {
-              "clanTag": "HST",
               "clientID": "host0000",
               "friends": [
                 "p2000000",
@@ -181,19 +177,16 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
               "username": "HostName",
             },
             {
-              "clanTag": null,
               "clientID": "p2000000",
               "username": "SecondOne",
               "verified": true,
             },
             {
-              "clanTag": null,
               "clientID": "cast0000",
               "spectator": true,
               "username": "Caster",
             },
             {
-              "clanTag": "TRD",
               "clientID": "p3000000",
               "username": "ThirdOne",
             },
@@ -227,7 +220,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
         "lobby": {
           "clients": [
             {
-              "clanTag": "HST",
               "clientID": "host0000",
               "friends": [
                 "p2000000",
@@ -235,19 +227,16 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
               "username": "HostName",
             },
             {
-              "clanTag": null,
               "clientID": "p2000000",
               "username": "SecondOne",
               "verified": true,
             },
             {
-              "clanTag": null,
               "clientID": "cast0000",
               "spectator": true,
               "username": "Caster",
             },
             {
-              "clanTag": "TRD",
               "clientID": "p3000000",
               "username": "ThirdOne",
             },
@@ -305,7 +294,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
           "lobbyCreatedAt": 1700000000000,
           "players": [
             {
-              "clanTag": "HST",
               "clientID": "host0000",
               "friends": [
                 "p2000000",
@@ -314,7 +302,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
               "username": "HostName",
             },
             {
-              "clanTag": null,
               "clientID": "p2000000",
               "cosmetics": {
                 "verified": true,
@@ -323,7 +310,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
               "username": "SecondOne",
             },
             {
-              "clanTag": "TRD",
               "clientID": "p3000000",
               "isLobbyCreator": false,
               "username": "ThirdOne",
@@ -530,7 +516,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
         "lobby": {
           "clients": [
             {
-              "clanTag": "HST",
               "clientID": "host0000",
               "username": "HostName",
             },
@@ -564,7 +549,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
         "lobby": {
           "clients": [
             {
-              "clanTag": "HST",
               "clientID": "host0000",
               "friends": [
                 "p2000000",
@@ -572,19 +556,16 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
               "username": "HostName",
             },
             {
-              "clanTag": null,
               "clientID": "p2000000",
               "username": "SecondOne",
               "verified": true,
             },
             {
-              "clanTag": null,
               "clientID": "cast0000",
               "spectator": true,
               "username": "Caster",
             },
             {
-              "clanTag": "TRD",
               "clientID": "p3000000",
               "username": "ThirdOne",
             },
@@ -618,7 +599,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
         "lobby": {
           "clients": [
             {
-              "clanTag": "HST",
               "clientID": "host0000",
               "friends": [
                 "p2000000",
@@ -626,19 +606,16 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
               "username": "HostName",
             },
             {
-              "clanTag": null,
               "clientID": "p2000000",
               "username": "SecondOne",
               "verified": true,
             },
             {
-              "clanTag": null,
               "clientID": "cast0000",
               "spectator": true,
               "username": "Caster",
             },
             {
-              "clanTag": "TRD",
               "clientID": "p3000000",
               "username": "ThirdOne",
             },
@@ -696,7 +673,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
           "lobbyCreatedAt": 1700000000000,
           "players": [
             {
-              "clanTag": "HST",
               "clientID": "host0000",
               "friends": [
                 "p2000000",
@@ -705,7 +681,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
               "username": "HostName",
             },
             {
-              "clanTag": null,
               "clientID": "p2000000",
               "cosmetics": {
                 "verified": true,
@@ -714,7 +689,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
               "username": "SecondOne",
             },
             {
-              "clanTag": "TRD",
               "clientID": "p3000000",
               "isLobbyCreator": false,
               "username": "ThirdOne",
@@ -927,7 +901,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
         "lobby": {
           "clients": [
             {
-              "clanTag": "HST",
               "clientID": "host0000",
               "friends": [
                 "p2000000",
@@ -935,19 +908,16 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
               "username": "HostName",
             },
             {
-              "clanTag": null,
               "clientID": "p2000000",
               "username": "SecondOne",
               "verified": true,
             },
             {
-              "clanTag": null,
               "clientID": "cast0000",
               "spectator": true,
               "username": "Caster",
             },
             {
-              "clanTag": "TRD",
               "clientID": "p3000000",
               "username": "ThirdOne",
             },
@@ -981,7 +951,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
         "lobby": {
           "clients": [
             {
-              "clanTag": "HST",
               "clientID": "host0000",
               "friends": [
                 "p2000000",
@@ -989,19 +958,16 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
               "username": "HostName",
             },
             {
-              "clanTag": null,
               "clientID": "p2000000",
               "username": "SecondOne",
               "verified": true,
             },
             {
-              "clanTag": null,
               "clientID": "cast0000",
               "spectator": true,
               "username": "Caster",
             },
             {
-              "clanTag": "TRD",
               "clientID": "p3000000",
               "username": "ThirdOne",
             },
@@ -1059,7 +1025,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
           "lobbyCreatedAt": 1700000000000,
           "players": [
             {
-              "clanTag": "HST",
               "clientID": "host0000",
               "friends": [
                 "p2000000",
@@ -1068,7 +1033,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
               "username": "HostName",
             },
             {
-              "clanTag": null,
               "clientID": "p2000000",
               "cosmetics": {
                 "verified": true,
@@ -1077,7 +1041,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
               "username": "SecondOne",
             },
             {
-              "clanTag": "TRD",
               "clientID": "p3000000",
               "isLobbyCreator": false,
               "username": "ThirdOne",
@@ -1284,7 +1247,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
         "lobby": {
           "clients": [
             {
-              "clanTag": "HST",
               "clientID": "host0000",
               "friends": [
                 "p2000000",
@@ -1292,19 +1254,16 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
               "username": "HostName",
             },
             {
-              "clanTag": null,
               "clientID": "p2000000",
               "username": "SecondOne",
               "verified": true,
             },
             {
-              "clanTag": null,
               "clientID": "cast0000",
               "spectator": true,
               "username": "Caster",
             },
             {
-              "clanTag": "TRD",
               "clientID": "p3000000",
               "username": "ThirdOne",
             },
@@ -1338,7 +1297,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
         "lobby": {
           "clients": [
             {
-              "clanTag": "HST",
               "clientID": "host0000",
               "friends": [
                 "p2000000",
@@ -1346,19 +1304,16 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
               "username": "HostName",
             },
             {
-              "clanTag": null,
               "clientID": "p2000000",
               "username": "SecondOne",
               "verified": true,
             },
             {
-              "clanTag": null,
               "clientID": "cast0000",
               "spectator": true,
               "username": "Caster",
             },
             {
-              "clanTag": "TRD",
               "clientID": "p3000000",
               "username": "ThirdOne",
             },
@@ -1416,7 +1371,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
           "lobbyCreatedAt": 1700000000000,
           "players": [
             {
-              "clanTag": "HST",
               "clientID": "host0000",
               "friends": [
                 "p2000000",
@@ -1425,7 +1379,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
               "username": "HostName",
             },
             {
-              "clanTag": null,
               "clientID": "p2000000",
               "cosmetics": {
                 "verified": true,
@@ -1434,7 +1387,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
               "username": "SecondOne",
             },
             {
-              "clanTag": "TRD",
               "clientID": "p3000000",
               "isLobbyCreator": false,
               "username": "ThirdOne",
@@ -1666,7 +1618,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
           "lobbyCreatedAt": 1700000000000,
           "players": [
             {
-              "clanTag": "HST",
               "clientID": "host0000",
               "friends": [
                 "p2000000",
@@ -1675,7 +1626,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
               "username": "HostName",
             },
             {
-              "clanTag": null,
               "clientID": "p2000000",
               "cosmetics": {
                 "verified": true,
@@ -1684,7 +1634,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
               "username": "SecondOne",
             },
             {
-              "clanTag": "TRD",
               "clientID": "p3000000",
               "isLobbyCreator": false,
               "username": "ThirdOne",
@@ -1789,7 +1738,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
     "autoStartAt": undefined,
     "clients": [
       {
-        "clanTag": "HST",
         "clientID": "host0000",
         "friends": [
           "p2000000",
@@ -1801,7 +1749,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
         "verified": undefined,
       },
       {
-        "clanTag": null,
         "clientID": "p2000000",
         "friends": undefined,
         "levelBadge": undefined,
@@ -1811,7 +1758,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
         "verified": true,
       },
       {
-        "clanTag": null,
         "clientID": "cast0000",
         "friends": undefined,
         "levelBadge": undefined,
@@ -1821,7 +1767,6 @@ exports[`GameServer wire transcript > matches the golden transcript for a script
         "verified": undefined,
       },
       {
-        "clanTag": "TRD",
         "clientID": "p3000000",
         "friends": undefined,
         "levelBadge": undefined,

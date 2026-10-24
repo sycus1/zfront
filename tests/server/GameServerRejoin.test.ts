@@ -76,22 +76,18 @@ describe("GameServer.rejoinClient", () => {
         clientID: P1,
         persistentID: "p1-pid",
         username: "OldName",
-        clanTag: "OLD",
       });
       game.joinClient(client);
 
       game.rejoinClient(makeMockWs() as any, "p1-pid", 0, {
         username: "NewName",
-        clanTag: "NEW",
       });
 
       expect(game.storedIdentity("p1-pid")).toEqual({
         username: "NewName",
-        clanTag: "NEW",
       });
       const seen = game.gameInfo().clients?.find((c) => c.clientID === P1);
       expect(seen?.username).toBe("NewName");
-      expect(seen?.clanTag).toBe("NEW");
     });
 
     it("drops the verified badge when the username changes", () => {
@@ -108,7 +104,6 @@ describe("GameServer.rejoinClient", () => {
 
       game.rejoinClient(makeMockWs() as any, "p1-pid", 0, {
         username: "NewName",
-        clanTag: null,
       });
 
       expect(client.cosmetics?.verified).toBeUndefined();
@@ -122,18 +117,15 @@ describe("GameServer.rejoinClient", () => {
         clientID: P1,
         persistentID: "p1-pid",
         username: "SameName",
-        clanTag: "OLD",
         cosmetics: { verified: true },
       });
       game.joinClient(client);
 
       game.rejoinClient(makeMockWs() as any, "p1-pid", 0, {
         username: "SameName",
-        clanTag: "NEW",
       });
 
       expect(client.cosmetics?.verified).toBe(true);
-      expect(game.storedIdentity("p1-pid")?.clanTag).toBe("NEW");
     });
 
     it("is ignored once the game has started", () => {
@@ -144,7 +136,6 @@ describe("GameServer.rejoinClient", () => {
         clientID: P1,
         persistentID: "p1-pid",
         username: "OldName",
-        clanTag: "OLD",
       });
       game.joinClient(client);
       startGame(game);
@@ -152,13 +143,11 @@ describe("GameServer.rejoinClient", () => {
       expect(
         game.rejoinClient(makeMockWs() as any, "p1-pid", 0, {
           username: "NewName",
-          clanTag: "NEW",
         }),
       ).toBe(true);
 
       expect(game.storedIdentity("p1-pid")).toEqual({
         username: "OldName",
-        clanTag: "OLD",
       });
     });
   });

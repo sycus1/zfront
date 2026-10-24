@@ -16,27 +16,18 @@ describe("Core Simulation - Team Resolution and Assignment", () => {
     return game.teams().filter((t) => t !== ColoredTeams.Bot);
   }
 
-  function createHuman(id: string, clanTag: string | null = null): PlayerInfo {
+  function createHuman(id: string): PlayerInfo {
     return new PlayerInfo(
       `Player ${id}`,
       PlayerType.Human,
       `client_${id}`,
       `p_${id}`,
       false,
-      clanTag,
     );
   }
 
-  test("GameImpl resolves 2 teams and assigns post-conversion clan roster", async () => {
-    // 5 CLAN members + 3 OTHER members initially (8 players, cap 4 on 2 teams).
-    // Server benched 5th CLAN member, leaving 4 CLAN + 3 OTHER (7 active players).
-    const clanPlayers = Array.from({ length: 4 }, (_, i) =>
-      createHuman(`c${i}`, "CLAN"),
-    );
-    const otherPlayers = Array.from({ length: 3 }, (_, i) =>
-      createHuman(`o${i}`, "OTHER"),
-    );
-    const postConversionRoster = [...clanPlayers, ...otherPlayers];
+  test("GameImpl resolves 2 teams and balances an odd roster", async () => {
+    const players = Array.from({ length: 7 }, (_, i) => createHuman(`p${i}`));
 
     const game = await setup(
       "plains",
@@ -45,38 +36,22 @@ describe("Core Simulation - Team Resolution and Assignment", () => {
         playerTeams: 2,
         nations: "disabled",
       },
-      postConversionRoster,
+      players,
     );
 
     // GameImpl constructor must have called resolveTeamsList(2, 7)
-    expect(playerTeamsOf(game)).toHaveLength(2);
     expect(playerTeamsOf(game)).toEqual([ColoredTeams.Red, ColoredTeams.Blue]);
 
-    // All 7 players must be in the game (no simulation kicks)
+    // All 7 players must be in the game (no simulation kicks), split 4/3.
     expect(game.allPlayers()).toHaveLength(7);
-
-    // All 4 CLAN players must be together on Red
-    for (const p of clanPlayers) {
-      expect(game.player(p.id).team()).toBe(ColoredTeams.Red);
-    }
-
-    // All 3 OTHER players must be together on Blue
-    for (const p of otherPlayers) {
-      expect(game.player(p.id).team()).toBe(ColoredTeams.Blue);
-    }
+    const onRed = players.filter(
+      (p) => game.player(p.id).team() === ColoredTeams.Red,
+    );
+    expect(onRed).toHaveLength(4);
   });
 
-  test("GameImpl dynamically resolves Quads team count for post-conversion roster", async () => {
-    // 4 CLAN + 5 solos on 0-nation map with Quads.
-    // Server benched 4th CLAN member because 9 players / 4 = 3 teams, cap 3.
-    // Post-conversion active roster has 3 CLAN + 5 solos = 8 players.
-    const clanPlayers = Array.from({ length: 3 }, (_, i) =>
-      createHuman(`qc${i}`, "CLAN"),
-    );
-    const soloPlayers = Array.from({ length: 5 }, (_, i) =>
-      createHuman(`qs${i}`),
-    );
-    const postConversionRoster = [...clanPlayers, ...soloPlayers];
+  test("GameImpl dynamically resolves the Quads team count from attendance", async () => {
+    const roster = Array.from({ length: 8 }, (_, i) => createHuman(`q${i}`));
 
     const game = await setup(
       "plains",
@@ -85,7 +60,7 @@ describe("Core Simulation - Team Resolution and Assignment", () => {
         playerTeams: Quads,
         nations: "disabled",
       },
-      postConversionRoster,
+      roster,
     );
 
     // 8 players in Quads -> Math.ceil(8 / 4) = 2 teams (Red, Blue)
@@ -94,11 +69,6 @@ describe("Core Simulation - Team Resolution and Assignment", () => {
 
     // All 8 players must be placed without tick-0 kicks
     expect(game.allPlayers()).toHaveLength(8);
-
-    // Clan members placed together on Red
-    for (const p of clanPlayers) {
-      expect(game.player(p.id).team()).toBe(ColoredTeams.Red);
-    }
   });
 
   test("GameImpl resolves numbered teams when playerTeams >= 8", async () => {

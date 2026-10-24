@@ -248,7 +248,6 @@ export class LangSelector extends LitElement {
       "player-stats",
       "team-stats",
       "leaderboard-player-list",
-      "leaderboard-clan-table",
       "build-menu",
       "win-modal",
       "game-starting-modal",

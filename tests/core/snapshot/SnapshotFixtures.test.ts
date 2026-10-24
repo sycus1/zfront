@@ -104,9 +104,7 @@ describe("snapshot fixtures from earlier builds", { timeout: 120_000 }, () => {
           gameID: "RESUMED01",
           lobbyCreatedAt: 0,
           config: header.gameConfig,
-          players: [
-            { clientID: human.clientID, username: "loader", clanTag: null },
-          ],
+          players: [{ clientID: human.clientID, username: "loader" }],
         },
         bytes,
       );

@@ -606,20 +606,14 @@ describe("NukeExecution kill credit", () => {
         "c1",
         "launcher_id",
         false,
-        "ALPHA",
+        [],
+        0,
       ),
-      new PlayerInfo("mate", PlayerType.Human, "c2", "mate_id", false, "ALPHA"),
-      new PlayerInfo("afk", PlayerType.Human, "c3", "afk_id", false, "ALPHA"),
-      new PlayerInfo(
-        "enemy",
-        PlayerType.Human,
-        "c4",
-        "enemy_id",
-        false,
-        "BETA",
-      ),
-      new PlayerInfo("e2", PlayerType.Human, "c5", "e2_id", false, "BETA"),
-      new PlayerInfo("e3", PlayerType.Human, "c6", "e3_id", false, "BETA"),
+      new PlayerInfo("mate", PlayerType.Human, "c2", "mate_id", false, [], 0),
+      new PlayerInfo("afk", PlayerType.Human, "c3", "afk_id", false, [], 0),
+      new PlayerInfo("enemy", PlayerType.Human, "c4", "enemy_id", false, [], 1),
+      new PlayerInfo("e2", PlayerType.Human, "c5", "e2_id", false, [], 1),
+      new PlayerInfo("e3", PlayerType.Human, "c6", "e3_id", false, [], 1),
     ]);
     const mate = g.player("mate_id");
     const afk = g.player("afk_id");

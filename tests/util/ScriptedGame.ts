@@ -95,7 +95,7 @@ export function scriptedGameStart(
     players: SCRIPTED_HUMANS.map((clientID, i) => ({
       clientID,
       username: `scripted${i}`,
-      clanTag: null,
+
       isLobbyCreator: i === 0,
     })),
   };

@@ -190,7 +190,6 @@ describe("Disconnected", () => {
         null,
         "player_1_id",
         false,
-        "CLAN",
       );
       const player2Info = new PlayerInfo(
         "Player2",
@@ -198,7 +197,6 @@ describe("Disconnected", () => {
         null,
         "player_2_id",
         false,
-        "CLAN",
       );
 
       game = await setup(
