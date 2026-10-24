@@ -1,0 +1,14 @@
+// Static deploy of the solo client to staging.zfront.app on Cloudflare
+// Workers Static Assets. Build static/ with scripts/build-static-site.sh first;
+// .github/workflows/deploy-staging.yml does both on every push to main.
+// Single-page fallback so a reload on /game/<id> still gets the app shell.
+{
+  "name": "zfront-staging",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./static",
+    "not_found_handling": "single-page-application",
+  },
+  "routes": [{ "pattern": "staging.zfront.app", "custom_domain": true }],
+  "workers_dev": true,
+}
