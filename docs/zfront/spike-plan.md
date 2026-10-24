@@ -84,17 +84,44 @@ UI polish, the economy, wave director tuning, art, multiplayer, deploying to Clo
   - If the density transfer is heavy, send only the cells that changed, or send every second tick.
 - **Reconsider the fork** only if the engine can't host the horde within budget even with plan B, or if H6 shows the integration has to cut deep into OpenFront's core. Fallback: a standalone horde worker that shares the map buffers.
 
-## Findings (to be filled in)
+## Findings
 
-| Metric                                                   | Target               | Result |
-| -------------------------------------------------------- | -------------------- | ------ |
-| Baseline p95 tick, Britannia, no horde                   | n/a                  |        |
-| p95 tick with 100k density, 500 elites                   | ≤ 30 ms              |        |
-| Full flow-field recompute                                | ≤ 50 ms              |        |
-| Density transfer per tick                                | ≤ 2 ms               |        |
-| Frame rate on integrated graphics                        | ≥ 60 (45 acceptable) |        |
-| Same-seed hash matches                                   | yes                  |        |
-| Lines changed in OpenFront files (excluding new modules) | small                |        |
+Day 0 and Day 1 were done on 2026-10-24 on branch `spike/horde`. Day 2 (client) and Day 3 (elite tuning and the go/no-go) are still to do.
+
+| Metric                                                   | Target               | Result                                                                                                                                                                                                     |
+| -------------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Baseline p95 tick, Britannia, no horde                   | n/a                  | **5.6 ms** (mean 3.2 ms), peak heap 135 MB                                                                                                                                                                 |
+| p95 tick with 100k density, 500 elites                   | ≤ 30 ms              | ✅ **9.3–9.9 ms** (mean 4.8–5.0 ms). The horde itself adds about 1.4 ms per tick.                                                                                                                          |
+| Full flow-field recompute                                | ≤ 50 ms              | ✅ mean **4.9–5.1 ms**, max **8.8–10.1 ms** (151 recomputes in 1,800 ticks)                                                                                                                                |
+| Density transfer per tick                                | ≤ 2 ms               | Not measured yet (Day 2)                                                                                                                                                                                   |
+| Frame rate on integrated graphics                        | ≥ 60 (45 acceptable) | Not measured yet (Day 2)                                                                                                                                                                                   |
+| Same-seed hash matches                                   | yes                  | ✅ Two perf runs gave the same game hash and the same horde hash. Unit tests confirm two-game determinism and a snapshot restore mid-wave.                                                                 |
+| Lines changed in OpenFront files (excluding new modules) | small                | ✅ **11 engine lines in 4 files** (`Schemas.ts`, `EngineConfig.ts`, `GameRunner.ts`, `ExecutionRegistry.ts`), plus test infrastructure: the perf flag, the snapshot cache list, and one coverage exemption |
+
+### Setup
+
+- **Command:** `npm run perf:game -- --map britannia --ticks 1800 --horde --no-cpu-profile --no-gc-profile --no-alloc-profile`
+- **Players:** 400 bots and 20 nations, the same as the baseline.
+- **Waves:** a 100k wave every 600 ticks from 16 coastal emitters, with all 500 elites in the first wave.
+- **Grid:** the coarse grid is 800×1044, about 835k cells.
+- **Machine:** Node on the dev desktop. Expect a browser Web Worker on a laptop to be roughly 1.5–2× slower, which still leaves headroom.
+
+### What happened
+
+- **Pressure works.** Peak alive was **266k** zombies, which is more than the 100k target, because waves stack up when nothing kills them. The horde destroyed 60 AI structures, and recomputing the routes after each loss stayed cheap.
+- **Turrets weren't part of the performance run,** because the AI nations built no Defence Posts. Unit tests cover turret behaviour. Each turret's cost is bounded at about 200 cells plus a scan of the elites per tick.
+- **Some zombies never left their emitters.** About 34k from the last wave were still waiting, because emitters stall when the cell they spawn into is full and the zombies there can't move (for example, coast with no reachable target). That's a gameplay tuning question, not a performance one.
+- **Design note.** Structures are re-scanned every tick, which is a cheap signature check, and the flow field is only rebuilt when the set of structures changes. Scanning every tick, rather than on an interval, is what keeps snapshot restore exact, because a restored game rebuilds these caches on its first tick.
+
+### Code
+
+- **New code** is in `packages/engine/src/horde/`:
+  - `FlowField.ts`: Dial's bucket-queue Dijkstra on a 4-connected grid
+  - `HordeField.ts`: the density double buffer, pressure on structures, and the terrain cost field
+  - `Elites.ts`: discrete elites as a struct of arrays
+  - `HordeExecution.ts`: waves, coastal emitters, turrets, structure HP and snapshots
+- **Tests** are in `tests/horde/`: 16 of them, covering the valley funnel, mountains blocking the flow, the cell cap, pressure, determinism and snapshot round-trips.
+- **Mode flag:** `GameConfig.horde` turns the mode on through `GameRunner.init`.
 
 ## After the spike: Phase 0 (strip and rebrand) checklist
 

@@ -166,6 +166,16 @@ export const DERIVED_FIELDS = new Set<string>([
   "reachableStationsCache",
   // NationStructureBehavior: only read in the tick it was computed in
   "mirvWorthSavingMemo",
+  // zfront HordeExecution: rebuilt from the units on the first tick after a
+  // restore (hordeStructureSig starts at -1), plus perf-harness timings
+  "hordeFlow",
+  "hordeStructureAt",
+  "hordeTurrets",
+  "hordeStructureSig",
+  "hordeProfile",
+  "obstacle",
+  // zfront HordeField: double-buffer scratch
+  "back",
 ]);
 
 // Search engines whose fields are per-query scratch (stamps, scores, open

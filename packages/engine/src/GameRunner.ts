@@ -36,6 +36,7 @@ import { createGame } from "./game/GameImpl";
 import { humanDisconnects, humanStatsSnapshot } from "./game/HumanStats";
 import { placeName, placeSpawnName } from "./game/NameBoxCalculator";
 import { createNationsForGame } from "./game/NationCreation";
+import { HordeExecution } from "./horde/HordeExecution";
 import {
   readSnapshotHeader,
   restoreGame,
@@ -192,6 +193,9 @@ export class GameRunner {
     this.game.addExecution(new WinCheckExecution());
     if (this.game.config().doomsdayClockConfig().enabled) {
       this.game.addExecution(new DoomsdayClockExecution());
+    }
+    if (this.game.config().horde()) {
+      this.game.addExecution(new HordeExecution());
     }
     if (!this.game.config().isUnitDisabled(UnitType.Factory)) {
       this.game.addExecution(

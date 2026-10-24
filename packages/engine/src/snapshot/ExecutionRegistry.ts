@@ -43,6 +43,7 @@ import { TribeExecutionSnapshot } from "../execution/TribeExecution";
 import { UpgradeStructureExecutionSnapshot } from "../execution/UpgradeStructureExecution";
 import { WarshipExecutionSnapshot } from "../execution/WarshipExecution";
 import { WinCheckExecutionSnapshot } from "../execution/WinCheckExecution";
+import { HordeExecutionSnapshot } from "../horde/HordeExecution";
 import type { ExecutionSnapshotType } from "./ExecutionSnapshot";
 
 /**
@@ -70,6 +71,7 @@ export const EXECUTION_SNAPSHOT_TYPES = [
   EmbargoExecutionSnapshot,
   EmojiExecutionSnapshot,
   FactoryExecutionSnapshot,
+  HordeExecutionSnapshot,
   MarkDisconnectedExecutionSnapshot,
   MirvExecutionSnapshot,
   MissileSiloExecutionSnapshot,

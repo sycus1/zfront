@@ -163,6 +163,9 @@ export class EngineConfig extends Config {
   waterNukes(): boolean {
     return this._gameConfig.waterNukes ?? false;
   }
+  horde(): boolean {
+    return this._gameConfig.horde ?? false;
+  }
   infiniteGold(): boolean {
     return this._gameConfig.infiniteGold;
   }

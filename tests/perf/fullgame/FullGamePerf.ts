@@ -25,6 +25,7 @@
  *                        [--no-cpu-profile] [--no-exec-profile]
  *                        [--no-gc-profile] [--no-alloc-profile]
  *                        [--footprint] [--snapshot-at 0,2000,12000]
+ *                        [--horde] [--horde-size 100000] [--elites 500]
  *
  * --footprint records the live heap (used heap after a forced full GC) at
  * every --window boundary; it requires NODE_OPTIONS=--expose-gc.
@@ -52,6 +53,7 @@ import { Executor } from "@openfront/engine/execution/ExecutionManager";
 import { createGame } from "@openfront/engine/game/GameImpl";
 import { createNationsForGame } from "@openfront/engine/game/NationCreation";
 import { GameRunner } from "@openfront/engine/GameRunner";
+import { HordeExecution } from "@openfront/engine/horde/HordeExecution";
 import { loadMapFiles } from "@openfront/shared/GameMapLoader";
 import fs from "fs";
 import v8 from "node:v8";
@@ -98,6 +100,9 @@ interface Options {
   footprint: boolean;
   snapshotAt: number[];
   waterNukes: boolean;
+  /** zfront: zombies per wave (0 = no horde). */
+  hordeSize: number;
+  elites: number;
 }
 
 function resolveMap(name: string): GameMapType {
@@ -129,6 +134,8 @@ function parseArgs(argv: string[]): Options {
     footprint: false,
     snapshotAt: [],
     waterNukes: false,
+    hordeSize: 0,
+    elites: 500,
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -184,6 +191,15 @@ function parseArgs(argv: string[]): Options {
         break;
       case "--water-nukes":
         opts.waterNukes = true;
+        break;
+      case "--horde":
+        if (opts.hordeSize === 0) opts.hordeSize = 100_000;
+        break;
+      case "--horde-size":
+        opts.hordeSize = parseInt(next(), 10);
+        break;
+      case "--elites":
+        opts.elites = parseInt(next(), 10);
         break;
       default:
         throw new Error(`unknown argument: ${arg}`);
@@ -298,6 +314,23 @@ async function main(): Promise<void> {
   );
   runner.init();
 
+  // zfront: one full-size wave every minute, all elites in the first one.
+  const horde =
+    opts.hordeSize > 0
+      ? new HordeExecution({
+          firstWaveDelay: 50,
+          waveInterval: 600,
+          firstWaveSize: opts.hordeSize,
+          waveGrowthPercent: 0,
+          emittersPerWave: 16,
+          emitRate: 500,
+          elitesPerWave: opts.elites,
+          maxElites: opts.elites,
+        })
+      : null;
+  if (horde) game.addExecution(horde);
+  let hordePeakAlive = 0;
+
   const gcTracker = opts.gcProfile ? new GcTracker() : null;
   gcTracker?.start();
   const heapSampler = opts.gcProfile ? new HeapSampler() : null;
@@ -378,6 +411,9 @@ async function main(): Promise<void> {
       process.exitCode = 1;
       break;
     }
+    if (horde) {
+      hordePeakAlive = Math.max(hordePeakAlive, horde.stats().alive);
+    }
     if (i % 50 === 0) {
       heapPeak = Math.max(heapPeak, process.memoryUsage().heapUsed);
     }
@@ -431,6 +467,22 @@ async function main(): Promise<void> {
     `Slowest ticks: ` +
       summary.slowest.map((s) => `#${s.tick} (${fmtMs(s.ms)}ms)`).join(", "),
   );
+
+  if (horde) {
+    const h = horde.stats();
+    console.log(`\n--- Horde (zfront) ---`);
+    console.log(
+      `Waves: ${h.wave} x ${opts.hordeSize} | peak alive ${hordePeakAlive} | ` +
+        `alive at end ${h.alive} | elites ${h.elites} | killed ${h.killed} | ` +
+        `structures destroyed ${h.structuresDestroyed}`,
+    );
+    console.log(
+      `Flow-field recomputes: ${h.recomputes} | ` +
+        `mean ${fmtMs(h.totalRecomputeMs / Math.max(1, h.recomputes))}ms | ` +
+        `max ${fmtMs(h.maxRecomputeMs)}ms | total ${fmtMs(h.totalRecomputeMs)}ms`,
+    );
+    console.log(`Horde state hash: ${horde.stateHash()}`);
+  }
 
   if (footprints.length > 0) {
     console.log(`\n--- Live-heap footprint (after forced full GC) ---`);
