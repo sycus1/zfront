@@ -1,13 +1,9 @@
 import { LitElement, html } from "lit";
 import { customElement } from "lit/decorators.js";
-import "./NavAccountMenu";
-import { NavNotificationsController } from "./NavNotificationsController";
 import "./NavUtilityIcons";
 
 @customElement("desktop-nav-bar")
 export class DesktopNavBar extends LitElement {
-  private _notifications = new NavNotificationsController(this);
-
   createRenderRoot() {
     return this;
   }

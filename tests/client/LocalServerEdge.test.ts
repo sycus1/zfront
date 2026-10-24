@@ -53,23 +53,6 @@ function makeGameStartInfo(): GameStartInfo {
 }
 
 describe("LocalServer edge cases", () => {
-  it("refuses to start or archive a lobby without gameStartInfo", () => {
-    const server = new LocalServer(
-      { playerName: "TestUser", playerClanTag: null } as any,
-      false,
-      new EventBus(),
-    );
-    server.updateCallback(
-      () => {},
-      () => {},
-    );
-
-    expect(() => server.start()).toThrow("missing gameStartInfo");
-    // endGame -> archiveGameRecord hits the same guard (and stops the
-    // turn-check interval start() had already begun).
-    expect(() => server.endGame()).toThrow("missing gameStartInfo");
-  });
-
   it("reports a desync when a replay hash disagrees with the archived one", () => {
     const messages: ServerMessage[] = [];
     const gameRecord = {

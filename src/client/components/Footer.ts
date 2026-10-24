@@ -1,7 +1,6 @@
 import { assetUrl } from "@openfront/shared/AssetUrls";
 import { LitElement, html } from "lit";
-import { customElement, state } from "lit/decorators.js";
-import { composeVersionDisplay, desktopVersion } from "../DesktopShell";
+import { customElement } from "lit/decorators.js";
 import { currentGameVersion } from "../GameVersion";
 
 @customElement("page-footer")
@@ -11,21 +10,8 @@ export class Footer extends LitElement {
   // guaranteed to exist at the moment this module is first imported.
   private readonly gameVersion = currentGameVersion();
 
-  // Starts as the game version alone and gains the shell version once the
-  // bridge answers, so the line is never blank while that call is in flight.
-  @state() private versionLabel = this.gameVersion;
-
   createRenderRoot() {
     return this;
-  }
-
-  connectedCallback() {
-    super.connectedCallback();
-    // desktopVersion() resolves null off the desktop shell and on its own
-    // timeout, so this can only ever leave the label as-is or extend it.
-    void desktopVersion().then((shellVersion) => {
-      this.versionLabel = composeVersionDisplay(this.gameVersion, shellVersion);
-    });
   }
 
   render() {
@@ -59,7 +45,7 @@ export class Footer extends LitElement {
                across web and Steam; the full string, shell version included,
                lives down here where a player can quote it in a bug report. -->
           <div class="footer-version text-xs mt-1 lg:mt-2 text-center px-4">
-            ${this.versionLabel}
+            ${this.gameVersion}
           </div>
           <div
             class="text-xs mt-1 lg:mt-2 flex items-center justify-center gap-4 px-4"

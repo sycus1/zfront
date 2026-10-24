@@ -1,6 +1,5 @@
 import { html, LitElement, TemplateResult } from "lit";
 import { customElement } from "lit/decorators.js";
-import { NavNotificationsController } from "./NavNotificationsController";
 
 const MOBILE_ITEM =
   "nav-menu-item block w-full text-left font-bold uppercase tracking-[0.05em] " +
@@ -13,8 +12,6 @@ const MOBILE_ITEM =
 
 @customElement("mobile-nav-bar")
 export class MobileNavBar extends LitElement {
-  private _notifications = new NavNotificationsController(this);
-
   createRenderRoot() {
     return this;
   }

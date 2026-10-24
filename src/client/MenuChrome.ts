@@ -77,22 +77,11 @@ export function hideMenuChrome(): void {
 }
 
 /**
- * Put back what hideMenuChrome took away, plus the promos section that the
- * game-start modal sweep closes.
+ * Put back what hideMenuChrome took away.
  *
  * Clears the inline display rather than forcing "block": these slots take
  * their real layout from the stylesheet, and a slot the page had its own
  * reason to hide must not be forced visible by us.
- *
- * The promos call is best-effort and must not throw. On the desktop shell --
- * the only place the in-place leave path can currently be reached -- ads never
- * load (`window.adsEnabled` is false there), so <homepage-promos> may not be
- * upgraded and may expose no show() at all, and its own close() reaches into
- * Playwire globals that are a bare stub on the app:// origin. A throw here
- * would abort handleLeaveLobby partway: not the lobby-socket restart, which
- * has already run by this point, but the joinModal.close() and the
- * `full-lobby` message that follow it -- leaving a stale modal open and the
- * player unaware of why their join failed.
  */
 export function restoreMenuChrome(): void {
   tornDown = false;
@@ -103,12 +92,4 @@ export function restoreMenuChrome(): void {
     // Drop the record so the next teardown captures the value afresh.
     displacedAdDisplay.delete(el);
   });
-  const promos = document.querySelector("homepage-promos") as
-    | (HTMLElement & { show?: () => void })
-    | null;
-  try {
-    promos?.show?.();
-  } catch (e) {
-    console.warn("failed to restore homepage promos", e);
-  }
 }
