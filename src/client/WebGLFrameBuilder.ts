@@ -3,13 +3,10 @@ import { assetUrl } from "@openfront/shared/AssetUrls";
 import {
   type EffectAttributesFor,
   type EffectType,
-  findEffectForSlot,
-  isNukeExplosionEffect,
   type NukeExplosionAttributes,
   type NukeExplosionType,
 } from "@openfront/shared/CosmeticSchemas";
 import { colord } from "colord";
-import { getCachedCosmetics } from "./Cosmetics";
 import { buildTerrainRowSpans } from "./render/frame/derive/TerrainRowSpans";
 import { uploadFrameData } from "./render/frame/Upload";
 // Type-only: a value import would pull GPURenderer and its `.glsl?raw` shader
@@ -28,7 +25,6 @@ import {
 } from "./render/gl/utils/ColorUtils";
 import type { PaletteEffectAttributes } from "./render/gl/utils/EffectPalette";
 import {
-  catalogEffectAttributes,
   PALETTE_SIZE,
   type PaletteEffectType,
   writePaletteEntry,
@@ -246,13 +242,9 @@ export class WebGLFrameBuilder {
   }
 
   /**
-   * Attach the firing player's resolved nuke-explosion cosmetic to each dead
-   * nuke event, so every client renders the shockwave in the owner's colors.
-   * The effect is per-bomb-type: the detonating unit maps to a nukeType slot
-   * (atom / hydro / mirvWarhead) and we resolve the player's selection for THAT
-   * slot, so an atom effect only shows on atom bombs, etc. Runs before
-   * uploadFrameData so the FX pass sees the params on the event; a player with no
-   * selection for that bomb is left undefined (the shockwave falls back to default).
+   * Attach the effect editor's nuke-explosion override to the local player's
+   * dead nuke events. Runs before uploadFrameData so the FX pass sees the
+   * params on the event; everything else keeps the default shockwave.
    */
   private resolveDeadUnitExplosions(gameView: GameView): void {
     const deadUnits = gameView.frameData().events.deadUnits;
@@ -260,8 +252,7 @@ export class WebGLFrameBuilder {
     const override = this.effectOverrides.get("nukeExplosion") as
       | NukeExplosionAttributes
       | undefined;
-    const catalog = getCachedCosmetics();
-    if (!catalog && !override) return; // Catalog not loaded yet — default FX this frame.
+    if (!override) return;
     for (const du of deadUnits) {
       if (!du.reachedTarget) continue; // SAM interceptions have no explosion cosmetic
       const nukeType = UNIT_TYPE_TO_NUKE_TYPE[du.unitType];
@@ -275,21 +266,6 @@ export class WebGLFrameBuilder {
         du.explosion = attributesToExplosionParams(override);
         continue;
       }
-      if (!catalog) continue;
-      // playerBySmallID throws on an unknown smallID; a stale/bad event must
-      // not kill the frame builder — skip it (default FX).
-      let player: ReturnType<GameView["playerBySmallID"]>;
-      try {
-        player = gameView.playerBySmallID(du.ownerSmallID);
-      } catch {
-        continue;
-      }
-      if (!player.isPlayer()) continue;
-      const name = player.cosmetics.effects?.[nukeType]?.name;
-      if (!name) continue;
-      const effect = findEffectForSlot(catalog, nukeType, name);
-      if (!effect || !isNukeExplosionEffect(effect)) continue;
-      du.explosion = attributesToExplosionParams(effect.attributes);
     }
   }
 
@@ -565,36 +541,23 @@ export class WebGLFrameBuilder {
   }
 
   /**
-   * Resolve each player's transport-ship-trail effect into the effect palette.
-   * A player's resolved cosmetic is just { name, effectType }; the style and
-   * colors live in the catalog, so we look them up via the cached cosmetics.
-   * Decoupled from syncPlayers' first-seen guard: if the catalog isn't loaded
-   * yet we leave the player unresolved and retry next tick (the trail keeps its
-   * territory color meanwhile). Re-uploads the effect texture only when a
-   * recognized style was actually written.
+   * Write the effect editor's overrides (local player only) into the effect
+   * palette. Re-uploads the effect texture only when something was written.
    */
   private syncPlayerEffects(gameView: GameView): void {
-    const catalog = getCachedCosmetics();
     let dirty = false;
     for (const p of gameView.players()) {
       const smallID = p.smallID();
       if (this.effectResolved.has(smallID)) continue;
-      // Effect-editor overrides apply to the local player only and don't need
-      // the catalog; everyone else waits for it (retry on a later tick).
+      // Effect-editor overrides apply to the local player only.
       const overrides =
         smallID === this.localPlayerSmallID && this.effectOverridesUsed
           ? this.effectOverrides
           : null;
-      if (!catalog && !overrides) continue;
-      // An override-only player (catalog still loading) is re-checked each
-      // tick so their real cosmetics resolve once the catalog arrives.
-      if (catalog) this.effectResolved.add(smallID);
+      if (!overrides) continue;
 
       const attrsFor = (effectType: PaletteEffectType) =>
-        (overrides?.get(effectType) as PaletteEffectAttributes | undefined) ??
-        (catalog
-          ? catalogEffectAttributes(catalog, p.cosmetics.effects, effectType)
-          : undefined);
+        overrides.get(effectType) as PaletteEffectAttributes | undefined;
       if (writePlayerEffects(this.effectPalette, smallID, attrsFor, gameView)) {
         dirty = true;
       }

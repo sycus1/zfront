@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   hideMenuChrome,
   menuChromeIsTornDown,
@@ -74,32 +74,6 @@ describe("restoreMenuChrome", () => {
     restoreMenuChrome();
 
     expect(el.getAttribute("style") ?? "").toBe(before ?? "");
-  });
-
-  it("reopens the promos section", () => {
-    const promos = document.createElement("homepage-promos") as HTMLElement & {
-      show: () => void;
-    };
-    promos.show = vi.fn();
-    document.body.appendChild(promos);
-
-    restoreMenuChrome();
-
-    expect(promos.show).toHaveBeenCalledOnce();
-  });
-
-  // The promos element is ad machinery. On the Steam shell -- the only place
-  // this restore path can be reached -- ads never load, so it may not be
-  // upgraded and may expose no show() at all. That must not throw and take the
-  // lobby-socket restart below it down with it.
-  it("tolerates a promos element that has no show()", () => {
-    document.body.appendChild(document.createElement("homepage-promos"));
-
-    expect(() => restoreMenuChrome()).not.toThrow();
-  });
-
-  it("tolerates the promos element being absent entirely", () => {
-    expect(() => restoreMenuChrome()).not.toThrow();
   });
 });
 

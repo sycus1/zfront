@@ -35,10 +35,8 @@ import { GameLeftSidebar } from "./layers/GameLeftSidebar";
 import { GameRightSidebar } from "./layers/GameRightSidebar";
 import { HeadsUpMessage } from "./layers/HeadsUpMessage";
 import { ImmunityTimer } from "./layers/ImmunityTimer";
-import { InGamePromo } from "./layers/InGamePromo";
 import { MainRadialMenu } from "./layers/MainRadialMenu";
 import { MultiTabModal } from "./layers/MultiTabModal";
-import { NewLobbyPrompt } from "./layers/NewLobbyPrompt";
 import { PerformanceOverlay } from "./layers/PerformanceOverlay";
 import { PlayerInfoOverlay } from "./layers/PlayerInfoOverlay";
 import { PlayerPanel } from "./layers/PlayerPanel";
@@ -162,15 +160,6 @@ export function createRenderer(
   }
   winModal.eventBus = eventBus;
   winModal.game = game;
-
-  const newLobbyPrompt = document.querySelector(
-    "new-lobby-prompt",
-  ) as NewLobbyPrompt;
-  if (!(newLobbyPrompt instanceof NewLobbyPrompt)) {
-    console.error("new lobby prompt not found");
-  }
-  newLobbyPrompt.eventBus = eventBus;
-  newLobbyPrompt.game = game;
 
   const replayPanel = document.querySelector("replay-panel") as ReplayPanel;
   if (!(replayPanel instanceof ReplayPanel)) {
@@ -303,12 +292,6 @@ export function createRenderer(
   immunityTimer.game = game;
   immunityTimer.eventBus = eventBus;
 
-  const inGamePromo = document.querySelector("in-game-promo") as InGamePromo;
-  if (!(inGamePromo instanceof InGamePromo)) {
-    console.error("in-game promo not found");
-  }
-  inGamePromo.game = game;
-
   const tutorialPanel = document.querySelector(
     "tutorial-panel",
   ) as TutorialPanel;
@@ -360,13 +343,11 @@ export function createRenderer(
     controlPanel,
     playerInfo,
     winModal,
-    newLobbyPrompt,
     replayPanel,
     settingsModal,
     playerPanel,
     headsUpMessage,
     multiTabModal,
-    inGamePromo,
     tutorialPanel,
     alertFrame,
     performanceOverlay,

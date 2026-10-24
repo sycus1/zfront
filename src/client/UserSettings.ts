@@ -15,7 +15,6 @@ import {
 } from "./StatsConstants";
 // DesktopShell.ts imports nothing, so this cannot introduce an import cycle
 // (verified with madge: 58 cycles before and after, none involving it).
-import { isDesktopShell } from "./DesktopShell";
 
 export function getDefaultKeybinds(isMac: boolean): Record<string, string> {
   return {
@@ -447,35 +446,6 @@ export class UserSettings {
 
   setLobbyStartAlerts(value: boolean) {
     this.setBool("settings.lobbyStartAlerts", value);
-  }
-
-  /**
-   * "Watch replay" opens the new replay viewer instead of the classic
-   * replay. Opt-in while the viewer is rolled out.
-   */
-  replayViewer() {
-    return this.getBool("settings.replayViewer", false);
-  }
-
-  setReplayViewer(value: boolean) {
-    this.setBool("settings.replayViewer", value);
-  }
-
-  steamBuildSeen() {
-    return this.getBool("settings.steamBuildSeen", false);
-  }
-
-  markSteamBuildSeen() {
-    this.setBool("settings.steamBuildSeen", true);
-  }
-
-  steamLobbyLinks(): "ask" | "steam" | "browser" {
-    const value = this.getString("settings.steamLobbyLinks", "ask");
-    return value === "steam" || value === "browser" ? value : "ask";
-  }
-
-  setSteamLobbyLinks(value: "steam" | "browser") {
-    this.setString("settings.steamLobbyLinks", value);
   }
 
   leftClickOpensMenu() {
@@ -946,7 +916,6 @@ export class UserSettings {
    * cannot drift apart the next time the default moves.
    */
   private defaultMasterVolume(): number {
-    if (isDesktopShell()) return AUDIO_DEFAULTS.master;
     const chosenBefore = AUDIO_VOLUME_KEYS.some(
       (key) => this.getCached(key) !== null,
     );

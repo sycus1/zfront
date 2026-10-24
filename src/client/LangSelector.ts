@@ -1,7 +1,6 @@
 import { assetUrl } from "@openfront/shared/AssetUrls";
 import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
-import { desktopSteamLocale } from "./DesktopShell";
 // The type-only use below is erased at runtime; keep this to register the modal.
 // oxlint-disable-next-line import/no-duplicates -- Required custom-element registration.
 import "./LanguageModal";
@@ -113,12 +112,7 @@ export class LangSelector extends LitElement {
    * good, because a saved choice outranks both of these.
    */
   private defaultLocale(): string {
-    const osLocale = navigator.language;
-    const steamLocale = desktopSteamLocale();
-    if (steamLocale === null) return osLocale;
-    return this.getClosestSupportedLang(steamLocale) === "en"
-      ? osLocale
-      : steamLocale;
+    return navigator.language;
   }
 
   private async initializeLanguage() {
