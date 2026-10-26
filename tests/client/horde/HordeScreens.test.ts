@@ -2,7 +2,10 @@ import type { HordeFrame } from "@openfront/engine-api/game/GameUpdates";
 import { GameUpdateType } from "@openfront/engine-api/game/GameUpdates";
 import { EventBus } from "@openfront/shared/EventBus";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { HordeHud } from "../../../src/client/hud/layers/HordeHud";
+import {
+  formatCountdown,
+  HordeHud,
+} from "../../../src/client/hud/layers/HordeHud";
 import { WinModal } from "../../../src/client/hud/layers/WinModal";
 import { SendWinnerEvent } from "../../../src/client/Transport";
 import type { GameView } from "../../../src/client/view";
@@ -21,6 +24,12 @@ function frame(overrides: Partial<HordeFrame> = {}): HordeFrame {
     outcome: "playing",
     hqHp: 15_000,
     hqMaxHp: 50_000,
+    nextWaveIn: 230,
+    nextWave: 5,
+    nextWaveShamblers: 90_000,
+    nextWaveElites: 120,
+    nextWaveSectors: 0b0000_0101,
+    nextWaveFinal: false,
     encodeMs: 0,
     sentAt: 0,
     ...overrides,
@@ -68,6 +77,57 @@ describe("HordeHud", () => {
     expect(
       hud.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow"),
     ).toBe("30");
+  });
+
+  it("announces the next wave's countdown, directions and size", async () => {
+    const hud = new HordeHud();
+    hud.game = hordeGame({ status: frame() });
+    document.body.append(hud);
+    hud.tick();
+    await hud.updateComplete;
+
+    const next = hud.querySelector("[data-horde-next]")?.textContent ?? "";
+    expect(next).toContain("horde_hud.next_wave");
+    expect(next).toContain("horde_hud.next_size");
+    // Sectors 0b101: north and east.
+    expect(hud.querySelector("[data-horde-from]")?.textContent).toContain(
+      "horde_hud.from",
+    );
+  });
+
+  it("calls out the final wave and the countdown to victory", async () => {
+    const final = new HordeHud();
+    final.game = hordeGame({
+      status: frame({
+        nextWave: 10,
+        nextWaveFinal: true,
+        nextWaveSectors: 0xff,
+      }),
+    });
+    const last = new HordeHud();
+    last.game = hordeGame({ status: frame({ nextWave: 0, wave: 10 }) });
+    document.body.append(final, last);
+    final.tick();
+    last.tick();
+    await final.updateComplete;
+    await last.updateComplete;
+
+    expect(final.querySelector("[data-horde-next]")?.textContent).toContain(
+      "horde_hud.final_wave",
+    );
+    expect(final.querySelector("[data-horde-from]")?.textContent?.trim()).toBe(
+      "horde_hud.from_everywhere",
+    );
+    expect(last.querySelector("[data-horde-next]")?.textContent).toContain(
+      "horde_hud.victory_in",
+    );
+  });
+
+  it("formats the countdown as minutes and seconds", () => {
+    expect(formatCountdown(0)).toBe("0:00");
+    expect(formatCountdown(5)).toBe("0:01");
+    expect(formatCountdown(230)).toBe("0:23");
+    expect(formatCountdown(905)).toBe("1:31");
   });
 
   it("stays hidden before the first horde frame and outside horde games", async () => {

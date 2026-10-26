@@ -920,6 +920,16 @@ export class UserSettingModal extends BaseModal {
       ></setting-keybind>
 
       <setting-keybind
+        action="buildWall"
+        label=${translateText("user_setting.build_wall")}
+        description=${translateText("user_setting.build_wall_desc")}
+        defaultKey=${this.defaultKeybinds.buildWall}
+        .value=${this.getKeyValue("buildWall")}
+        .display=${this.getKeyChar("buildWall")}
+        @change=${this.handleKeybindChange}
+      ></setting-keybind>
+
+      <setting-keybind
         action="buildMissileSilo"
         label=${translateText("user_setting.build_missile_silo")}
         description=${translateText("user_setting.build_missile_silo_desc")}

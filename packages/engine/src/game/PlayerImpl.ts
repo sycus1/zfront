@@ -1324,6 +1324,8 @@ export class PlayerImpl implements Player {
       case UnitType.City:
       case UnitType.Factory:
         return this.landBasedStructureSpawn(targetTile, validTiles);
+      case UnitType.Wall:
+        return this.wallSpawn(targetTile);
       default:
         assertNever(unitType);
     }
@@ -1436,6 +1438,29 @@ export class PlayerImpl implements Player {
       return false;
     }
     return tiles[0];
+  }
+
+  /**
+   * zfront: a wall goes exactly where it is placed, on the player's own
+   * land, at least two tiles from any other wall or structure. That keeps
+   * one wall per 2x2 horde cell, so walls two tiles apart make a solid line.
+   */
+  wallSpawn(tile: TileRef): TileRef | false {
+    const mg = this.mg;
+    if (mg.owner(tile) !== this || !mg.isLand(tile) || mg.isImpassable(tile)) {
+      return false;
+    }
+    // Range 1.5 takes in the eight neighbouring tiles; units still under
+    // construction count, as they do for structure spacing.
+    const crowded = mg.anyUnitNearby(
+      tile,
+      1.5,
+      [UnitType.Wall, ...Structures.types],
+      () => true,
+      undefined,
+      true,
+    );
+    return crowded ? false : tile;
   }
 
   private validStructureSpawnTiles(tile: TileRef): TileRef[] {

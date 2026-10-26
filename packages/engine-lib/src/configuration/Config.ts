@@ -217,6 +217,9 @@ export class Config {
       case UnitType.DefensePost:
         info = { constructionDuration: this.instantBuild() ? 0 : 5 * 10 };
         break;
+      case UnitType.Wall:
+        info = { constructionDuration: this.instantBuild() ? 0 : 10 };
+        break;
       case UnitType.SAMLauncher:
         info = {
           constructionDuration: this.instantBuild()
