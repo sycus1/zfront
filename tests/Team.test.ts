@@ -46,16 +46,7 @@ describe("Teams", () => {
     // Matchmade 2v2: the server stamps teamIndex per player; the split
     // [h1,h4] vs [h2,h3] must survive full game construction.
     const pinned = (name: string, teamIndex: number) =>
-      new PlayerInfo(
-        name,
-        PlayerType.Human,
-        name,
-        name,
-        false,
-        null,
-        [],
-        teamIndex,
-      );
+      new PlayerInfo(name, PlayerType.Human, name, name, false, [], teamIndex);
     game = await setup(
       "plains",
       {

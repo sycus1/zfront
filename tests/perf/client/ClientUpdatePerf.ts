@@ -97,7 +97,7 @@ function resolveMap(name: string): GameMapType {
 
 function parseArgs(argv: string[]): Options {
   const opts: Options = {
-    map: GameMapType.World,
+    map: GameMapType.Britannia,
     ticks: 1800,
     bots: 400,
     nations: "default",
@@ -270,10 +270,6 @@ function computeViewHash(gameView: GameView): string {
     fnv.mixU32(sid);
     fnv.mixString(JSON.stringify(status, jsonReplacer));
   }
-  for (const [sid, cluster] of frame.allianceClusters) {
-    fnv.mixU32(sid);
-    fnv.mixU32(cluster);
-  }
   for (const state of gameView.unitStates().values()) {
     fnv.mixString(JSON.stringify(state, jsonReplacer));
   }
@@ -366,7 +362,6 @@ async function main(): Promise<void> {
     clientMapData,
     undefined, // no local client — bots-only game, myPlayer stays null
     "perf-harness",
-    null,
     gameStart.gameID,
     gameStart.players,
   );

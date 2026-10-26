@@ -191,20 +191,6 @@ export class DoGroundAttackEvent implements GameEvent {}
 
 export class DoRetaliateAttackEvent implements GameEvent {}
 
-export class DoRequestAllianceEvent implements GameEvent {
-  constructor(
-    public readonly tile?: TileRef,
-    public readonly playerID?: PlayerID,
-  ) {}
-}
-
-export class DoBreakAllianceEvent implements GameEvent {
-  constructor(
-    public readonly tile?: TileRef,
-    public readonly playerID?: PlayerID,
-  ) {}
-}
-
 export class DoTargetPlayerEvent implements GameEvent {
   constructor(
     public readonly tile?: TileRef,
@@ -445,12 +431,6 @@ export class InputHandler {
     });
     this.addKeybindAndEvent(this.keybinds.selectAllWarships, () => {
       this.eventBus.emit(new SelectAllWarshipsEvent());
-    });
-    this.addKeybindAndEvent(this.keybinds.requestAlliance, () => {
-      this.eventBus.emit(new DoRequestAllianceEvent());
-    });
-    this.addKeybindAndEvent(this.keybinds.breakAlliance, () => {
-      this.eventBus.emit(new DoBreakAllianceEvent());
     });
     this.addKeybindAndEvent(this.keybinds.targetPlayer, () => {
       this.eventBus.emit(new DoTargetPlayerEvent());

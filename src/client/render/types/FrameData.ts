@@ -69,12 +69,11 @@ export interface FrameData {
   readonly relationMatrix: Uint8Array;
   readonly relationSize: number;
   /**
-   * True when relationMatrix was rebuilt this tick (alliance/embargo change).
+   * True when relationMatrix was rebuilt this tick (a player was added).
    * Consumers skip the GPU upload — and the full-map border recompute it
    * triggers — when false.
    */
   readonly relationsDirty: boolean;
-  readonly allianceClusters: ReadonlyMap<number, number>;
   readonly nukeTelegraphs: NukeTelegraphData[];
   readonly attackRings: AttackRingInput[];
   /** True when structures changed this tick (added/removed/level change). */

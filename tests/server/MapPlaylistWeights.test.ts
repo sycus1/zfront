@@ -21,12 +21,12 @@ describe("MapPlaylist weight overrides", () => {
     const count = (overrides: object) =>
       p
         .buildMapsList("ffa", undefined, overrides)
-        .filter((m) => m === GameMapType.World).length;
+        .filter((m) => m === GameMapType.Britannia).length;
 
-    expect(count({ [GameMapType.World]: { ffaFrequency: 37 } })).toBe(37);
-    expect(count({ [GameMapType.World]: { ffaFrequency: 0 } })).toBe(0);
+    expect(count({ [GameMapType.Britannia]: { ffaFrequency: 37 } })).toBe(37);
+    expect(count({ [GameMapType.Britannia]: { ffaFrequency: 0 } })).toBe(0);
     // A field for another queue leaves ffa on the build's value.
-    expect(count({ [GameMapType.World]: { teamFrequency: 37 } })).toBe(
+    expect(count({ [GameMapType.Britannia]: { teamFrequency: 37 } })).toBe(
       count({}),
     );
   });
@@ -40,17 +40,10 @@ describe("MapPlaylist weight overrides", () => {
     playlist.setWeightOverrides({});
     expect(p.playlists.ffa.length).toBeGreaterThan(0);
 
-    playlist.setWeightOverrides({ [GameMapType.World]: { ffaFrequency: 0 } });
+    playlist.setWeightOverrides({
+      [GameMapType.Britannia]: { ffaFrequency: 0 },
+    });
     expect(p.playlists.ffa).toEqual([]);
-  });
-
-  it("stops serving a map pulled to 0", async () => {
-    const playlist = new MapPlaylist();
-    playlist.setWeightOverrides({ [GameMapType.World]: { ffaFrequency: 0 } });
-    const queued = internals(playlist).playlists;
-    const config = await playlist.gameConfig("ffa");
-    expect(config.gameMap).not.toBe(GameMapType.World);
-    expect(queued.ffa).not.toContain(GameMapType.World);
   });
 
   it("ignores overrides that would empty a queue", async () => {

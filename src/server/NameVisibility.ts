@@ -1,4 +1,3 @@
-import { GameMode } from "@openfront/engine-api/game/GameTypes";
 import { ClientID, GameConfig } from "@openfront/engine-api/Schemas";
 import { simpleHash } from "@openfront/engine-lib/Util";
 import { anonWordName } from "@openfront/shared/AnonNames";
@@ -21,11 +20,7 @@ export interface NameVisibilityView {
   gameID: string;
   config: () => Pick<
     GameConfig,
-    | "anonymizeNames"
-    | "nameReveals"
-    | "nameRevealPublicIds"
-    | "gameMode"
-    | "disableClanTags"
+    "anonymizeNames" | "nameReveals" | "nameRevealPublicIds"
   >;
   // Every client that ever joined, in join order — the order fixes each
   // player's anonymous-name slot.
@@ -91,7 +86,7 @@ export class NameVisibility {
   // the team unplayable — you cannot coordinate with someone you cannot identify —
   // so a pinned team sees itself, exactly as a player already sees themselves.
   // Only PINNED teams: those are assigned server-side, so the server knows them
-  // here. A team game that groups by clanTag/friends is resolved on the clients,
+  // here. A team game that groups by friends is resolved on the clients,
   // and the server has no answer to give.
   private sameMatchmadeTeam(
     viewer: ClientID | undefined,
@@ -131,40 +126,24 @@ export class NameVisibility {
     );
   }
 
-  // Per-viewer start info. `real` is the game's own start info and is never
-  // touched, so the archived record keeps real identities; `wire` is the
-  // shared copy clients receive (clan tags already stripped when the lobby
-  // disables them). clanTag and friends feed the deterministic team
+  // Per-viewer start info. `wire` is the shared copy clients receive; the
+  // game's own start info is never touched, so the archived record keeps
+  // real identities. friends feed the deterministic team
   // assignment (TeamAssignment.ts), so they are blanked for every player
   // here, identical on every client, never per-viewer, or clients desync.
   // Only the username of players this viewer can't see is anonymized, and
   // their cosmetics hidden, neither of which the simulation reads.
-  //
-  // Exception: admins in FFA get the real clan tags (the display pipeline then
-  // shows them everywhere) so they can spot teaming live. Safe ONLY in FFA —
-  // that mode never runs assignTeams, so clanTag never reaches the simulation,
-  // and the desync hash (Player.hash) excludes names. Gated on FFA, NOT
-  // disableClanTags: a Team game with tags disabled DOES assign teams by
-  // clanTag, so a per-viewer reveal there would desync.
-  startInfoFor(
-    viewer: ClientID,
-    isAdmin: boolean,
-    real: WireGameStartInfo,
-    wire: WireGameStartInfo,
-  ): WireGameStartInfo {
-    const config = this.view.config();
-    const revealClanTags = isAdmin && config.gameMode === GameMode.FFA;
-    if (!config.anonymizeNames) {
-      return revealClanTags ? real : wire;
+  startInfoFor(viewer: ClientID, wire: WireGameStartInfo): WireGameStartInfo {
+    if (!this.view.config().anonymizeNames) {
+      return wire;
     }
     return {
       ...wire,
-      players: wire.players.map((p, i) => {
+      players: wire.players.map((p) => {
         const seesReal = this.seesReal(viewer, p.clientID);
         return {
           ...p,
           username: seesReal ? p.username : this.anonName(viewer, p.clientID),
-          clanTag: revealClanTags ? real.players[i].clanTag : null,
           friends: undefined,
           cosmetics: seesReal ? p.cosmetics : undefined,
         };
@@ -184,19 +163,17 @@ export class NameVisibility {
   ): LobbyClient[] {
     const friendsFor = friendsLookup(active);
     const config = this.view.config();
-    const hideClanTags = config.disableClanTags ?? false;
     return active.map((c) => {
       if (!this.seesReal(viewer, c.clientID)) {
         return {
           username: this.anonName(viewer, c.clientID),
-          clanTag: null,
           clientID: c.clientID,
           spectator: c.spectator || undefined,
           teamIndex: this.view.teamIndex(c),
         };
       }
       // A TEAMMATE reveal is deliberately narrower than the others. Seeing a
-      // teammate's clanTag and friends would hand out more than the identity
+      // teammate's friends would hand out more than the identity
       // needed to coordinate: `friends` in particular names a THIRD party —
       // the viewer would learn their teammate is friends with a specific
       // still-anonymized opponent, which the host never granted. The wider
@@ -205,7 +182,6 @@ export class NameVisibility {
         config.anonymizeNames && !this.seesRealBeyondTeam(viewer, c.clientID);
       return {
         username: c.username,
-        clanTag: teammateOnly || hideClanTags ? null : (c.clanTag ?? null),
         clientID: c.clientID,
         friends: teammateOnly ? undefined : friendsFor(c),
         verified: c.cosmetics?.verified,

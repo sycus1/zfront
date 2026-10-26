@@ -30,7 +30,7 @@ async function startGame() {
     view,
     { layers: LAYERS } as TerrainMapData,
     new UserSettings(),
-    GameMapType.Ommatrypta,
+    GameMapType.Britannia,
     GameMapSize.Normal,
     loader,
     new AbortController().signal,

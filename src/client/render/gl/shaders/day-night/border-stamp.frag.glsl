@@ -11,9 +11,7 @@ uniform vec2 uMapSize;
 uniform int uAltView;
 uniform float uHighlightBrighten;
 uniform float uDefenseCheckerDarken;
-uniform float uEmbargoTintRatio;
 uniform float uFriendlyTintRatio;
-uniform vec3 uEmbargoTint;
 uniform vec3 uFriendlyTint;
 
 in vec2 vWorldPos;
@@ -30,7 +28,7 @@ void main() {
   vec4 borderData = texelFetch(uBorderTex, tc, 0);
   float borderType = borderData.r;      // 0=interior, ~0.5=normal, ~1.0=highlight
   bool defense = texelFetch(uDefenseCoverageTex, tc, 0).r > 0.5; // same-owner defense post nearby
-  float relation = borderData.a;        // 0.0=neutral, ~0.5=friendly, ~1.0=embargo
+  float relation = borderData.a;        // 0.0=neutral, ~0.5=friendly
 
   bool isBorder = borderType > 0.25;
   bool isHighlightBorder = borderType > 0.75;
@@ -48,9 +46,7 @@ void main() {
         bc = mix(bc, vec3(1.0), uHighlightBrighten);
       }
       // Relationship tint (applied BEFORE defense checkerboard, matching game)
-      if (relation > 0.75) {
-        bc = mix(bc, uEmbargoTint, uEmbargoTintRatio);
-      } else if (relation > 0.25) {
+      if (relation > 0.25) {
         bc = mix(bc, uFriendlyTint, uFriendlyTintRatio);
       }
       // Defense bonus: checkerboard darken (applied AFTER tint, matching game)

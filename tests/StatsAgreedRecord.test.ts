@@ -23,7 +23,6 @@ describe("GameEndInfo.statsAgreed", () => {
     {
       clientID: "abCD1234",
       username: "player",
-      clanTag: null,
       persistentID: null,
       stats: { finalTiles: 100n },
     },
@@ -38,7 +37,6 @@ describe("GameEndInfo.statsAgreed", () => {
       1_700_000_000_000,
       1_700_000_060_000,
       ["player", "abCD1234"],
-      undefined,
       undefined,
       undefined,
       undefined,

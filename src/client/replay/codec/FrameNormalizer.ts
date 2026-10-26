@@ -8,7 +8,7 @@
  * on the separate packedPlayerUpdates / packedAttackUpdates channels, and
  * playerNameViewData only shows up on ticks where name placement is
  * rebuilt. This merges that stream with the same functions GameView uses
- * (applyStateUpdate, and the packed-channel, embargo and motion plan code
+ * (applyStateUpdate, and the packed-channel and motion plan code
  * in src/client/view), so the replay holds exactly what a live client
  * would have shown. Unlike GameView it never changes a state it has handed
  * out: frames keep theirs.
@@ -34,7 +34,6 @@ import type {
 import {
   applyPackedAttackTroops,
   applyPackedPlayerStats,
-  embargoSmallIDs,
   playerStateFromUpdate,
   playerStaticFromUpdate,
   unitStateFromUpdate,
@@ -62,11 +61,6 @@ export const UPDATE_TYPE_ROUTING: Record<
   Player: "entity",
   DisplayEvent: "misc",
   DisplayChatEvent: "misc",
-  AllianceRequest: "misc",
-  AllianceRequestReply: "misc",
-  BrokeAlliance: "misc",
-  AllianceExpired: "misc",
-  AllianceExtension: "misc",
   TargetPlayer: "misc",
   Emoji: "misc",
   Win: "misc",
@@ -77,7 +71,6 @@ export const UPDATE_TYPE_ROUTING: Record<
   RailroadConstructionEvent: "events",
   RailroadSnapEvent: "events",
   ConquestEvent: "dropped",
-  EmbargoEvent: "misc",
   SpawnPhaseEnd: "events",
   GamePaused: "misc",
   DonateEvent: "misc",
@@ -175,16 +168,6 @@ export class FrameNormalizer {
         applyStateUpdate(this.live.get(smallID)!, pu);
         touched.add(smallID);
       }
-    }
-
-    // Pass 2: embargoes come as a Set<PlayerID> but the renderer wants
-    // smallIDs. Done after pass 1 so players first seen this tick resolve.
-    for (const pu of playerUpdates) {
-      if (pu.embargoes === undefined) continue;
-      this.live.get(this.smallIDs.get(pu.id)!)!.embargoes = embargoSmallIDs(
-        pu.embargoes,
-        (id) => this.smallIDs.get(id),
-      );
     }
 
     // The packed stats and attack troop counts. Attack entries are copied

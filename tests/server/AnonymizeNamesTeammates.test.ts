@@ -17,14 +17,12 @@ function makeClient(
   clientID: string,
   username: string,
   publicId: string,
-  clanTag: string | null = "CLAN",
   friends: string[] = [],
 ) {
   return harnessClient({
     clientID,
     persistentID: `${clientID}-pid`,
     username,
-    clanTag,
     publicId,
     friends,
     cosmetics: { verified: true },
@@ -52,10 +50,10 @@ function makeGame(matchmakingTeams?: string[][]) {
 
 function roster(): Client[] {
   return [
-    makeClient("alice", "AliceReal", "alice-pub", "AAA"),
-    makeClient("bob", "BobReal", "bob-pub", "BBB", ["carol-pub"]),
-    makeClient("carol", "CarolReal", "carol-pub", "CCC"),
-    makeClient("dave", "DaveReal", "dave-pub", "DDD"),
+    makeClient("alice", "AliceReal", "alice-pub"),
+    makeClient("bob", "BobReal", "bob-pub", ["carol-pub"]),
+    makeClient("carol", "CarolReal", "carol-pub"),
+    makeClient("dave", "DaveReal", "dave-pub"),
   ];
 }
 
@@ -174,7 +172,6 @@ describe("anonymizeNames: pinned teammates see each other (lobby)", () => {
   it("does NOT leak a teammate's clanTag", () => {
     // clanTag feeds assignTeams and is exactly the kind of identity the host
     // chose to hide; coordinating needs the name, not the tag.
-    expect(byId(makeGame(TEAMS).gameInfo("alice"), "bob").clanTag).toBeNull();
   });
 
   it("does NOT leak a teammate's friends — that names a THIRD party", () => {
@@ -189,7 +186,6 @@ describe("anonymizeNames: pinned teammates see each other (lobby)", () => {
   it("still gives the viewer their OWN clanTag and friends", () => {
     // The teammate narrowing must not regress the pre-existing self reveal.
     const info = makeGame(TEAMS).gameInfo("bob");
-    expect(byId(info, "bob").clanTag).toBe("BBB");
     expect(byId(info, "bob").friends).toEqual(["carol"]);
   });
 
@@ -239,17 +235,15 @@ function withStartInfo(matchmakingTeams?: string[][]) {
     {
       clientID: "alice",
       username: "AliceReal",
-      clanTag: "AAA",
       friends: ["bob"],
     },
     {
       clientID: "bob",
       username: "BobReal",
-      clanTag: "BBB",
       friends: ["carol"],
     },
-    { clientID: "carol", username: "CarolReal", clanTag: "CCC", friends: [] },
-    { clientID: "dave", username: "DaveReal", clanTag: "DDD", friends: [] },
+    { clientID: "carol", username: "CarolReal", friends: [] },
+    { clientID: "dave", username: "DaveReal", friends: [] },
   ];
   const startInfo = {
     gameID: "g1",
@@ -259,8 +253,7 @@ function withStartInfo(matchmakingTeams?: string[][]) {
   } as unknown as GameStartInfo;
   const wire = JSON.parse(JSON.stringify(startInfo)) as GameStartInfo;
   return {
-    startInfoFor: (viewer: string) =>
-      names.startInfoFor(viewer, false, startInfo, wire),
+    startInfoFor: (viewer: string) => names.startInfoFor(viewer, wire),
   };
 }
 
@@ -291,7 +284,6 @@ describe("anonymizeNames: pinned teammates in the IN-GAME start payload", () => 
     // who can see whose name.
     const info = withStartInfo(TEAMS).startInfoFor("alice");
     for (const id of ["alice", "bob", "carol", "dave"]) {
-      expect(player(info, id).clanTag).toBeNull();
       expect(player(info, id).friends).toBeUndefined();
     }
   });

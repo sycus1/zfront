@@ -16,7 +16,6 @@ import {
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
 import {
-  AllianceView,
   AttackUpdate,
   PlayerUpdate,
 } from "@openfront/engine-api/game/GameUpdates";
@@ -40,7 +39,6 @@ import { UnitView } from "./UnitView";
 const userSettings: UserSettings = new UserSettings();
 
 const FRIENDLY_TINT_TARGET = { r: 0, g: 255, b: 0, a: 1 };
-const EMBARGO_TINT_TARGET = { r: 255, g: 0, b: 0, a: 1 };
 const BORDER_TINT_RATIO = 0.35;
 
 export class PlayerView implements PlayerLike {
@@ -64,10 +62,8 @@ export class PlayerView implements PlayerLike {
   // Pre-computed border color variants
   private _borderColorNeutral!: Colord;
   private _borderColorFriendly!: Colord;
-  private _borderColorEmbargo!: Colord;
   private _borderColorDefendedNeutral!: { light: Colord; dark: Colord };
   private _borderColorDefendedFriendly!: { light: Colord; dark: Colord };
-  private _borderColorDefendedEmbargo!: { light: Colord; dark: Colord };
 
   constructor(
     private game: GameView,
@@ -128,7 +124,7 @@ export class PlayerView implements PlayerLike {
 
   /**
    * Compute every theme-derived color (fill, border, structure, and the
-   * neutral/friendly/embargo border variants) from the active theme. Re-callable
+   * neutral/friendly border variants) from the active theme. Re-callable
    * so a mid-game theme change — e.g. toggling colorblind mode — can refresh them.
    */
   private computeColors(): void {
@@ -177,30 +173,11 @@ export class PlayerView implements PlayerLike {
       a: baseRgb.a,
     });
 
-    this._borderColorEmbargo = colord({
-      r: Math.round(
-        baseRgb.r * (1 - BORDER_TINT_RATIO) +
-          EMBARGO_TINT_TARGET.r * BORDER_TINT_RATIO,
-      ),
-      g: Math.round(
-        baseRgb.g * (1 - BORDER_TINT_RATIO) +
-          EMBARGO_TINT_TARGET.g * BORDER_TINT_RATIO,
-      ),
-      b: Math.round(
-        baseRgb.b * (1 - BORDER_TINT_RATIO) +
-          EMBARGO_TINT_TARGET.b * BORDER_TINT_RATIO,
-      ),
-      a: baseRgb.a,
-    });
-
     this._borderColorDefendedNeutral = theme.defendedBorderColors(
       this._borderColorNeutral,
     );
     this._borderColorDefendedFriendly = theme.defendedBorderColors(
       this._borderColorFriendly,
-    );
-    this._borderColorDefendedEmbargo = theme.defendedBorderColors(
-      this._borderColorEmbargo,
     );
   }
 
@@ -220,11 +197,6 @@ export class PlayerView implements PlayerLike {
     if (!userSettings.emojis()) {
       this.state.outgoingEmojis = [];
     }
-  }
-
-  /** Set the renderer-format embargoes (smallIDs). */
-  setEmbargoSmallIDs(smallIDs: number[]): void {
-    this.state.embargoes = smallIDs;
   }
 
   territoryColor(tile?: TileRef): Colord {
@@ -248,7 +220,7 @@ export class PlayerView implements PlayerLike {
 
   /**
    * Border color for a tile:
-   * - Tints by neighbor relations (embargo → red, friendly → green, else neutral).
+   * - Tints by neighbor relations (friendly → green, else neutral).
    * - If defended, applies theme checkerboard to the tinted color.
    */
   borderColor(tile?: TileRef, isDefended: boolean = false): Colord {
@@ -256,15 +228,12 @@ export class PlayerView implements PlayerLike {
       return this._borderColor;
     }
 
-    const { hasEmbargo, hasFriendly } = this.borderRelationFlags(tile);
+    const { hasFriendly } = this.borderRelationFlags(tile);
 
     let baseColor: Colord;
     let defendedColors: { light: Colord; dark: Colord };
 
-    if (hasEmbargo) {
-      baseColor = this._borderColorEmbargo;
-      defendedColors = this._borderColorDefendedEmbargo;
-    } else if (hasFriendly) {
+    if (hasFriendly) {
       baseColor = this._borderColorFriendly;
       defendedColors = this._borderColorDefendedFriendly;
     } else {
@@ -287,11 +256,9 @@ export class PlayerView implements PlayerLike {
    * Border relation flags for a tile, used by both CPU and WebGL renderers.
    */
   borderRelationFlags(tile: TileRef): {
-    hasEmbargo: boolean;
     hasFriendly: boolean;
   } {
     const mySmallID = this.smallID();
-    let hasEmbargo = false;
     let hasFriendly = false;
 
     for (const n of this.game.neighbors(tile)) {
@@ -304,16 +271,12 @@ export class PlayerView implements PlayerLike {
         continue;
       }
 
-      if (this.hasEmbargo(otherOwner)) {
-        hasEmbargo = true;
-        break;
-      }
-
       if (this.isFriendly(otherOwner) || otherOwner.isFriendly(this)) {
         hasFriendly = true;
+        break;
       }
     }
-    return { hasEmbargo, hasFriendly };
+    return { hasFriendly };
   }
 
   async actions(
@@ -396,11 +359,6 @@ export class PlayerView implements PlayerLike {
       ? this.anonymousName
       : this.static.displayName;
   }
-  clanTag(): string | null {
-    return this.anonymousName !== null && userSettings.anonymousNames()
-      ? null
-      : this.static.clanTag;
-  }
   clientID(): ClientID | null {
     return this.static.clientID;
   }
@@ -437,11 +395,6 @@ export class PlayerView implements PlayerLike {
   }
   numTilesOwned(): number {
     return this.state.tilesOwned;
-  }
-  allies(): PlayerView[] {
-    return this.state.allies.map(
-      (a) => this.game.playerBySmallID(a) as PlayerView,
-    );
   }
   targets(): PlayerView[] {
     return this.state.targets.map(
@@ -493,32 +446,12 @@ export class PlayerView implements PlayerLike {
     return this.static.isLobbyCreator;
   }
 
-  isAlliedWith(other: PlayerView): boolean {
-    return this.state.allies.some((n) => other.smallID() === n);
-  }
-
   isOnSameTeam(other: PlayerView): boolean {
     return this.static.team !== null && this.static.team === other.static.team;
   }
 
   isFriendly(other: PlayerView): boolean {
-    return this.isAlliedWith(other) || this.isOnSameTeam(other);
-  }
-
-  isRequestingAllianceWith(other: PlayerView) {
-    return this.state.outgoingAllianceRequests.some((id) => other.id() === id);
-  }
-
-  alliances(): AllianceView[] {
-    return this.state.alliances;
-  }
-
-  hasEmbargoAgainst(other: PlayerView): boolean {
-    return this.state.embargoes.includes(other.smallID());
-  }
-
-  hasEmbargo(other: PlayerView): boolean {
-    return this.hasEmbargoAgainst(other) || other.hasEmbargoAgainst(this);
+    return this.isOnSameTeam(other);
   }
 
   profile(): Promise<PlayerProfile> {
@@ -535,14 +468,6 @@ export class PlayerView implements PlayerLike {
     // Add own targets
     for (const id of this.state.targets) {
       result.push(this.game.playerBySmallID(id) as PlayerView);
-    }
-
-    // Add allies' targets
-    for (const allyID of this.state.allies) {
-      const ally = this.game.playerBySmallID(allyID) as PlayerView;
-      for (const targetId of ally.state.targets) {
-        result.push(this.game.playerBySmallID(targetId) as PlayerView);
-      }
     }
 
     // Add teammates' targets
@@ -563,13 +488,6 @@ export class PlayerView implements PlayerLike {
   hasTransitiveTarget(sid: number): boolean {
     if (this.state.targets.includes(sid)) return true;
 
-    for (const allyID of this.state.allies) {
-      const ally = this.game.playerBySmallID(allyID) as PlayerView;
-      if (ally && ally.state.targets.includes(sid)) {
-        return true;
-      }
-    }
-
     const myTeam = this.static.team;
     if (myTeam !== null) {
       for (const p of this.game.playerViews()) {
@@ -586,12 +504,6 @@ export class PlayerView implements PlayerLike {
     return false;
   }
 
-  isTraitor(): boolean {
-    return this.state.isTraitor;
-  }
-  getTraitorRemainingTicks(): number {
-    return this.state.traitorRemainingTicks;
-  }
   inDoomsdayClock(): boolean {
     return this.state.inDoomsdayClock;
   }
@@ -602,9 +514,6 @@ export class PlayerView implements PlayerLike {
     return this.inDoomsdayClock()
       ? this.game.ticks() - this.state.markedDoomsdayClockTick
       : 0;
-  }
-  betrayals(): number {
-    return this.state.betrayals;
   }
   outgoingEmojis(): EmojiMessage[] {
     return this.state.outgoingEmojis;

@@ -2,7 +2,6 @@ import type { EmojiMessage } from "@openfront/engine-api/game/GameTypes";
 import {
   ATTACK_DELTA_INCOMING,
   ATTACK_DELTA_OUTGOING,
-  AllianceView,
   AttackUpdate,
   GameUpdateType,
   PlayerUpdate,
@@ -14,7 +13,7 @@ import {
  *
  * `type` and `id` are always included on the returned diff. Array/object
  * fields are compared by structural equality (length + per-element);
- * `embargoes` is compared as a set; primitive fields by `===`.
+ * primitive fields by `===`.
  *
  * WARNING: this diff is field-by-field by design (no JSON.stringify, for
  * perf — see tests/perf/DiffPlayerUpdatePerf.ts). When you add a field to
@@ -41,7 +40,6 @@ export function diffPlayerUpdate(
     prev.clientID === next.clientID &&
     prev.name === next.name &&
     prev.displayName === next.displayName &&
-    prev.clanTag === next.clanTag &&
     prev.nationFlag === next.nationFlag &&
     prev.team === next.team &&
     prev.smallID === next.smallID &&
@@ -53,27 +51,17 @@ export function diffPlayerUpdate(
     prev.tradeGold === next.tradeGold &&
     prev.trainGold === next.trainGold &&
     prev.piracyGold === next.piracyGold &&
-    prev.isTraitor === next.isTraitor &&
-    prev.traitorRemainingTicks === next.traitorRemainingTicks &&
     prev.inDoomsdayClock === next.inDoomsdayClock &&
     prev.markedDoomsdayClockTick === next.markedDoomsdayClockTick &&
     prev.isDecaying === next.isDecaying &&
     prev.hasSpawned === next.hasSpawned &&
     prev.spawnTile === next.spawnTile &&
-    prev.betrayals === next.betrayals &&
     prev.lastDeleteUnitTick === next.lastDeleteUnitTick &&
     prev.isLobbyCreator === next.isLobbyCreator &&
-    numberArrayEqual(prev.allies, next.allies) &&
     numberArrayEqual(prev.targets, next.targets) &&
-    stringArrayEqual(
-      prev.outgoingAllianceRequests,
-      next.outgoingAllianceRequests,
-    ) &&
-    stringSetEqual(prev.embargoes, next.embargoes) &&
     emojiArrayEqual(prev.outgoingEmojis, next.outgoingEmojis) &&
     attackArrayMembershipEqual(prev.outgoingAttacks, next.outgoingAttacks) &&
-    attackArrayMembershipEqual(prev.incomingAttacks, next.incomingAttacks) &&
-    allianceArrayEqual(prev.alliances, next.alliances)
+    attackArrayMembershipEqual(prev.incomingAttacks, next.incomingAttacks)
   ) {
     return null;
   }
@@ -94,7 +82,6 @@ export function diffPlayerUpdate(
   setIfDifferent("clientID", prev.clientID === next.clientID);
   setIfDifferent("name", prev.name === next.name);
   setIfDifferent("displayName", prev.displayName === next.displayName);
-  setIfDifferent("clanTag", prev.clanTag === next.clanTag);
   setIfDifferent("nationFlag", prev.nationFlag === next.nationFlag);
   setIfDifferent("team", prev.team === next.team);
   setIfDifferent("smallID", prev.smallID === next.smallID);
@@ -108,11 +95,6 @@ export function diffPlayerUpdate(
   setIfDifferent("piracyGold", prev.piracyGold === next.piracyGold);
   // tilesOwned / gold / troops / goldEarned intentionally absent — see
   // EXCEPTION above (goldEarned churns every tick via worker income).
-  setIfDifferent("isTraitor", prev.isTraitor === next.isTraitor);
-  setIfDifferent(
-    "traitorRemainingTicks",
-    prev.traitorRemainingTicks === next.traitorRemainingTicks,
-  );
   setIfDifferent(
     "inDoomsdayClock",
     prev.inDoomsdayClock === next.inDoomsdayClock,
@@ -124,22 +106,12 @@ export function diffPlayerUpdate(
   setIfDifferent("isDecaying", prev.isDecaying === next.isDecaying);
   setIfDifferent("hasSpawned", prev.hasSpawned === next.hasSpawned);
   setIfDifferent("spawnTile", prev.spawnTile === next.spawnTile);
-  setIfDifferent("betrayals", prev.betrayals === next.betrayals);
   setIfDifferent(
     "lastDeleteUnitTick",
     prev.lastDeleteUnitTick === next.lastDeleteUnitTick,
   );
   setIfDifferent("isLobbyCreator", prev.isLobbyCreator === next.isLobbyCreator);
-  setIfDifferent("allies", numberArrayEqual(prev.allies, next.allies));
   setIfDifferent("targets", numberArrayEqual(prev.targets, next.targets));
-  setIfDifferent(
-    "outgoingAllianceRequests",
-    stringArrayEqual(
-      prev.outgoingAllianceRequests,
-      next.outgoingAllianceRequests,
-    ),
-  );
-  setIfDifferent("embargoes", stringSetEqual(prev.embargoes, next.embargoes));
   setIfDifferent(
     "outgoingEmojis",
     emojiArrayEqual(prev.outgoingEmojis, next.outgoingEmojis),
@@ -156,10 +128,6 @@ export function diffPlayerUpdate(
     "incomingAttacks",
     attackArrayMembershipEqual(prev.incomingAttacks, next.incomingAttacks),
   );
-  setIfDifferent(
-    "alliances",
-    allianceArrayEqual(prev.alliances, next.alliances),
-  );
 
   return changed ? diff : null;
 }
@@ -169,22 +137,6 @@ function numberArrayEqual(a?: number[], b?: number[]): boolean {
   if (!a || !b) return false;
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
-
-function stringArrayEqual(a?: string[], b?: string[]): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
-
-function stringSetEqual(a?: Set<string>, b?: Set<string>): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  if (a.size !== b.size) return false;
-  for (const v of a) if (!b.has(v)) return false;
   return true;
 }
 
@@ -238,26 +190,6 @@ export function packAttackTroopDeltas(
       out.push(ownerSmallID, direction, i, next[i].troops);
     }
   }
-}
-
-function allianceArrayEqual(a?: AllianceView[], b?: AllianceView[]): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    const x = a[i];
-    const y = b[i];
-    if (
-      x.id !== y.id ||
-      x.other !== y.other ||
-      x.createdAt !== y.createdAt ||
-      x.expiresAt !== y.expiresAt ||
-      x.hasExtensionRequest !== y.hasExtensionRequest
-    ) {
-      return false;
-    }
-  }
-  return true;
 }
 
 function emojiArrayEqual(a?: EmojiMessage[], b?: EmojiMessage[]): boolean {

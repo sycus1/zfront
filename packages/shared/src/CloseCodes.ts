@@ -12,9 +12,6 @@ export const CloseCode = {
   LobbyFull: 4006,
   WrongWorker: 4007,
   GameStarted: 4008,
-  RankedLimitReached: 4100,
-  InvalidClan: 4101,
-  ClanVerificationFailed: 4102,
   NotTrusted: 4103,
 } as const;
 
@@ -51,9 +48,6 @@ export const CloseReason = {
   NoHeartbeat: "close_reason.no_heartbeat",
   GameEnded: "close_reason.game_ended",
   GameStarted: "close_reason.game_started",
-  RankedLimitReached: "close_reason.ranked_limit_reached",
-  InvalidClan: "close_reason.invalid_clan",
-  ClanVerificationFailed: "close_reason.clan_verification_failed",
   // Rendered in one case only: a second redirect from the same lobby, which
   // the client refuses rather than following. The redirect itself is silent.
   PoolRedirect: "close_reason.pool_redirect",

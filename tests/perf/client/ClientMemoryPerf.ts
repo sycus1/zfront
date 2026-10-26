@@ -17,11 +17,11 @@
  *   bash .claude/skills/run-openfront/setup.sh
  *
  * Usage:
- *   npm run perf:client-mem -- --map "Giant World Map" --ticks 3000 \
+ *   npm run perf:client-mem -- --map "Britannia" --ticks 3000 \
  *     --window 500 --snapshot-at 0,3000
  *
  * Flags:
- *   --map <name>          GameMapType value (default "Giant World Map")
+ *   --map <name>          GameMapType value (default "Britannia")
  *   --bots <n>            bot count (default 400, the solo-modal default)
  *   --difficulty <d>      Easy|Medium|Hard|Impossible (default modal default)
  *   --ticks <n>           run until this game tick (default 3000)
@@ -73,7 +73,7 @@ interface Checkpoint {
 
 function parseArgs(): Options {
   const opts: Options = {
-    map: "Giant World Map",
+    map: "Britannia",
     bots: 400,
     difficulty: undefined,
     ticks: 3000,

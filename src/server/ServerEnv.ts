@@ -70,16 +70,9 @@ export class ServerEnv {
     }
     return v;
   }
-  // Optional, unlike turnstileSiteKey: a deployment without a key just keeps
-  // the inline Stripe flow off (the store falls back to redirect checkout).
-  static stripePublishableKey(): string | undefined {
-    const v = process.env.STRIPE_PUBLISHABLE_KEY;
-    if (!v) return undefined;
-    return v;
-  }
   // Optional: the Grafana Faro collector the browser client reports to.
   // Absent keeps client telemetry off. A public ingest URL, not a secret,
-  // so it travels through BOOTSTRAP_CONFIG like the Stripe key.
+  // so it travels through BOOTSTRAP_CONFIG.
   static faroCollectorUrl(): string | undefined {
     const v = process.env.FARO_COLLECTOR_URL;
     if (!v) return undefined;

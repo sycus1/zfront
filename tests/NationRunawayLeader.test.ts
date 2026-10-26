@@ -3,16 +3,14 @@ import {
   GameMode,
   PlayerInfo,
   PlayerType,
-  Tick,
 } from "@openfront/engine-api/game/GameTypes";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import { AttackExecution } from "@openfront/engine/execution/AttackExecution";
-import { NationAllianceBehavior } from "@openfront/engine/execution/nation/NationAllianceBehavior";
 import { NationAttackBehavior } from "@openfront/engine/execution/nation/NationAttackBehavior";
 import { NationEmojiBehavior } from "@openfront/engine/execution/nation/NationEmojiBehavior";
 import { findRunawayLeader } from "@openfront/engine/execution/nation/NationUtils";
 import { NationWarshipBehavior } from "@openfront/engine/execution/nation/NationWarshipBehavior";
-import { AllianceRequest, Game, Player } from "@openfront/engine/game/Game";
+import { Game, Player } from "@openfront/engine/game/Game";
 import { setup } from "./util/Setup";
 
 /**
@@ -55,12 +53,6 @@ async function setupStripes(
     game,
     nation,
   );
-  const allianceBehavior = new NationAllianceBehavior(
-    new PseudoRandom(42),
-    game,
-    nation,
-    emojiBehavior,
-  );
   const attackBehavior = new NationAttackBehavior(
     new PseudoRandom(42),
     game,
@@ -68,7 +60,6 @@ async function setupStripes(
     0.5, // triggerRatio
     0.3, // reserveRatio
     0.2, // expandRatio
-    allianceBehavior,
     emojiBehavior,
     new NationWarshipBehavior(
       new PseudoRandom(42),
@@ -84,7 +75,6 @@ async function setupStripes(
     leader,
     nation,
     runnerUp,
-    allianceBehavior,
     attackBehavior,
   };
 }
@@ -133,55 +123,6 @@ describe("findRunawayLeader", () => {
       GameMode.Team,
     );
     expect(findRunawayLeader(game)).toBeNull();
-  });
-});
-
-describe("Alliances with a runaway leader", () => {
-  function requestFrom(game: Game, requestor: Player, recipient: Player) {
-    const request = {
-      requestor: () => requestor,
-      recipient: () => recipient,
-      createdAt: () =>
-        (game.config().numSpawnPhaseTurns() + 2) as unknown as Tick,
-      accept: vi.fn(),
-      reject: vi.fn(),
-    } as unknown as AllianceRequest;
-    vi.spyOn(recipient, "incomingAllianceRequests").mockReturnValue([request]);
-    return request;
-  }
-
-  it.each([
-    [Difficulty.Easy, true],
-    [Difficulty.Medium, false],
-    [Difficulty.Hard, false],
-    [Difficulty.Impossible, false],
-  ])(
-    "%s: accepts a request from the much stronger runaway leader: %s",
-    async (difficulty, expected) => {
-      const { game, leader, nation, allianceBehavior } =
-        await setupStripes(difficulty);
-      leader.setTroops(1_000_000);
-      nation.setTroops(100_000);
-
-      const request = requestFrom(game, leader, nation);
-      allianceBehavior.handleAllianceRequests();
-
-      expect(vi.mocked(request.accept).mock.calls.length > 0).toBe(expected);
-    },
-  );
-
-  it("Impossible: still accepts a stronger player that isn't running away", async () => {
-    const { game, leader, nation, allianceBehavior } = await setupStripes(
-      Difficulty.Impossible,
-      [10, 100, 20, 70],
-    );
-    leader.setTroops(1_000_000);
-    nation.setTroops(100_000);
-
-    const request = requestFrom(game, leader, nation);
-    allianceBehavior.handleAllianceRequests();
-
-    expect(request.accept).toHaveBeenCalled();
   });
 });
 

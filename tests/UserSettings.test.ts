@@ -358,9 +358,7 @@ describe("UserSettings stats columns", () => {
   beforeEach(resetUserSettingsState);
 
   it("returns defaults when nothing is stored", () => {
-    // The player table opens with the clan tag shown; a team has no tag.
     expect(new UserSettings().statsColumns("player")).toEqual([
-      "clan",
       "tiles",
       "gold",
       "maxtroops",
@@ -398,7 +396,6 @@ describe("UserSettings stats columns", () => {
   it("falls back to defaults on corrupt JSON", () => {
     localStorage.setItem(PLAYER_STATS_COLUMNS_KEY, "not json");
     expect(new UserSettings().statsColumns("player")).toEqual([
-      "clan",
       "tiles",
       "gold",
       "maxtroops",
@@ -408,7 +405,6 @@ describe("UserSettings stats columns", () => {
   it("falls back to defaults when no valid ids remain", () => {
     localStorage.setItem(PLAYER_STATS_COLUMNS_KEY, JSON.stringify(["bogus"]));
     expect(new UserSettings().statsColumns("player")).toEqual([
-      "clan",
       "tiles",
       "gold",
       "maxtroops",
@@ -538,54 +534,6 @@ describe("UserSettings per-player cosmetics (#4955)", () => {
     s.setAttackRatio(0.5);
     UserSettings.setPlayerId(null);
     expect(s.attackRatio()).toBe(0.5);
-  });
-
-  it("returns default nukeAllianceSafetyDuration of 5 and persists updates", () => {
-    const s = new UserSettings();
-    expect(s.nukeAllianceSafetyDuration()).toBe(5);
-
-    s.setNukeAllianceSafetyDuration(15);
-    expect(s.nukeAllianceSafetyDuration()).toBe(15);
-
-    const s2 = new UserSettings();
-    expect(s2.nukeAllianceSafetyDuration()).toBe(15);
-  });
-
-  it("clamps values to 0..30 in setNukeAllianceSafetyDuration", () => {
-    const s = new UserSettings();
-    s.setNukeAllianceSafetyDuration(-5);
-    expect(s.nukeAllianceSafetyDuration()).toBe(0);
-
-    s.setNukeAllianceSafetyDuration(45);
-    expect(s.nukeAllianceSafetyDuration()).toBe(30);
-
-    s.setNukeAllianceSafetyDuration(12.6);
-    expect(s.nukeAllianceSafetyDuration()).toBe(13);
-  });
-
-  it("falls back to default 5 for malformed or out-of-range persisted values", () => {
-    const s = new UserSettings();
-    const invalidValues = [
-      "Infinity",
-      "-Infinity",
-      "NaN",
-      "invalid",
-      "5.5",
-      "-1",
-      "31",
-      "100",
-      "",
-    ];
-
-    for (const invalid of invalidValues) {
-      localStorage.setItem("settings.nukeAllianceSafetyDuration", invalid);
-      const statics = UserSettings as unknown as {
-        cache: Map<string, string | null>;
-      };
-      statics.cache.clear();
-
-      expect(s.nukeAllianceSafetyDuration()).toBe(5);
-    }
   });
 });
 

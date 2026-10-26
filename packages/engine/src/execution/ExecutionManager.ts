@@ -7,18 +7,12 @@ import {
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import { simpleHash } from "@openfront/engine-lib/Util";
 import { Execution, Game } from "../game/Game";
-import { AllianceExtensionExecution } from "./alliance/AllianceExtensionExecution";
-import { AllianceRejectExecution } from "./alliance/AllianceRejectExecution";
-import { AllianceRequestExecution } from "./alliance/AllianceRequestExecution";
-import { BreakAllianceExecution } from "./alliance/BreakAllianceExecution";
 import { AttackExecution } from "./AttackExecution";
 import { BoatRetreatExecution } from "./BoatRetreatExecution";
 import { ConstructionExecution } from "./ConstructionExecution";
 import { DeleteUnitExecution } from "./DeleteUnitExecution";
 import { DonateGoldExecution } from "./DonateGoldExecution";
 import { DonateTroopsExecution } from "./DonateTroopExecution";
-import { EmbargoAllExecution } from "./EmbargoAllExecution";
-import { EmbargoExecution } from "./EmbargoExecution";
 import { EmojiExecution } from "./EmojiExecution";
 import { MarkDisconnectedExecution } from "./MarkDisconnectedExecution";
 import { MoveWarshipExecution } from "./MoveWarshipExecution";
@@ -42,8 +36,6 @@ export class Executor {
     private mg: Game,
     private gameID_: GameID,
     private clientID: ClientID | undefined,
-    // Purchased bot tribe names drawn for this game (GameStartInfo.tribes).
-    private purchasedTribeNames: string[] = [],
   ) {
     // Add one to avoid id collisions with tribes.
     this.random = new PseudoRandom(simpleHash(gameID_) + 1);
@@ -91,12 +83,6 @@ export class Executor {
         );
       case "boat":
         return new TransportShipExecution(player, intent.dst, intent.troops);
-      case "allianceRequest":
-        return new AllianceRequestExecution(player, intent.recipient);
-      case "allianceReject":
-        return new AllianceRejectExecution(intent.requestor, player);
-      case "breakAlliance":
-        return new BreakAllianceExecution(player, intent.recipient);
       case "targetPlayer":
         return new TargetPlayerExecution(player, intent.target);
       case "emoji":
@@ -109,10 +95,6 @@ export class Executor {
         );
       case "donate_gold":
         return new DonateGoldExecution(player, intent.recipient, intent.gold);
-      case "embargo":
-        return new EmbargoExecution(player, intent.targetID, intent.action);
-      case "embargo_all":
-        return new EmbargoAllExecution(player, intent.action);
       case "build_unit":
         return new ConstructionExecution(
           player,
@@ -121,10 +103,6 @@ export class Executor {
           intent.rocketDirectionUp,
           intent.amount,
         );
-      case "allianceExtension": {
-        return new AllianceExtensionExecution(player, intent.recipient);
-      }
-
       case "upgrade_structure":
         return new UpgradeStructureExecution(
           player,
@@ -156,7 +134,6 @@ export class Executor {
       .filter((c): c is NonNullable<typeof c> => c !== undefined);
     return new TribeSpawner(this.mg, this.gameID_, nationCells).spawnTribes(
       numTribes,
-      this.purchasedTribeNames,
     );
   }
 

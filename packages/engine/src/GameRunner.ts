@@ -61,7 +61,6 @@ export async function createGameRunner(
       p.clientID,
       random.nextID(),
       p.isLobbyCreator ?? false,
-      p.clanTag,
       p.friends ?? [],
       p.teamIndex ?? null,
     );
@@ -86,12 +85,7 @@ export async function createGameRunner(
 
   const gr = new GameRunner(
     game,
-    new Executor(
-      game,
-      gameStart.gameID,
-      clientID,
-      gameStart.tribes?.map((t) => t.name),
-    ),
+    new Executor(game, gameStart.gameID, clientID),
     callBack,
   );
   gr.init();
@@ -136,12 +130,7 @@ export async function createGameRunnerFromSnapshot(
   // No init(): the snapshot already holds every execution init() adds.
   return new GameRunner(
     game,
-    new Executor(
-      game,
-      gameStart.gameID,
-      clientID,
-      gameStart.tribes?.map((t) => t.name),
-    ),
+    new Executor(game, gameStart.gameID, clientID),
     callBack,
   );
 }
@@ -341,7 +330,6 @@ export class GameRunner {
       canAttack: tile !== null && player.canAttack(tile),
       buildableUnits: units === null ? [] : player.buildableUnits(tile, units),
       canSendEmojiAllPlayers: player.canSendEmoji(AllPlayers),
-      canEmbargoAll: player.canEmbargoAll(),
     } as PlayerActions;
 
     if (tile !== null && this.game.hasOwner(tile)) {
@@ -350,12 +338,8 @@ export class GameRunner {
         sharedBorder: player.sharesBorderWith(other),
         canSendEmoji: player.canSendEmoji(other),
         canTarget: player.canTarget(other),
-        canSendAllianceRequest: player.canSendAllianceRequest(other),
-        canBreakAlliance: player.isAlliedWith(other),
         canDonateGold: player.canDonateGold(other),
         canDonateTroops: player.canDonateTroops(other),
-        canEmbargo: !player.hasEmbargoAgainst(other),
-        allianceInfo: player.allianceInfo(other) ?? undefined,
       };
     }
 

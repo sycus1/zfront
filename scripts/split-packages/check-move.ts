@@ -36,7 +36,7 @@ const EXPECTED = [
   /^map-generator\/(codegen\.go|README\.md)$/,
   /^scripts\/buildAssetHashes\.ts$/,
   /^scripts\/split-packages\//,
-  /^tests\/(BuildAssetHashes|CloseCodes|LayerBoundaries|RenderDesktopDescriptor|TranslationSystem)\.test\.ts$/,
+  /^tests\/(BuildAssetHashes|CloseCodes|LayerBoundaries|TranslationSystem)\.test\.ts$/,
   /^packages\/shared\/src\/AssetUrls\.ts$/,
 ];
 

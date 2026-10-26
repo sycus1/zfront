@@ -46,7 +46,7 @@ type StartPreparation = {
 };
 
 const DEFAULT_OPTIONS = {
-  selectedMap: GameMapType.World,
+  selectedMap: GameMapType.Britannia,
   selectedDifficulty: Difficulty.Easy,
   bots: 400,
   infiniteGold: false,
@@ -64,8 +64,6 @@ const DEFAULT_OPTIONS = {
   startingGold: false,
   startingGoldValue: undefined as number | undefined,
   disabledUnits: [] as UnitType[],
-  customAlliances: false,
-  customAllianceMinutes: undefined as number | undefined,
   waterNukes: false,
   doomsdayClock: false,
   doomsdayClockSpeed: "normal" as DoomsdayClockSpeed,
@@ -104,9 +102,6 @@ export class SinglePlayerModal extends BaseModal {
   @state() private disabledUnits: UnitType[] = [
     ...DEFAULT_OPTIONS.disabledUnits,
   ];
-  @state() private customAlliances: boolean = DEFAULT_OPTIONS.customAlliances;
-  @state() private customAllianceMinutes: number | undefined =
-    DEFAULT_OPTIONS.customAllianceMinutes;
   @state() private waterNukes: boolean = DEFAULT_OPTIONS.waterNukes;
   @state() private doomsdayClock: boolean = DEFAULT_OPTIONS.doomsdayClock;
   @state() private doomsdayClockSpeed: DoomsdayClockSpeed =
@@ -188,22 +183,6 @@ export class SinglePlayerModal extends BaseModal {
         .onToggle=${this.handleStartingGoldToggle}
         .onChange=${this.handleStartingGoldValueChanges}
         .onKeyDown=${this.handleStartingGoldValueKeyDown}
-      ></toggle-input-card>`,
-      html`<toggle-input-card
-        .labelKey=${"game_settings.custom_alliances"}
-        .checked=${this.customAlliances}
-        .inputMin=${0}
-        .inputMax=${15}
-        .inputStep=${1}
-        .inputValue=${this.customAllianceMinutes}
-        .inputAriaLabel=${translateText("game_settings.custom_alliances")}
-        .inputPlaceholder=${translateText("game_settings.mins_placeholder")}
-        .defaultInputValue=${0}
-        .minValidOnEnable=${0}
-        .zeroLabel=${`(${translateText("public_game_modifier.disable_alliances")})`}
-        .onToggle=${this.handleCustomAlliancesToggle}
-        .onInput=${this.handleCustomAllianceMinutesInput}
-        .onKeyDown=${this.handleCustomAllianceMinutesKeyDown}
       ></toggle-input-card>`,
       html`<toggle-input-card
         .labelKey=${"game_settings.overtime"}
@@ -393,8 +372,6 @@ export class SinglePlayerModal extends BaseModal {
     this.goldMultiplierValue = DEFAULT_OPTIONS.goldMultiplierValue;
     this.startingGold = DEFAULT_OPTIONS.startingGold;
     this.startingGoldValue = DEFAULT_OPTIONS.startingGoldValue;
-    this.customAlliances = DEFAULT_OPTIONS.customAlliances;
-    this.customAllianceMinutes = DEFAULT_OPTIONS.customAllianceMinutes;
     this.waterNukes = DEFAULT_OPTIONS.waterNukes;
     this.doomsdayClock = DEFAULT_OPTIONS.doomsdayClock;
     this.doomsdayClockSpeed = DEFAULT_OPTIONS.doomsdayClockSpeed;
@@ -547,14 +524,6 @@ export class SinglePlayerModal extends BaseModal {
     this.startingGoldValue = toOptionalNumber(value);
   };
 
-  private handleCustomAlliancesToggle = (
-    checked: boolean,
-    value: number | string | undefined,
-  ) => {
-    this.customAlliances = checked;
-    this.customAllianceMinutes = toOptionalNumber(value);
-  };
-
   private handleOvertimeToggle = (
     checked: boolean,
     value: number | string | undefined,
@@ -578,19 +547,6 @@ export class SinglePlayerModal extends BaseModal {
       return;
     }
     this.overtimeStartMinutes = value;
-  };
-
-  private handleCustomAllianceMinutesKeyDown = (e: KeyboardEvent) => {
-    preventDisallowedKeys(e, ["-", "+", "e"]);
-  };
-
-  private handleCustomAllianceMinutesInput = (e: Event) => {
-    const input = e.target as HTMLInputElement;
-    const value = parseBoundedIntegerFromInput(input, { min: 0, max: 15 });
-    if (value === undefined) {
-      return;
-    }
-    this.customAllianceMinutes = value;
   };
 
   private handleMaxTimerValueKeyDown = (e: KeyboardEvent) => {
@@ -711,7 +667,6 @@ export class SinglePlayerModal extends BaseModal {
             {
               clientID,
               username: resolvedName.name,
-              clanTag: usernameInput?.getClanTag() ?? null,
               cosmetics,
             },
           ],
@@ -746,9 +701,6 @@ export class SinglePlayerModal extends BaseModal {
               ? {
                   startingGold: Math.round(this.startingGoldValue * 1_000_000),
                 }
-              : {}),
-            ...(this.customAlliances
-              ? { customAllianceDuration: this.customAllianceMinutes ?? 0 }
               : {}),
             ...(this.waterNukes ? { waterNukes: true } : {}),
             // zfront spike: every solo game has zombie waves.

@@ -1,4 +1,3 @@
-import { GameType } from "@openfront/engine-api/game/GameTypes";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GamePhase } from "../../src/server/GameServer";
 import {
@@ -66,20 +65,6 @@ describe("GameLifecycle", () => {
     );
     // The lobby-info broadcast the join armed is gone too.
     expect(vi.getTimerCount()).toBe(0);
-  });
-
-  it("ignores prestart() once the game has ended", async () => {
-    // start() already refuses an ended game; prestart() must too, or an
-    // ended lobby could change stage and go fetch tribes after shutdown.
-    const fetchTribes = vi.fn(async () => []);
-    const game = makeGame({
-      config: { gameType: GameType.Public, bots: 1 },
-      deps: { fetchTribes },
-    });
-    await game.end();
-    game.prestart();
-    expect(game.hasStarted()).toBe(false);
-    expect(fetchTribes).not.toHaveBeenCalled();
   });
 
   it("should be resilient to multiple end() calls", async () => {

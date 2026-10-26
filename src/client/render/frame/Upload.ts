@@ -48,7 +48,6 @@ export interface FrameUploadTarget {
     statusData?: ReadonlyMap<number, PlayerStatusData>,
   ): void;
   updateRelations(data: Uint8Array, size: number): void;
-  setSAMAllianceClusters(clusters: ReadonlyMap<number, number>): void;
   updateHorde(frame: HordeFrame): void;
 }
 
@@ -127,7 +126,4 @@ export function uploadFrameData(
   if (frame.relationsDirty) {
     view.updateRelations(frame.relationMatrix, frame.relationSize);
   }
-
-  // --- Alliance clusters (SAM pass) ---
-  view.setSAMAllianceClusters(frame.allianceClusters);
 }

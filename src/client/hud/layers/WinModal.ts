@@ -1,7 +1,12 @@
-import { GameUpdateType } from "@openfront/engine-api/game/GameUpdates";
+import {
+  GameUpdateType,
+  type HordeFrame,
+  type WinUpdate,
+} from "@openfront/engine-api/game/GameUpdates";
 import type { AllPlayersStats, Winner } from "@openfront/engine-api/Schemas";
+import { renderNumber } from "@openfront/engine-lib/Format";
 import { EventBus } from "@openfront/shared/EventBus";
-import { html, LitElement } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import {
   getTranslatedPlayerTeamLabel,
@@ -28,6 +33,11 @@ export class WinModal extends LitElement implements Controller {
 
   private _title: string;
 
+  /** zfront: the horde game's result, shown instead of OpenFront's. */
+  @state()
+  private hordeResult: { won: boolean; status: HordeFrame | null } | null =
+    null;
+
   // Override to prevent shadow DOM creation
   createRenderRoot() {
     return this;
@@ -45,6 +55,7 @@ export class WinModal extends LitElement implements Controller {
         <h2 class="m-0 mb-4 text-[26px] text-center text-white shrink-0">
           ${this._title || ""}
         </h2>
+        ${this.hordeResult ? this.renderHordeResult(this.hordeResult) : nothing}
         <!-- Leaving is the quieter action, on the left; staying in the game
              is the main one, on the right. -->
         <div class="mt-4 flex flex-wrap justify-between gap-2.5 shrink-0">
@@ -61,6 +72,47 @@ export class WinModal extends LitElement implements Controller {
               : translateText("win_modal.spectate"),
             () => this.hide(),
             "keep",
+          )}
+        </div>
+      </div>
+    `;
+  }
+
+  private renderHordeResult(result: {
+    won: boolean;
+    status: HordeFrame | null;
+  }) {
+    const s = result.status;
+    const summary = result.won
+      ? translateText("horde_result.won_summary", {
+          total: s?.wavesToWin ?? 0,
+        })
+      : translateText("horde_result.lost_summary", { wave: s?.wave ?? 0 });
+    const row = (label: string, value: string, key: string) =>
+      html`<div class="flex justify-between gap-4 py-1" data-horde-stat=${key}>
+        <span class="text-white/70">${label}</span>
+        <span class="font-semibold tabular-nums">${value}</span>
+      </div>`;
+    return html`
+      <div class="shrink-0 text-center" data-horde-result>
+        <p class="m-0 mb-3 text-white/90">${summary}</p>
+        <div class="mx-auto max-w-xs text-left">
+          ${row(
+            translateText("horde_result.waves"),
+            s && s.wavesToWin > 0
+              ? `${s.wave} / ${s.wavesToWin}`
+              : String(s?.wave ?? 0),
+            "waves",
+          )}
+          ${row(
+            translateText("horde_result.killed"),
+            renderNumber(s?.killed ?? 0),
+            "killed",
+          )}
+          ${row(
+            translateText("horde_result.structures_lost"),
+            String(s?.structuresDestroyed ?? 0),
+            "structures",
           )}
         </div>
       </div>
@@ -101,8 +153,12 @@ export class WinModal extends LitElement implements Controller {
   init() {}
 
   tick() {
+    const horde = this.game.config().gameConfig().horde === true;
     const myPlayer = this.game.myPlayer();
+    // In a horde game the HQ falling ends the game, and the result screen
+    // says so; no separate death notice.
     if (
+      !horde &&
       !this.hasShownDeathModal &&
       myPlayer &&
       !myPlayer.isAlive() &&
@@ -121,6 +177,11 @@ export class WinModal extends LitElement implements Controller {
       this.eventBus.emit(new SendWinnerEvent(winner, allPlayersStats));
     };
     winUpdates.forEach((wu) => {
+      if (horde) {
+        vote(wu.winner, wu.allPlayersStats);
+        this.showHordeResult(wu);
+        return;
+      }
       if (wu.winner === undefined) {
         // Match cancelled: the game ends with no winner.
         vote(undefined, wu.allPlayersStats);
@@ -174,6 +235,23 @@ export class WinModal extends LitElement implements Controller {
         this.show();
       }
     });
+  }
+
+  private showHordeResult(wu: WinUpdate): void {
+    const me = this.game.myPlayer()?.clientID();
+    const won =
+      wu.winner !== undefined &&
+      wu.winner[0] === "player" &&
+      me !== undefined &&
+      wu.winner[1] === me;
+    this.hordeResult = { won, status: this.game.hordeStatus() };
+    this._title = translateText(
+      won ? "horde_result.won_title" : "horde_result.lost_title",
+    );
+    this.isWin = won;
+    this.playEndOfGameSound();
+    history.replaceState(null, "", `${window.location.pathname}?replay`);
+    this.show();
   }
 
   private playEndOfGameSound(): void {

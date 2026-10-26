@@ -1,11 +1,9 @@
 import { GameMap, TileRef } from "@openfront/engine-api/game/GameMap";
 import {
   Cell,
-  formatPlayerDisplayName,
   GameUpdates,
   PlayerID,
   PlayerType,
-  Team,
   TerrainType,
   TerraNullius,
   Tick,
@@ -15,6 +13,7 @@ import {
 import {
   GameUpdateType,
   GameUpdateViewData,
+  HordeFrame,
   SpawnPhaseEndUpdate,
 } from "@openfront/engine-api/game/GameUpdates";
 import { GameLike, UnitPredicate } from "@openfront/engine-api/game/ReadViews";
@@ -25,7 +24,6 @@ import { TerrainMapData } from "@openfront/engine-lib/game/TerrainMapLoader";
 import { TerraNulliusImpl } from "@openfront/engine-lib/game/TerraNulliusImpl";
 import { UnitGrid } from "@openfront/engine-lib/game/UnitGrid";
 import { PlayerCosmetics, WirePlayer } from "@openfront/shared/WireSchemas";
-import { computeAllianceClusters } from "../render/frame/derive/AllianceClusters";
 import { extractAttackRings } from "../render/frame/derive/AttackRings";
 import { extractNukeTelegraphs } from "../render/frame/derive/NukeTelegraphs";
 import { computePlayerStatus } from "../render/frame/derive/PlayerStatus";
@@ -38,14 +36,9 @@ import type { FrameData, NameEntry } from "../render/types";
 import { STRUCTURE_TYPES } from "../render/types";
 import { TRAIL_TYPES } from "../render/types/UnitType";
 import { UserSettings } from "../UserSettings";
-import { resolveTeamClanTag } from "../Utils";
 import { WorkerClient } from "../WorkerClient";
 import type { CosmeticVisibility } from "./CosmeticVisibility";
-import {
-  applyPackedAttackTroops,
-  applyPackedPlayerStats,
-  embargoSmallIDs,
-} from "./EntityState";
+import { applyPackedAttackTroops, applyPackedPlayerStats } from "./EntityState";
 import {
   MotionPlanResolver,
   type GridMotionPlan,
@@ -76,7 +69,6 @@ export class GameView implements GameLike {
   private _unitStates = new Map<number, import("../render/types").UnitState>();
   /** smallID → team, for the renderer's relation matrix (team games). */
   private _teams = new Map<number, string>();
-  private _teamClanTags: Map<Team, string | null> | null = null;
   private updatedTiles: TileRef[] = [];
   private updatedTerrainTiles: TileRef[] = [];
   private nukeImpactTiles: TileRef[] = [];
@@ -102,6 +94,8 @@ export class GameView implements GameLike {
    * tick by update(). Renderer reads this each frame via frameData().
    */
   private _frame: FrameData;
+  /** zfront: the latest horde frame, kept across ticks for the HUD. */
+  private _lastHordeFrame: HordeFrame | null = null;
   private _structuresDirty = false;
   /** True until first populateFrame() — controls full-vs-delta tile upload. */
   private _firstPopulate = true;
@@ -114,10 +108,8 @@ export class GameView implements GameLike {
   // tick (PlayerUpdates are partial — field presence means "changed").
   /** Names: nameData record applied, or a player was added. */
   private _namesDirty = true;
-  /** Relation matrix: allies/embargoes changed, or a player was added. */
+  /** Relation matrix: a player was added. */
   private _relationsDirty = true;
-  /** Alliance clusters: allies changed, or a player was added. */
-  private _clustersDirty = true;
 
   private unitGrid: UnitGrid<UnitView>;
   private readonly motion = new MotionPlanResolver();
@@ -148,7 +140,6 @@ export class GameView implements GameLike {
     private _mapData: TerrainMapData,
     private _myClientID: ClientID | undefined,
     private _myUsername: string,
-    private _myClanTag: string | null,
     private _gameID: GameID,
     humans: WirePlayer[],
     private _resumedFromSave = false,
@@ -204,7 +195,6 @@ export class GameView implements GameLike {
       relationMatrix: new Uint8Array(0),
       relationSize: 0,
       relationsDirty: false,
-      allianceClusters: new Map(),
       nukeTelegraphs: [],
       attackRings: [],
       structuresDirty: false,
@@ -278,11 +268,6 @@ export class GameView implements GameLike {
       this._gameOver = true;
     }
 
-    const myDisplayName = formatPlayerDisplayName(
-      this._myUsername,
-      this._myClanTag,
-    );
-
     // Name placements arrive only on ticks where the worker recomputed them
     // (see GameUpdateViewData.playerNameViewData). Apply to existing alive
     // players here; dead players keep their last placement (names freeze at
@@ -298,8 +283,7 @@ export class GameView implements GameLike {
       this._namesDirty = true;
     }
 
-    // Pass 1: ensure every player exists with up-to-date PlayerState. We need
-    // all smallIDs registered before pass 2 can translate embargo PlayerIDs.
+    // Pass 1: ensure every player exists with up-to-date PlayerState.
     // PlayerUpdate is now partial: only `id` is guaranteed; everything else
     // is present only when its value changed since the last emission.
     gu.updates[GameUpdateType.Player].forEach((pu) => {
@@ -312,22 +296,11 @@ export class GameView implements GameLike {
       // static — present only on first emission — so this branch only runs once.
       if (pu.clientID !== undefined && pu.clientID === this._myClientID) {
         pu.name = this._myUsername;
-        pu.displayName = myDisplayName;
-        pu.clanTag = this._myClanTag;
+        pu.displayName = this._myUsername;
       }
 
       if (pu.smallID !== undefined) {
         this.smallIDToID.set(pu.smallID, pu.id);
-      }
-
-      // Derived-data dirty tracking: field presence on a partial update
-      // means the field changed this tick.
-      if (pu.allies !== undefined) {
-        this._relationsDirty = true;
-        this._clustersDirty = true;
-      }
-      if (pu.embargoes !== undefined) {
-        this._relationsDirty = true;
       }
 
       if (existing !== undefined) {
@@ -361,22 +334,7 @@ export class GameView implements GameLike {
         }
         this._namesDirty = true;
         this._relationsDirty = true;
-        this._clustersDirty = true;
-        this._teamClanTags = null;
       }
-    });
-
-    // Pass 2: translate engine embargoes (Set<PlayerID>) → renderer-format
-    // smallIDs. Only re-translate when embargoes changed (field present);
-    // unchanged sets stay at the previously-computed renderer-format list.
-    gu.updates[GameUpdateType.Player].forEach((pu) => {
-      if (pu.embargoes === undefined) return;
-      const player = this._players.get(pu.id);
-      if (player === undefined) return;
-      const smallIDs = embargoSmallIDs(pu.embargoes, (id) =>
-        this._players.get(id)?.smallID(),
-      );
-      player.setEmbargoSmallIDs(smallIDs);
     });
 
     // Packed per-player stats and attack troop counts, the per-tick churn
@@ -513,41 +471,35 @@ export class GameView implements GameLike {
     f.tick = gu.tick;
     f.inSpawnPhase = this.startTick === null;
     f.hordeFrame = gu.hordeFrame ?? null;
+    if (gu.hordeFrame) this._lastHordeFrame = gu.hordeFrame;
     f.railroadDirty = this.railroadCache.railroadDirty;
     f.trailDirtyRowMin = this.trailManager.dirtyRowMin;
     f.trailDirtyRowMax = this.trailManager.dirtyRowMax;
 
     f.playerStatus = computePlayerStatus(this._playerStates, this._unitStates, {
       localPlayerSmallID: this._myPlayer?.smallID() ?? 0,
-      localPlayerID: this._myPlayer?.id() ?? "",
       tileState: this._map.tileStateBuffer(),
       tick: gu.tick,
-      allianceDuration: this._config.allianceDuration(),
       isTransitiveTarget: (sid) =>
         (this._markedPlayers?.has(sid) ?? false) ||
         (this._myPlayer?.hasTransitiveTarget(sid) ?? false),
       doomsdayClockWarnTicks:
         this._config.doomsdayClockConfig().warnSeconds * 10,
     });
-    // Relations + clusters depend only on allies/embargoes/teams, which
-    // change rarely (teams only when a player is added) — recompute only
-    // when one of those inputs arrived this tick. buildRelationMatrix
+    // Relations depend only on teams, which change only when a player is
+    // added — recompute only then. buildRelationMatrix
     // writes into a reusable module-level buffer, so skipping the call
     // leaves f.relationMatrix's contents intact. f.relationsDirty lets the
     // upload layer skip the GPU push (and the full-map border recompute it
     // triggers) on unchanged ticks.
     if (this._relationsDirty) {
       this._relationsDirty = false;
-      const rel = buildRelationMatrix(this._playerStates, this._teams);
+      const rel = buildRelationMatrix(this._teams);
       f.relationMatrix = rel.matrix;
       f.relationSize = rel.size;
       f.relationsDirty = true;
     } else {
       f.relationsDirty = false;
-    }
-    if (this._clustersDirty) {
-      this._clustersDirty = false;
-      f.allianceClusters = computeAllianceClusters(this._playerStates);
     }
     f.nukeTelegraphs = extractNukeTelegraphs(
       this._unitStates,
@@ -632,6 +584,14 @@ export class GameView implements GameLike {
   /** Public accessor: the renderer reads this and uploads to the GPU. */
   frameData(): FrameData {
     return this._frame;
+  }
+
+  /**
+   * zfront: the latest horde frame (waves, kills, HQ health), or null before
+   * the first one or outside horde mode.
+   */
+  hordeStatus(): HordeFrame | null {
+    return this._lastHordeFrame;
   }
 
   /**
@@ -728,39 +688,6 @@ export class GameView implements GameLike {
 
   players(): PlayerView[] {
     return Array.from(this._players.values());
-  }
-
-  teamClanTag(team: Team | null): string | null {
-    if (!team) return null;
-    if (this._teamClanTags === null) {
-      if (this._players.size === 0) return null;
-      this._teamClanTags = this.initTeamClanTags();
-    }
-    return this._teamClanTags.get(team) ?? null;
-  }
-
-  invalidateTeamClanTags(): void {
-    this._teamClanTags = null;
-  }
-
-  private initTeamClanTags(): Map<Team, string | null> {
-    const teams = new Map<Team, PlayerView[]>();
-    for (const player of this._players.values()) {
-      const t = player.team();
-      if (t) {
-        let list = teams.get(t);
-        if (!list) {
-          list = [];
-          teams.set(t, list);
-        }
-        list.push(player);
-      }
-    }
-    const result = new Map<Team, string | null>();
-    for (const [t, players] of teams.entries()) {
-      result.set(t, resolveTeamClanTag(players));
-    }
-    return result;
   }
 
   /**

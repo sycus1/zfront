@@ -140,47 +140,6 @@ describe("GameView.update — players", () => {
     );
     expect(game.myPlayer()?.name()).toBe("RealName");
   });
-
-  it("invalidates the teamClanTag cache when a new player is added", () => {
-    const game = makeGameView();
-    // 1. Initial state with 1 player in team 1
-    game.update(
-      withPlayers(1, [
-        makePlayerUpdate({ id: "p1", smallID: 1, team: "1", clanTag: "MARS" }),
-      ]),
-    );
-    expect(game.teamClanTag("1")).toBe("MARS");
-
-    // 2. Add second player to team 1 in tick 2
-    game.update(
-      withPlayers(2, [
-        makePlayerUpdate({ id: "p2", smallID: 2, team: "1", clanTag: "UN" }),
-      ]),
-    );
-    // Cache should have been invalidated, and recalculation should see both players
-    expect(game.teamClanTag("1")).toBe("MARS / UN");
-  });
-
-  it("can explicitly invalidate teamClanTag cache (e.g. for anonymous names toggle)", () => {
-    const game = makeGameView();
-    game.update(
-      withPlayers(1, [
-        makePlayerUpdate({ id: "p1", smallID: 1, team: "1", clanTag: "MARS" }),
-      ]),
-    );
-    expect(game.teamClanTag("1")).toBe("MARS");
-
-    // Simulate the streamer mode toggle bypassing GameUpdate logic
-    // by silently mutating the static player clan tag
-    game.player("p1").static.clanTag = "EARTH";
-
-    // Explicitly invalidate cache
-    game.invalidateTeamClanTags();
-
-    // The next lookup will lazily re-evaluate it based on current player state
-    // If invalidation is broken, this would incorrectly return "MARS"
-    expect(game.teamClanTag("1")).toBe("EARTH");
-  });
 });
 
 describe("GameView.update — packed channels", () => {
@@ -398,56 +357,10 @@ describe("GameView.update — derived-data dirty flags", () => {
     return game;
   }
 
-  it("relationMatrix recomputes when allies arrive on a partial update", () => {
+  it("relationMatrix leaves players without a team neutral", () => {
     const game = twoPlayers();
     const size = game.frameData().relationSize;
     expect(game.frameData().relationMatrix[1 * size + 2]).toBe(0); // neutral
-
-    const gu = makeEmptyGu(2);
-    gu.updates[GameUpdateType.Player] = [
-      { type: GameUpdateType.Player, id: "alice", allies: [2] },
-    ];
-    game.update(gu);
-    // friendly, both directions
-    expect(game.frameData().relationMatrix[1 * size + 2]).toBe(1);
-    expect(game.frameData().relationMatrix[2 * size + 1]).toBe(1);
-  });
-
-  it("relationMatrix recomputes when embargoes arrive on a partial update", () => {
-    const game = twoPlayers();
-    const size = game.frameData().relationSize;
-
-    const gu = makeEmptyGu(2);
-    gu.updates[GameUpdateType.Player] = [
-      {
-        type: GameUpdateType.Player,
-        id: "alice",
-        embargoes: new Set(["bob"]),
-      },
-    ];
-    game.update(gu);
-    expect(game.frameData().relationMatrix[1 * size + 2]).toBe(2); // embargo
-  });
-
-  it("allianceClusters keep identity on clean ticks and recompute on allies change", () => {
-    const game = twoPlayers();
-    const before = game.frameData().allianceClusters;
-    expect(before.get(1)).not.toBe(before.get(2)); // separate clusters
-
-    // Clean tick: no relation inputs changed → cached object, untouched.
-    game.update(makeEmptyGu(2));
-    expect(game.frameData().allianceClusters).toBe(before);
-
-    // Alliance forms → recomputed: alice and bob share a cluster root.
-    const gu = makeEmptyGu(3);
-    gu.updates[GameUpdateType.Player] = [
-      { type: GameUpdateType.Player, id: "alice", allies: [2] },
-      { type: GameUpdateType.Player, id: "bob", allies: [1] },
-    ];
-    game.update(gu);
-    const after = game.frameData().allianceClusters;
-    expect(after).not.toBe(before);
-    expect(after.get(1)).toBe(after.get(2));
   });
 
   it("names map keeps identity and content on ticks without a record", () => {

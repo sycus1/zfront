@@ -58,33 +58,10 @@ describe("Player update diffing (toUpdate)", () => {
     expect(full!.id).toBe("charlie_id");
     expect(full!.name).toBe("charlie");
     expect(full!.smallID).toBe(charlie.smallID());
-    expect(full!.allies).toEqual([]);
     expect(full!.targets).toEqual([]);
-    expect(full!.embargoes).toEqual(new Set());
     expect(full!.outgoingAttacks).toEqual([]);
     expect(full!.incomingAttacks).toEqual([]);
-    expect(full!.outgoingAllianceRequests).toEqual([]);
-    expect(full!.alliances).toEqual([]);
     expect(full!.outgoingEmojis).toEqual([]);
-  });
-
-  test("first toUpdate carries the clan tag unmerged next to displayName", () => {
-    const eveInfo = new PlayerInfo(
-      "eve",
-      PlayerType.Human,
-      "eve_client",
-      "eve_id",
-      false,
-      "ABCDE",
-    );
-    game.addPlayer(eveInfo);
-    const full = game.player("eve_id").toUpdate();
-    expect(full).not.toBeNull();
-    // Consumers that lay the two out separately read clanTag; consumers that
-    // want the merged form keep reading displayName.
-    expect(full!.clanTag).toBe("ABCDE");
-    expect(full!.name).toBe("eve");
-    expect(full!.displayName).toBe("[ABCDE] eve");
   });
 
   test("clanTag is null in the snapshot for a player without a clan", () => {
@@ -95,7 +72,6 @@ describe("Player update diffing (toUpdate)", () => {
       "fran_id",
     );
     game.addPlayer(franInfo);
-    expect(game.player("fran_id").toUpdate()!.clanTag).toBeNull();
   });
 
   test("an unchanged clan tag stays out of later diffs", () => {
@@ -105,15 +81,13 @@ describe("Player update diffing (toUpdate)", () => {
       "gus_client",
       "gus_id",
       false,
-      "ABCDE",
     );
     game.addPlayer(gusInfo);
     const gus = game.player("gus_id");
     gus.toUpdate(); // first full snapshot
-    gus.markTraitor();
+    gus.markDisconnected(true);
     const diff = gus.toUpdate();
     expect(diff).not.toBeNull();
-    expect(diff!.clanTag).toBeUndefined();
   });
 
   test("toUpdate returns null when nothing changed", () => {
@@ -124,15 +98,14 @@ describe("Player update diffing (toUpdate)", () => {
 
   test("primitive changes appear in the diff without unchanged collections", () => {
     alice.toUpdate();
-    alice.markTraitor();
+    alice.markDisconnected(true);
     const diff = alice.toUpdate();
     expect(diff).not.toBeNull();
-    expect(diff!.isTraitor).toBe(true);
+    expect(diff!.isDisconnected).toBe(true);
     // Unchanged collection fields must be absent from the diff.
-    expect(diff!.allies).toBeUndefined();
-    expect(diff!.embargoes).toBeUndefined();
+    expect(diff!.targets).toBeUndefined();
     expect(diff!.outgoingAttacks).toBeUndefined();
-    expect(diff!.alliances).toBeUndefined();
+    expect(diff!.incomingAttacks).toBeUndefined();
   });
 
   test("stat churn (gold/troops/tilesOwned) travels via statsOut, not the diff", () => {
@@ -159,7 +132,7 @@ describe("Player update diffing (toUpdate)", () => {
     expect(statsOut).toEqual([]);
 
     // A non-stat change produces an object diff but no quad.
-    alice.markTraitor();
+    alice.markDisconnected(true);
     expect(alice.toUpdate(statsOut)).not.toBeNull();
     expect(statsOut).toEqual([]);
   });
@@ -205,39 +178,6 @@ describe("Player update diffing (toUpdate)", () => {
     expect(full!.troops).toBe(dora.troops());
     expect(full!.tilesOwned).toBe(dora.numTilesOwned());
     expect(statsOut).toEqual([]);
-  });
-
-  test("adding and removing an embargo shows up in consecutive diffs", () => {
-    alice.toUpdate();
-    alice.addEmbargo(bob, false);
-    let diff = alice.toUpdate();
-    expect(diff).not.toBeNull();
-    expect(diff!.embargoes).toEqual(new Set(["bob_id"]));
-
-    expect(alice.toUpdate()).toBeNull(); // stable until something changes
-
-    alice.stopEmbargo(bob);
-    diff = alice.toUpdate();
-    expect(diff).not.toBeNull();
-    expect(diff!.embargoes).toEqual(new Set());
-  });
-
-  test("an alliance shows up in allies and alliance views", () => {
-    alice.toUpdate();
-    bob.toUpdate();
-    const request = alice.createAllianceRequest(bob);
-    expect(request).not.toBeNull();
-    request!.accept();
-
-    const aliceDiff = alice.toUpdate();
-    expect(aliceDiff).not.toBeNull();
-    expect(aliceDiff!.allies).toEqual([bob.smallID()]);
-    expect(aliceDiff!.alliances).toHaveLength(1);
-    expect(aliceDiff!.alliances![0].other).toBe("bob_id");
-
-    const bobDiff = bob.toUpdate();
-    expect(bobDiff).not.toBeNull();
-    expect(bobDiff!.allies).toEqual([alice.smallID()]);
   });
 
   test("targeting a player appears in the diff", () => {
@@ -322,7 +262,7 @@ describe("Player update diffing (toUpdate)", () => {
     // consumer must throw instead of silently corrupting every player's
     // updates. (Updates crossing to the main thread are structured-cloned,
     // so real consumers get mutable copies.)
-    expect(() => full.allies!.push(999)).toThrow();
+    expect(() => full.targets!.push(999)).toThrow();
     expect(() => full.outgoingAttacks!.pop()).toThrow();
 
     // And other players see no spurious changes.

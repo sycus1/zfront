@@ -1,7 +1,6 @@
 import { TileRef } from "@openfront/engine-api/game/GameMap";
 import {
   MessageType,
-  PlayerType,
   TerraNullius,
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
@@ -92,16 +91,6 @@ export class TransportShipExecution implements Execution {
       );
       this.active = false;
       return;
-    }
-
-    if (this.target.isPlayer()) {
-      const targetPlayer = this.target as Player;
-      if (
-        targetPlayer.type() !== PlayerType.Bot &&
-        this.attacker.type() !== PlayerType.Bot
-      ) {
-        this.rejectIncomingAllianceRequests(targetPlayer);
-      }
     }
 
     if (this.target === this.attacker) {
@@ -336,15 +325,6 @@ export class TransportShipExecution implements Execution {
 
   isActive(): boolean {
     return this.active;
-  }
-
-  private rejectIncomingAllianceRequests(target: Player) {
-    const request = this.attacker
-      .incomingAllianceRequests()
-      .find((ar) => ar.requestor() === target);
-    if (request !== undefined) {
-      request.reject();
-    }
   }
 
   snapshot(w: SnapshotWriter): ExecRecord {

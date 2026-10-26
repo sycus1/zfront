@@ -1,4 +1,3 @@
-import { ReservedClanTagsResponseSchema } from "@openfront/shared/ClanApiSchemas";
 import { CosmeticsSchema } from "@openfront/shared/CosmeticSchemas";
 import { base64url } from "jose";
 import { Logger } from "winston";
@@ -21,7 +20,6 @@ export class PrivilegeRefresher {
   constructor(
     private cosmeticsEndpoint: string,
     private apiKey: string,
-    private reservedClanTagsEndpoint: string,
     parentLog: Logger,
     private refreshInterval: number = 1000 * 60 * 3,
   ) {
@@ -54,10 +52,7 @@ export class PrivilegeRefresher {
         }
       };
 
-      const [cosmeticsResponse, reservedClanTagsResponse] = await Promise.all([
-        fetchWithTimeout(this.cosmeticsEndpoint),
-        fetchWithTimeout(this.reservedClanTagsEndpoint),
-      ]);
+      const cosmeticsResponse = await fetchWithTimeout(this.cosmeticsEndpoint);
 
       if (!cosmeticsResponse || !cosmeticsResponse.ok) {
         throw new Error(
@@ -72,34 +67,11 @@ export class PrivilegeRefresher {
         throw new Error(`Invalid cosmetics data: ${result.error.message}`);
       }
 
-      // Reserved clan tags are critical: a missing or malformed list would
-      // make every non-member tag look fictional and let impersonation
-      // through. Throw so the previous (good) checker is retained instead.
-      if (!reservedClanTagsResponse || !reservedClanTagsResponse.ok) {
-        throw new Error(
-          `Reserved clan tags HTTP error! status: ${reservedClanTagsResponse?.status ?? "network error"}`,
-        );
-      }
-      const reservedClanTagsData = await reservedClanTagsResponse.json();
-      const reservedClanTagsResult =
-        ReservedClanTagsResponseSchema.safeParse(reservedClanTagsData);
-      if (!reservedClanTagsResult.success) {
-        throw new Error(
-          `Invalid reserved clan tags data: ${reservedClanTagsResult.error.message}`,
-        );
-      }
-      const reservedClanTags = new Set(
-        reservedClanTagsResult.data.map((tag) => tag.toUpperCase()),
-      );
-
       this.privilegeChecker = new PrivilegeCheckerImpl(
         result.data,
         base64url.decode,
-        reservedClanTags,
       );
-      this.log.info(
-        `Privilege checker loaded successfully (${reservedClanTags.size} reserved clan tags)`,
-      );
+      this.log.info(`Privilege checker loaded successfully`);
     } catch (error) {
       this.log.error(`Failed to load privilege checker:`, error);
       throw error;

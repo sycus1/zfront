@@ -99,21 +99,6 @@ describe("FrameNormalizer", () => {
     expect(snap1.outgoingAttacks[0].troops).toBe(500);
   });
 
-  test("embargoes translate PlayerIDs to smallIDs, including same-tick newcomers", () => {
-    const n = new FrameNormalizer();
-    const f = n.push(
-      frame(1, {
-        updates: {
-          [P]: [
-            fullPlayer(1, { embargoes: new Set(["p2", "unknown"]) }),
-            fullPlayer(2),
-          ],
-        },
-      }),
-    );
-    expect(f.players.get(1)!.embargoes).toEqual([2]);
-  });
-
   test("name placements persist across ticks that omit them", () => {
     const n = new FrameNormalizer();
     const f1 = n.push(

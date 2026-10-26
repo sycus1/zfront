@@ -23,7 +23,6 @@ export class PlayerStats extends StatsTable {
       .map((player) => ({
         key: player.id(),
         name: player.name(),
-        clanTag: player.clanTag(),
         values: columnValues(player, game, columns),
         emphasized:
           myPlayer !== null &&

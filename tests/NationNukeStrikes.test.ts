@@ -13,7 +13,6 @@ import {
 } from "@openfront/engine-lib/configuration/Config";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import { AttackExecution } from "@openfront/engine/execution/AttackExecution";
-import { NationAllianceBehavior } from "@openfront/engine/execution/nation/NationAllianceBehavior";
 import { NationAttackBehavior } from "@openfront/engine/execution/nation/NationAttackBehavior";
 import { NationEmojiBehavior } from "@openfront/engine/execution/nation/NationEmojiBehavior";
 import { NationMIRVBehavior } from "@openfront/engine/execution/nation/NationMIRVBehavior";
@@ -98,12 +97,6 @@ function nukeBehavior(
     game,
     nation,
   );
-  const allianceBehavior = new NationAllianceBehavior(
-    new PseudoRandom(1),
-    game,
-    nation,
-    emojiBehavior,
-  );
   const attackBehavior = new NationAttackBehavior(
     new PseudoRandom(1),
     game,
@@ -111,7 +104,6 @@ function nukeBehavior(
     0.5,
     RESERVE_RATIO,
     0.2,
-    allianceBehavior,
     emojiBehavior,
     new NationWarshipBehavior(new PseudoRandom(1), game, nation, emojiBehavior),
   );

@@ -319,18 +319,12 @@ export const ClusterSnapshot = snapshotType({
 });
 export type ClusterState = z.infer<typeof ClusterSnapshot.schema>;
 
-function rel(
-  player: Player,
-  other: Player,
-): "self" | "team" | "ally" | "other" {
+function rel(player: Player, other: Player): "self" | "team" | "other" {
   if (player === other) {
     return "self";
   }
   if (player.isOnSameTeam(other)) {
     return "team";
-  }
-  if (player.isAlliedWith(other)) {
-    return "ally";
   }
   return "other";
 }

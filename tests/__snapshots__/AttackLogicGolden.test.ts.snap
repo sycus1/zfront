@@ -1642,15 +1642,10 @@ exports[`attackLogic golden values > player vs player: situational modifiers 1`]
     "defenderLoss": 5,
     "tickFraction": 0.0578264,
   },
-  "defender is traitor": {
-    "attackerLoss": 19.2788,
+  "defense post + fallout (stacking)": {
+    "attackerLoss": 1156.73,
     "defenderLoss": 5,
-    "tickFraction": 0.0154204,
-  },
-  "defense post + fallout + traitor (stacking)": {
-    "attackerLoss": 578.363,
-    "defenderLoss": 5,
-    "tickFraction": 0.28037,
+    "tickFraction": 0.350463,
   },
   "disconnected teammate": {
     "attackerLoss": 0,

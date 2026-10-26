@@ -26,7 +26,7 @@ function oldRecord() {
       winner: ["player", "abCD1234"],
       config: {
         // no `nations` — predates configurable nation count
-        gameMap: "Africa",
+        gameMap: "Britannia",
         difficulty: "Medium",
         donateGold: true,
         donateTroops: true,
@@ -66,7 +66,6 @@ describe("ArchivedAnalyticsRecordSchema", () => {
     if (!result.success) return;
     const player = result.data.info.players[0];
     expect(player.username).toBe("[BR] køva!");
-    expect(player.clanTag).toBeNull();
     expect(player.stats?.conquests).toEqual([3n]);
     expect(result.data.info.config.nations).toBe("default");
   });
@@ -82,7 +81,6 @@ describe("ArchivedAnalyticsRecordSchema", () => {
           {
             ...base.info.players[0],
             username: "NormalName",
-            clanTag: "ABC",
             stats: { conquests: ["1", "2", "0"] },
           },
         ],
@@ -93,19 +91,18 @@ describe("ArchivedAnalyticsRecordSchema", () => {
     expect(result.success).toBe(true);
     if (!result.success) return;
     expect(result.data.info.config.nations).toBe("disabled");
-    expect(result.data.info.players[0].clanTag).toBe("ABC");
     expect(result.data.info.players[0].stats?.conquests).toEqual([1n, 2n, 0n]);
   });
 
   test("normalizes accidental whitespace around an archived map name", () => {
     const record = oldRecord();
-    record.info.config.gameMap = "Deglaciated Antarctica ";
+    record.info.config.gameMap = "Britannia ";
 
     const result = ArchivedAnalyticsRecordSchema.safeParse(record);
 
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect(result.data.info.config.gameMap).toBe("Deglaciated Antarctica");
+    expect(result.data.info.config.gameMap).toBe("Britannia");
   });
 
   // Client-archived singleplayer records are stored by the API worker exactly
@@ -122,7 +119,6 @@ describe("ArchivedAnalyticsRecordSchema", () => {
           {
             ...base.info.players[0],
             username: "NormalName",
-            clanTag: "ABC",
             stats: { conquests: ["1", "2", "0"] },
           },
         ],

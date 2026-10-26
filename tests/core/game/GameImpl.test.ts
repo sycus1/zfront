@@ -1,5 +1,4 @@
 import { GameID } from "@openfront/engine-api/Schemas";
-import { AttackExecution } from "@openfront/engine/execution/AttackExecution";
 import { SpawnExecution } from "@openfront/engine/execution/SpawnExecution";
 //import { TransportShipExecution } from "@openfront/engine/execution/TransportShipExecution";
 import { TileRef } from "@openfront/engine-api/game/GameMap";
@@ -9,14 +8,11 @@ import {
   PlayerType,
 } from "@openfront/engine-api/game/GameTypes";
 import { GameUpdateType } from "@openfront/engine-api/game/GameUpdates";
-import { AllianceRequestExecution } from "@openfront/engine/execution/alliance/AllianceRequestExecution";
-import { Game, Player } from "@openfront/engine/game/Game";
+import { Game } from "@openfront/engine/game/Game";
 import { setup } from "../../util/Setup";
 
 const gameID: GameID = "game_id";
 let game: Game;
-let attacker: Player;
-let defender: Player;
 let defenderSpawn: TileRef;
 let attackerSpawn: TileRef;
 
@@ -57,77 +53,6 @@ describe("GameImpl", () => {
         defenderSpawn,
       ),
     );
-
-    attacker = game.player(attackerInfo.id);
-    defender = game.player(defenderInfo.id);
-  });
-
-  test("Don't become traitor when betraying inactive player", async () => {
-    vi.spyOn(attacker, "canSendAllianceRequest").mockReturnValue(true);
-    vi.spyOn(defender, "canSendAllianceRequest").mockReturnValue(true);
-    game.addExecution(new AllianceRequestExecution(attacker, defender.id()));
-    game.executeNextTick();
-
-    game.addExecution(new AllianceRequestExecution(defender, attacker.id()));
-    game.executeNextTick();
-
-    expect(attacker.allianceWith(defender)).toBeTruthy();
-    expect(defender.allianceWith(attacker)).toBeTruthy();
-
-    //Defender is marked disconnected
-    defender.markDisconnected(true);
-
-    game.executeNextTick();
-    game.executeNextTick();
-
-    // STEP 1: First betray (manually break alliance)
-    const alliance = attacker.allianceWith(defender);
-    expect(alliance).toBeTruthy();
-    attacker.breakAlliance(alliance!);
-
-    // STEP 2: Then attack after betrayal
-    game.addExecution(new AttackExecution(100, attacker, defender.id()));
-
-    do {
-      game.executeNextTick();
-    } while (attacker.outgoingAttacks().length > 0);
-
-    expect(attacker.isTraitor()).toBe(false);
-    expect(attacker.allianceWith(defender)).toBeFalsy();
-  });
-
-  test("Do become traitor when betraying active player", async () => {
-    vi.spyOn(attacker, "canSendAllianceRequest").mockReturnValue(true);
-    vi.spyOn(defender, "canSendAllianceRequest").mockReturnValue(true);
-    game.addExecution(new AllianceRequestExecution(attacker, defender.id()));
-    game.executeNextTick();
-
-    game.addExecution(new AllianceRequestExecution(defender, attacker.id()));
-    game.executeNextTick();
-
-    expect(attacker.allianceWith(defender)).toBeTruthy();
-    expect(defender.allianceWith(attacker)).toBeTruthy();
-
-    //Defender is NOT marked disconnected
-
-    game.executeNextTick();
-    game.executeNextTick();
-
-    // First betray (manually break alliance)
-    const alliance = attacker.allianceWith(defender);
-    expect(alliance).toBeTruthy();
-    attacker.breakAlliance(alliance!);
-
-    game.executeNextTick();
-
-    game.addExecution(new AttackExecution(100, attacker, defender.id()));
-
-    do {
-      game.executeNextTick();
-    } while (attacker.outgoingAttacks().length > 0);
-
-    expect(attacker.isTraitor()).toBe(true);
-    expect(attacker.allianceWith(defender)).toBeFalsy();
   });
 
   test("Singleplayer late human spawn gets spawn immunity", async () => {

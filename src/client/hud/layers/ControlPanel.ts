@@ -267,7 +267,7 @@ export class ControlPanel extends LitElement implements Controller {
       return { type: "warning", message: "control_panel.low_troops_warning" };
     }
 
-    // Info messages: check nearby players for traitors, AFK allies, AFK teammates
+    // Info messages: check nearby players for AFK teammates
     for (const nearbyID of this._nearbyPlayerIDs) {
       let other;
       try {
@@ -284,15 +284,6 @@ export class ControlPanel extends LitElement implements Controller {
 
       if (!hasNotAttackedRecently) continue;
 
-      if (other.isTraitor() && player.isAlliedWith(other)) {
-        return { type: "info", message: "control_panel.traitor_neighbor_info" };
-      }
-      if (other.isDisconnected() && player.isAlliedWith(other)) {
-        return {
-          type: "info",
-          message: "control_panel.allied_afk_neighbor_info",
-        };
-      }
       if (other.isDisconnected() && player.isOnSameTeam(other)) {
         return {
           type: "info",

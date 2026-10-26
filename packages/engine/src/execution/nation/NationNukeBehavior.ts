@@ -437,19 +437,6 @@ export class NationNukeBehavior {
       }
     }
 
-    // Assist allies, check their targets (this is basically the same as in assistAllies, but without sending emojis)
-    for (const ally of this.player.allies()) {
-      if (ally.targets().length === 0) continue;
-      if (this.player.relation(ally) < Relation.Friendly) continue;
-
-      for (const target of ally.targets()) {
-        if (target === this.player) continue;
-        if (this.player.isFriendly(target)) continue;
-        // Found a valid ally target to nuke
-        return target;
-      }
-    }
-
     // Find the most hated player
     // Ignore much weaker players (we don't need nukes to deal with them)
     const myMaxTroops = this.game.config().maxTroops(this.player);

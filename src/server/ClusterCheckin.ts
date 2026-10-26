@@ -74,9 +74,7 @@ const RefusalBodySchema = z.object({
  * The site this server registers under: the page host (SITE_HOST — the apex
  * for blue/green, `<subdomain>.<DOMAIN>` under GAME_DOMAIN), else its own
  * public host for an old-style standalone deploy. Undefined under local
- * development, where there is no public host and nothing registers. The
- * ranked check-in names the same site (RankedCheckin.ts), so the API pools
- * this server only with players whose page reads this site's list.
+ * development, where there is no public host and nothing registers.
  */
 export function registeredSite(): string | undefined {
   return ServerEnv.siteHost() ?? ServerEnv.publicHost();

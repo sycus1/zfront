@@ -181,48 +181,6 @@ describe("RenderHtml siteHost injection", () => {
   });
 });
 
-describe("RenderHtml stripePublishableKey injection", () => {
-  let tempDir: string | null = null;
-
-  beforeEach(() => {
-    stubIdentity();
-    vi.stubEnv("TURNSTILE_SITE_KEY", "test-key");
-    vi.stubEnv("GIT_COMMIT", "abc");
-    vi.stubEnv("DOMAIN", "openfront.io");
-    vi.stubEnv("SUBDOMAIN", "blue");
-  });
-
-  afterEach(async () => {
-    vi.unstubAllEnvs();
-    clearAppShellContentCache();
-    if (tempDir) {
-      await fs.rm(tempDir, { recursive: true, force: true });
-      tempDir = null;
-    }
-  });
-
-  // Same expression index.html uses to emit the optional key line.
-  const TEMPLATE =
-    '<%- typeof stripePublishableKey !== "undefined" && stripePublishableKey ? "stripePublishableKey: " + stripePublishableKey + "," : "" %>';
-
-  async function render(): Promise<string> {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "render-html-"));
-    const htmlPath = path.join(tempDir, "index.html");
-    await fs.writeFile(htmlPath, TEMPLATE, "utf8");
-    return getAppShellContent(htmlPath);
-  }
-
-  test("carries the deployment's key into the page", async () => {
-    vi.stubEnv("STRIPE_PUBLISHABLE_KEY", "pk_test_abc");
-    expect(await render()).toBe('stripePublishableKey: "pk_test_abc",');
-  });
-
-  test("omits the line entirely for a deployment without a key", async () => {
-    vi.stubEnv("STRIPE_PUBLISHABLE_KEY", "");
-    expect(await render()).toBe("");
-  });
-});
-
 describe("RenderHtml faroCollectorUrl injection", () => {
   beforeEach(() => {
     stubIdentity();
@@ -256,8 +214,7 @@ describe("RenderHtml faroCollectorUrl injection", () => {
 // The real template, not a fixture. Everything above renders a one-line stub,
 // which is the right scope for those tests but cannot catch the thing this
 // file most needs to catch: that the guarded BOOTSTRAP_CONFIG block in
-// index.html still produces the page the client (and the Steam shell, which
-// renders the same file) boots from.
+// index.html still produces the page the client boots from.
 const REAL_TEMPLATE = path.resolve(__dirname, "../../index.html");
 
 function bootstrapConfig(html: string): Record<string, unknown> {
@@ -277,7 +234,6 @@ describe("RenderHtml environment-only render", () => {
     vi.stubEnv("SITE_HOST", "openfront.io");
     vi.stubEnv("INSTANCE_ID", "i-1");
     vi.stubEnv("GIT_COMMIT", "abc");
-    vi.stubEnv("STRIPE_PUBLISHABLE_KEY", "pk_test_abc");
     vi.stubEnv("FARO_COLLECTOR_URL", "https://faro.example/collect/k");
   });
 
@@ -312,9 +268,6 @@ describe("RenderHtml environment-only render", () => {
     ["gameEnv"],
     ["turnstileSiteKey"],
     ["jwtAudience"],
-    // Environment-scoped, so the static per-version page must carry it:
-    // it is how a page served by the static Worker still gets a key.
-    ["stripePublishableKey"],
     ["faroCollectorUrl"],
     ["cdnBase"],
     ["assetManifest"],
@@ -359,7 +312,6 @@ describe("RenderHtml environment-only render", () => {
         '        instanceLetter: "a",',
         '        turnstileSiteKey: "test-key",',
         '        jwtAudience: "openfront.io",',
-        '        stripePublishableKey: "pk_test_abc",',
         '        faroCollectorUrl: "https://faro.example/collect/k",',
         '        instanceId: "i-1",',
         '        serverHost: "blue.openfront.io",',

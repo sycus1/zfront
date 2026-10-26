@@ -15,14 +15,13 @@ import {
 const teams = [ColoredTeams.Red, ColoredTeams.Blue];
 
 describe("assignTeams", () => {
-  const createPlayer = (id: string, clan?: string): PlayerInfo => {
+  const createPlayer = (id: string): PlayerInfo => {
     return new PlayerInfo(
       `Player ${id}`,
       PlayerType.Human,
       null, // clientID (null for testing)
       id,
       false,
-      clan,
     );
   };
 
@@ -32,7 +31,6 @@ describe("assignTeams", () => {
   const createPlayerWithFriends = (
     id: string,
     friends: string[],
-    clan?: string,
     clientID: string = id,
   ): PlayerInfo => {
     return new PlayerInfo(
@@ -41,12 +39,11 @@ describe("assignTeams", () => {
       clientID,
       id, // PlayerInfo.id
       false,
-      clan,
       friends,
     );
   };
 
-  it("should assign players to teams when no clans are present", () => {
+  it("should assign players to teams alternately", () => {
     const players = [
       createPlayer("1"),
       createPlayer("2"),
@@ -63,63 +60,6 @@ describe("assignTeams", () => {
     expect(result.get(players[3])).toEqual(ColoredTeams.Blue);
   });
 
-  it("should keep clan members together on the same team", () => {
-    const players = [
-      createPlayer("1", "CLANA"),
-      createPlayer("2", "CLANA"),
-      createPlayer("3", "CLANB"),
-      createPlayer("4", "CLANB"),
-    ];
-
-    const result = assignTeams(players, teams, false);
-
-    // Check that clan members are on the same team
-    expect(result.get(players[0])).toEqual(ColoredTeams.Red);
-    expect(result.get(players[1])).toEqual(ColoredTeams.Red);
-    expect(result.get(players[2])).toEqual(ColoredTeams.Blue);
-    expect(result.get(players[3])).toEqual(ColoredTeams.Blue);
-  });
-
-  it("should handle mixed clan and non-clan players", () => {
-    const players = [
-      createPlayer("1", "CLANA"),
-      createPlayer("2", "CLANA"),
-      createPlayer("3"),
-      createPlayer("4"),
-    ];
-
-    const result = assignTeams(players, teams, false);
-
-    // Check that clan members are together and non-clan players balance teams
-    expect(result.get(players[0])).toEqual(ColoredTeams.Red);
-    expect(result.get(players[1])).toEqual(ColoredTeams.Red);
-    expect(result.get(players[2])).toEqual(ColoredTeams.Blue);
-    expect(result.get(players[3])).toEqual(ColoredTeams.Blue);
-  });
-
-  it("should kick players when teams are full", () => {
-    const players = [
-      createPlayer("1", "CLANA"),
-      createPlayer("2", "CLANA"),
-      createPlayer("3", "CLANA"),
-      createPlayer("4", "CLANA"),
-      createPlayer("5", "CLANB"),
-      createPlayer("6", "CLANB"),
-    ];
-
-    const result = assignTeams(players, teams, false);
-
-    // Check that players are kicked when teams are full
-    expect(result.get(players[0])).toEqual(ColoredTeams.Red);
-    expect(result.get(players[1])).toEqual(ColoredTeams.Red);
-    expect(result.get(players[2])).toEqual(ColoredTeams.Red);
-
-    expect(result.get(players[3])).toEqual("kicked");
-
-    expect(result.get(players[4])).toEqual(ColoredTeams.Blue);
-    expect(result.get(players[5])).toEqual(ColoredTeams.Blue);
-  });
-
   it("should handle empty player list", () => {
     const result = assignTeams([], teams, false);
     expect(result.size).toBe(0);
@@ -131,73 +71,27 @@ describe("assignTeams", () => {
     expect(result.get(players[0])).toEqual(ColoredTeams.Red);
   });
 
-  it("should handle multiple clans with different sizes", () => {
-    const players = [
-      createPlayer("1", "CLANA"),
-      createPlayer("2", "CLANA"),
-      createPlayer("3", "CLANA"),
-      createPlayer("4", "CLANB"),
-      createPlayer("5", "CLANB"),
-      createPlayer("6", "CLANC"),
-    ];
-
-    const result = assignTeams(players, teams, false);
-
-    // Check that larger clans are assigned first
-    expect(result.get(players[0])).toEqual(ColoredTeams.Red);
-    expect(result.get(players[1])).toEqual(ColoredTeams.Red);
-    expect(result.get(players[2])).toEqual(ColoredTeams.Red);
-    expect(result.get(players[3])).toEqual(ColoredTeams.Blue);
-    expect(result.get(players[4])).toEqual(ColoredTeams.Blue);
-    expect(result.get(players[5])).toEqual(ColoredTeams.Blue);
-  });
-
   it("should distribute players among a larger number of teams", () => {
-    const players = [
-      createPlayer("1", "CLANA"),
-      createPlayer("2", "CLANA"),
-      createPlayer("3", "CLANA"),
-      createPlayer("4", "CLANB"),
-      createPlayer("5", "CLANB"),
-      createPlayer("6", "CLANC"),
-      createPlayer("7"),
-      createPlayer("8"),
-      createPlayer("9"),
-      createPlayer("10"),
-      createPlayer("11"),
-      createPlayer("12"),
-      createPlayer("13"),
-      createPlayer("14"),
+    const players = Array.from({ length: 14 }, (_, i) => createPlayer(`${i}`));
+    const sevenTeams = [
+      ColoredTeams.Red,
+      ColoredTeams.Blue,
+      ColoredTeams.Yellow,
+      ColoredTeams.Green,
+      ColoredTeams.Purple,
+      ColoredTeams.Orange,
+      ColoredTeams.Teal,
     ];
 
-    const result = assignTeams(
-      players,
-      [
-        ColoredTeams.Red,
-        ColoredTeams.Blue,
-        ColoredTeams.Yellow,
-        ColoredTeams.Green,
-        ColoredTeams.Purple,
-        ColoredTeams.Orange,
-        ColoredTeams.Teal,
-      ],
-      false,
-    );
+    const result = assignTeams(players, sevenTeams, false);
 
+    // Round-robin: every team gets exactly two players, nobody is kicked.
+    for (const team of sevenTeams) {
+      expect([...result.values()].filter((t) => t === team)).toHaveLength(2);
+    }
+    expect([...result.values()]).not.toContain("kicked");
     expect(result.get(players[0])).toEqual(ColoredTeams.Red);
-    expect(result.get(players[1])).toEqual(ColoredTeams.Red);
-    expect(result.get(players[2])).toEqual("kicked");
-    expect(result.get(players[3])).toEqual(ColoredTeams.Blue);
-    expect(result.get(players[4])).toEqual(ColoredTeams.Blue);
-    expect(result.get(players[5])).toEqual(ColoredTeams.Yellow);
-    expect(result.get(players[6])).toEqual(ColoredTeams.Green);
-    expect(result.get(players[7])).toEqual(ColoredTeams.Purple);
-    expect(result.get(players[8])).toEqual(ColoredTeams.Orange);
-    expect(result.get(players[9])).toEqual(ColoredTeams.Teal);
-    expect(result.get(players[10])).toEqual(ColoredTeams.Yellow);
-    expect(result.get(players[11])).toEqual(ColoredTeams.Green);
-    expect(result.get(players[12])).toEqual(ColoredTeams.Purple);
-    expect(result.get(players[13])).toEqual(ColoredTeams.Orange);
+    expect(result.get(players[7])).toEqual(ColoredTeams.Red);
   });
 
   it("should keep two friends on the same team", () => {
@@ -246,25 +140,6 @@ describe("assignTeams", () => {
     expect(result.get(players[0])).toEqual(result.get(players[1]));
   });
 
-  it("should merge friend and clan groups when they overlap", () => {
-    // 1 and 2 share clan CLANA, 2 is friends with 3 (no clan)
-    // → all three end up on the same team. 6 players, maxTeamSize = 3.
-    const players = [
-      createPlayerWithFriends("1", [], "CLANA"),
-      createPlayerWithFriends("2", ["3"], "CLANA"),
-      createPlayerWithFriends("3", [], undefined),
-      createPlayerWithFriends("4", [], undefined),
-      createPlayerWithFriends("5", [], undefined),
-      createPlayerWithFriends("6", [], undefined),
-    ];
-
-    const result = assignTeams(players, teams, false);
-
-    const teamOf1 = result.get(players[0]);
-    expect(result.get(players[1])).toEqual(teamOf1);
-    expect(result.get(players[2])).toEqual(teamOf1);
-  });
-
   it("should spill friend-group overflow to other teams (no kicks)", () => {
     // 4-player friend group + 2 strangers, maxTeamSize = ceil(6/2) = 3.
     // Friend overflow spills to the other team rather than getting kicked.
@@ -293,10 +168,10 @@ describe("assignTeams", () => {
     // keying on PlayerInfo.id ("player-1"/"player-2"), no edges would form
     // and these two would land on opposite teams.
     const players = [
-      createPlayerWithFriends("player-1", ["client-2"], undefined, "client-1"),
-      createPlayerWithFriends("player-2", ["client-1"], undefined, "client-2"),
-      createPlayerWithFriends("player-3", [], undefined, "client-3"),
-      createPlayerWithFriends("player-4", [], undefined, "client-4"),
+      createPlayerWithFriends("player-1", ["client-2"], "client-1"),
+      createPlayerWithFriends("player-2", ["client-1"], "client-2"),
+      createPlayerWithFriends("player-3", [], "client-3"),
+      createPlayerWithFriends("player-4", [], "client-4"),
     ];
 
     const result = assignTeams(players, teams, false);
@@ -311,7 +186,6 @@ describe("assignTeams", () => {
   const createPinnedPlayer = (
     id: string,
     teamIndex: number | null,
-    clan?: string,
     friends: string[] = [],
   ): PlayerInfo => {
     return new PlayerInfo(
@@ -320,7 +194,6 @@ describe("assignTeams", () => {
       id, // clientID
       id,
       false,
-      clan,
       friends,
       teamIndex,
     );
@@ -340,22 +213,6 @@ describe("assignTeams", () => {
     expect(result.get(players[1])).toEqual(ColoredTeams.Blue);
     expect(result.get(players[2])).toEqual(ColoredTeams.Blue);
     expect(result.get(players[3])).toEqual(ColoredTeams.Red);
-  });
-
-  it("should let pins override clan grouping", () => {
-    // Two clanmates matched onto opposite teams stay split: the matcher's
-    // balancing is authoritative over the clan all-on-one-team rule.
-    const players = [
-      createPinnedPlayer("1", 0, "CLANA"),
-      createPinnedPlayer("2", 1, "CLANA"),
-      createPinnedPlayer("3", 1),
-      createPinnedPlayer("4", 0),
-    ];
-
-    const result = assignTeams(players, teams, false);
-
-    expect(result.get(players[0])).toEqual(ColoredTeams.Red);
-    expect(result.get(players[1])).toEqual(ColoredTeams.Blue);
   });
 
   it("should balance unpinned players around pinned ones", () => {
@@ -391,7 +248,7 @@ describe("assignTeams", () => {
   it("should pull an unpinned friend toward a pinned player's team", () => {
     const players = [
       createPinnedPlayer("1", 0),
-      createPinnedPlayer("2", null, undefined, ["1"]),
+      createPinnedPlayer("2", null, ["1"]),
       createPinnedPlayer("3", null),
       createPinnedPlayer("4", null),
     ];

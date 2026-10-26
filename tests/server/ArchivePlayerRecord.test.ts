@@ -13,12 +13,6 @@ import {
 // What the game writes into the record it archives, driven through real
 // joins and starts and read off the injected archive.
 
-// Lets the fetchTribes .then/.catch chain settle.
-async function flushMicrotasks() {
-  await Promise.resolve();
-  await Promise.resolve();
-}
-
 describe("archived game records", () => {
   let archive: ReturnType<
     typeof vi.fn<(r: PartialGameRecord) => Promise<void>>
@@ -54,7 +48,7 @@ describe("archived game records", () => {
       clientID: ALICE,
       persistentID: "alice-pid",
       username: "alice",
-      clanTag: "AA",
+
       publicId: "alice-pub",
       friends: ["bob-pub"],
       ip: "1.1.1.1",
@@ -84,7 +78,7 @@ describe("archived game records", () => {
     expect(a).toMatchObject({
       clientID: ALICE,
       username: "alice",
-      clanTag: "AA",
+
       persistentID: "alice-pid",
       teamIndex: 0,
       friends: [BOB],
@@ -98,50 +92,6 @@ describe("archived game records", () => {
     // No friends in the game is recorded as the field being absent.
     expect(b.friends).toBeUndefined();
     expect(archived().info.winner).toEqual(["player", ALICE]);
-  });
-
-  it("records clan wars players under their team's clan, not the tag they joined with", async () => {
-    // The API rates clan wars by the clan tags in the record, so they come
-    // from the assignment: alice joined with another clan's tag, bob with
-    // none.
-    const ALICE = cid("alice");
-    const BOB = cid("bob");
-    const game = makeGame({
-      config: { gameType: GameType.Public },
-      matchmakingTeams: [["alice-pub"], ["bob-pub"]],
-      matchmakingClanTags: ["ALLY", "BETA"],
-      deps: { archive },
-    });
-    const alice = makeClient({
-      clientID: ALICE,
-      persistentID: "alice-pid",
-      username: "alice",
-      clanTag: "OTHER",
-      publicId: "alice-pub",
-      ip: "1.1.1.1",
-    });
-    const bob = makeClient({
-      clientID: BOB,
-      persistentID: "bob-pid",
-      username: "bob",
-      publicId: "bob-pub",
-      ip: "2.2.2.2",
-    });
-    game.joinClient(alice);
-    game.joinClient(bob);
-    startGame(game);
-
-    for (const c of [alice, bob]) {
-      await mockWsOf(c).emit({
-        type: "winner",
-        winner: ["player", ALICE],
-        allPlayersStats: {},
-      });
-    }
-
-    const [a, b] = archived().info.players;
-    expect(a).toMatchObject({ clientID: ALICE, clanTag: "ALLY", teamIndex: 0 });
-    expect(b).toMatchObject({ clientID: BOB, clanTag: "BETA", teamIndex: 1 });
   });
 
   it("records a player the winner vote has no stats for without a warn line", async () => {
@@ -192,44 +142,6 @@ describe("archived game records", () => {
     expect(log.debug).toHaveBeenCalledWith(
       expect.stringContaining(`Unable to find stats for clientID ${BOB}`),
     );
-  });
-
-  it("carries custom tribe names into the archived record for infra ingest and replays", async () => {
-    const fetchTribes = vi.fn(async () => [
-      { name: "Dragon Riders" },
-      { name: "Night Wolves" },
-    ]);
-    const game = makeGame({
-      config: { gameType: GameType.Public, bots: 2 },
-      deps: { archive, fetchTribes },
-    });
-    game.joinClient(makeClient({ publicId: "someone-pub" }));
-
-    game.prestart();
-    await flushMicrotasks();
-    game.start();
-    // Ending an unfinished game archives it as it stands.
-    await game.end();
-
-    expect(archive).toHaveBeenCalledTimes(1);
-    expect(archived().info.tribes).toEqual([
-      { name: "Dragon Riders" },
-      { name: "Night Wolves" },
-    ]);
-  });
-
-  it("omits tribes from the archived record when none were fetched", async () => {
-    const game = makeGame({
-      config: { gameType: GameType.Public, bots: 2 },
-      deps: { archive },
-    });
-    game.joinClient(makeClient());
-
-    startGame(game);
-    await game.end();
-
-    expect(archive).toHaveBeenCalledTimes(1);
-    expect(archived().info.tribes).toBeUndefined();
   });
 
   it("records the public lobby type for infra's per-type join rates", async () => {

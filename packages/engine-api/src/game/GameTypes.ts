@@ -133,19 +133,6 @@ export enum GameMode {
   Team = "Team",
 }
 
-export enum RankedType {
-  OneVOne = "1v1",
-  TwoVTwo = "2v2",
-  FreeForAll = "ffa",
-  ClanWars = "clanwars",
-}
-
-// Ranked FFA lobby size. The API's matcher assigns between these many players
-// and only rates a game whose roster is in this range, so a match that ends
-// up with fewer is cancelled before it starts.
-export const RANKED_FFA_MIN_PLAYERS = 4;
-export const RANKED_FFA_MAX_PLAYERS = 10;
-
 export const isGameMode = (value: unknown): value is GameMode =>
   isEnumValue(GameMode, value);
 
@@ -161,7 +148,6 @@ export interface PublicGameModifiers {
   isHardNations?: boolean;
   startingGold?: number;
   goldMultiplier?: number;
-  isAlliancesDisabled?: boolean;
   isPortsDisabled?: boolean;
   isNukesDisabled?: boolean;
   isSAMsDisabled?: boolean;
@@ -318,7 +304,6 @@ export class PlayerInfo {
     // TODO: make player id the small id
     public readonly id: PlayerID,
     public readonly isLobbyCreator: boolean = false,
-    public readonly clanTag: string | null = null,
     public readonly friends: ClientID[] = [],
     // Server-pinned team slot (index into the game's team list) for
     // matchmade team games; null = assign normally.
@@ -329,7 +314,7 @@ export class PlayerInfo {
     // name (e.g. India's and Pakistan's "Punjab").
     public readonly nationFlag: string | null = null,
   ) {
-    this.displayName = formatPlayerDisplayName(this.name, this.clanTag);
+    this.displayName = this.name;
   }
 }
 
@@ -344,7 +329,6 @@ export interface PlayerActions {
   canAttack: boolean;
   buildableUnits: BuildableUnit[];
   canSendEmojiAllPlayers: boolean;
-  canEmbargoAll?: boolean;
   interaction?: PlayerInteraction;
 }
 
@@ -394,7 +378,6 @@ export const STRUCTURE_BULK_STEPS: readonly number[] = [5, 10];
 
 export interface PlayerProfile {
   relations: Record<number, Relation>;
-  alliances: number[];
 }
 
 export interface PlayerBorderTiles {
@@ -426,24 +409,12 @@ export interface HumanDisconnects {
   disconnectedAt: Record<ClientID, number>;
 }
 
-export interface AllianceInfo {
-  expiresAt: Tick;
-  inExtensionWindow: boolean;
-  myPlayerAgreedToExtend: boolean;
-  otherAgreedToExtend: boolean;
-  canExtend: boolean;
-}
-
 export interface PlayerInteraction {
   sharedBorder: boolean;
   canSendEmoji: boolean;
-  canSendAllianceRequest: boolean;
-  canBreakAlliance: boolean;
   canTarget: boolean;
   canDonateGold: boolean;
   canDonateTroops: boolean;
-  canEmbargo: boolean;
-  allianceInfo?: AllianceInfo;
 }
 
 export interface EmojiMessage {
@@ -467,22 +438,15 @@ export enum MessageType {
   SAM_HIT,
   CAPTURED_ENEMY_UNIT,
   UNIT_DESTROYED,
-  ALLIANCE_ACCEPTED,
-  ALLIANCE_REJECTED,
-  ALLIANCE_REQUEST,
-  ALLIANCE_BROKEN,
-  ALLIANCE_EXPIRED,
   DONATION_SENT,
   DONATION_RECEIVED,
   CHAT,
-  RENEW_ALLIANCE,
 }
 
 // Message categories used for filtering events in the EventsDisplay
 export enum MessageCategory {
   ATTACK = "ATTACK",
   NUKE = "NUKE",
-  ALLIANCE = "ALLIANCE",
   TRADE = "TRADE",
   CHAT = "CHAT",
 }
@@ -502,12 +466,6 @@ export const MESSAGE_TYPE_CATEGORIES: Record<MessageType, MessageCategory> = {
   [MessageType.SAM_HIT]: MessageCategory.ATTACK,
   [MessageType.CAPTURED_ENEMY_UNIT]: MessageCategory.ATTACK,
   [MessageType.UNIT_DESTROYED]: MessageCategory.ATTACK,
-  [MessageType.ALLIANCE_ACCEPTED]: MessageCategory.ALLIANCE,
-  [MessageType.ALLIANCE_REJECTED]: MessageCategory.ALLIANCE,
-  [MessageType.ALLIANCE_REQUEST]: MessageCategory.ALLIANCE,
-  [MessageType.ALLIANCE_BROKEN]: MessageCategory.ALLIANCE,
-  [MessageType.ALLIANCE_EXPIRED]: MessageCategory.ALLIANCE,
-  [MessageType.RENEW_ALLIANCE]: MessageCategory.ALLIANCE,
   [MessageType.DONATION_SENT]: MessageCategory.TRADE,
   [MessageType.DONATION_RECEIVED]: MessageCategory.TRADE,
   [MessageType.CHAT]: MessageCategory.CHAT,
@@ -524,11 +482,4 @@ export interface NameViewData {
   x: number;
   y: number;
   size: number;
-}
-
-export function formatPlayerDisplayName(
-  username: string,
-  clanTag?: string | null,
-): string {
-  return clanTag ? `[${clanTag}] ${username}` : username;
 }

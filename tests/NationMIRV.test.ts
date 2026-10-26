@@ -596,7 +596,8 @@ describe("Nation MIRV Retaliation", () => {
       null,
       "team1_id",
       false,
-      "ALPHA",
+      [],
+      0,
     );
     const teamPlayer2Info = new PlayerInfo(
       "team_player_2",
@@ -604,7 +605,8 @@ describe("Nation MIRV Retaliation", () => {
       null,
       "team2_id",
       false,
-      "ALPHA",
+      [],
+      0,
     );
     const nationInfo = new PlayerInfo(
       "defender_nation",

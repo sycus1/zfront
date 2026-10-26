@@ -6,7 +6,6 @@ import {
 } from "@openfront/engine-api/game/GameTypes";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import { ConstructionExecution } from "@openfront/engine/execution/ConstructionExecution";
-import { NationAllianceBehavior } from "@openfront/engine/execution/nation/NationAllianceBehavior";
 import { NationAttackBehavior } from "@openfront/engine/execution/nation/NationAttackBehavior";
 import { NationEmojiBehavior } from "@openfront/engine/execution/nation/NationEmojiBehavior";
 import { NationWarshipBehavior } from "@openfront/engine/execution/nation/NationWarshipBehavior";
@@ -35,7 +34,6 @@ describe("Nation boats and hostile warships", () => {
 
     const random = new PseudoRandom(42);
     const emoji = new NationEmojiBehavior(random, game, nation);
-    const alliance = new NationAllianceBehavior(random, game, nation, emoji);
     const warships = new NationWarshipBehavior(random, game, nation, emoji);
     const behavior = new NationAttackBehavior(
       random,
@@ -44,7 +42,6 @@ describe("Nation boats and hostile warships", () => {
       0, // triggerRatio
       0, // reserveRatio
       0, // expandRatio
-      alliance,
       emoji,
       warships,
     );
@@ -111,19 +108,6 @@ describe("Nation boats and hostile warships", () => {
 
   it("Easy: sends the boat anyway", async () => {
     const { game, island, navy, behavior } = await setupBoats(Difficulty.Easy);
-    const water = game.ref(11, 12);
-    navy.buildUnit(UnitType.Warship, water, { patrolTile: water });
-    const spy = spyExecutions(game);
-    expect(behavior.sendAttack(island)).toBe(true);
-    expect(boatsSent(spy)).toHaveLength(1);
-  });
-
-  it("ignores warships of allies", async () => {
-    const { game, nation, island, navy, behavior } = await setupBoats(
-      Difficulty.Impossible,
-    );
-    navy.createAllianceRequest(nation)?.accept();
-    expect(navy.isAlliedWith(nation)).toBe(true);
     const water = game.ref(11, 12);
     navy.buildUnit(UnitType.Warship, water, { patrolTile: water });
     const spy = spyExecutions(game);
@@ -318,7 +302,6 @@ describe("Nation boat routes on open water", () => {
       0,
       0,
       0,
-      new NationAllianceBehavior(random, game, nation, emoji),
       emoji,
       new NationWarshipBehavior(random, game, nation, emoji),
     );

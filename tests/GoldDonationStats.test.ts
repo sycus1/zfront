@@ -1,4 +1,8 @@
-import { PlayerInfo, PlayerType } from "@openfront/engine-api/game/GameTypes";
+import {
+  ColoredTeams,
+  PlayerInfo,
+  PlayerType,
+} from "@openfront/engine-api/game/GameTypes";
 import {
   DONATION_BROKE_GOLD_THRESHOLD,
   DONATION_INDEX_GOLD_RECV,
@@ -8,6 +12,7 @@ import {
 import { DonateGoldExecution } from "@openfront/engine/execution/DonateGoldExecution";
 import { SpawnExecution } from "@openfront/engine/execution/SpawnExecution";
 import { Game, Player } from "@openfront/engine/game/Game";
+import { GameImpl } from "@openfront/engine/game/GameImpl";
 import { setup } from "./util/Setup";
 
 let game: Game;
@@ -130,10 +135,10 @@ describe("GoldDonationStats", () => {
 });
 
 describe("GoldDonationStats through DonateGoldExecution", () => {
-  test("an allied donation is recorded on the recipient", async () => {
+  test("a teammate donation is recorded on the recipient", async () => {
     game = await setup("ocean_and_land", { donateGold: true });
-    game.addPlayer(donorInfo);
-    game.addPlayer(recipientInfo);
+    (game as GameImpl).addPlayer(donorInfo, ColoredTeams.Red);
+    (game as GameImpl).addPlayer(recipientInfo, ColoredTeams.Red);
     donor = game.player("donor");
     recipient = game.player("recipient");
 
@@ -141,7 +146,6 @@ describe("GoldDonationStats through DonateGoldExecution", () => {
       new SpawnExecution("game_id", donorInfo, game.ref(0, 10)),
       new SpawnExecution("game_id", recipientInfo, game.ref(0, 15)),
     );
-    donor.createAllianceRequest(recipient)?.accept();
     game.executeNextTick();
 
     donor.addGold(500_000n);

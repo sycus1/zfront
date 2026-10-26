@@ -50,7 +50,6 @@ describe("TrainStation", () => {
       addTrainGold: vi.fn(),
       id: 1,
       canTrade: vi.fn().mockReturnValue(true),
-      isAlliedWith: vi.fn().mockReturnValue(false),
       isOnSameTeam: vi.fn().mockReturnValue(false),
       isFriendly: vi.fn().mockReturnValue(false),
     } as any;
@@ -100,7 +99,6 @@ describe("TrainStation", () => {
       addTrainGold: vi.fn(),
       id: 1,
       canTrade: vi.fn().mockReturnValue(true),
-      isAlliedWith: vi.fn().mockReturnValue(false),
       isOnSameTeam: vi.fn().mockReturnValue(false),
     } as any;
     const trainOwner = {
@@ -108,7 +106,6 @@ describe("TrainStation", () => {
       addTrainGold: vi.fn(),
       id: 2,
       canTrade: vi.fn().mockReturnValue(true),
-      isAlliedWith: vi.fn().mockReturnValue(false),
       isOnSameTeam: vi.fn().mockReturnValue(false),
     } as any;
 
@@ -214,7 +211,7 @@ describe("EngineConfig.trainGold trade stop penalty", () => {
 
   beforeEach(() => {
     const gameConfig: GameConfig = {
-      gameMap: GameMapType.Asia,
+      gameMap: GameMapType.Britannia,
       gameMapSize: GameMapSize.Normal,
       gameMode: GameMode.FFA,
       gameType: GameType.Singleplayer,
@@ -247,16 +244,6 @@ describe("EngineConfig.trainGold trade stop penalty", () => {
   it("floors at 5k when penalty exceeds base gold", () => {
     // stop 12: effective = 3 -> 10k - 15k -> floor at 5k
     expect(config.trainGold("self", 12, mockPlayer)).toBe(5_000n);
-  });
-
-  it("floors at 5k for ally base even with heavy penalty", () => {
-    // ally base 35k, stop 20: effective = 11 -> penalty 55k -> floor at 5k
-    expect(config.trainGold("ally", 20, mockPlayer)).toBe(5_000n);
-  });
-
-  it("ally base gold reduces correctly after free window", () => {
-    // ally base 35k, stop 11: effective = 2 -> 35k - 10k = 25k
-    expect(config.trainGold("ally", 11, mockPlayer)).toBe(25_000n);
   });
 
   it("other/team base gold reduces correctly after free window", () => {

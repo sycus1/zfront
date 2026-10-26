@@ -4,19 +4,16 @@ import type { ColumnId, StatsTableKind } from "../../../StatsConstants";
 import { formatPercentage, translateText } from "../../../Utils";
 import type { GameView, PlayerView } from "../../../view";
 import {
-  allianceIcon,
   cityIcon,
   claimIcon,
   factoryIcon,
   goldCoinIcon,
-  guildIcon,
   missileSiloIcon,
   portIcon,
   profileIcon,
   samLauncherIcon,
   soldierIcon,
   teamIcon,
-  traitorIcon,
   upperLimitIcon,
   warshipIcon,
 } from "../../HotbarIcons";
@@ -47,7 +44,6 @@ export type ColumnAlignment = "start" | "center" | "end";
 export interface ColumnRow {
   readonly position: number;
   readonly name: string;
-  readonly clanTag?: string | null;
   readonly value: number;
 }
 
@@ -118,16 +114,6 @@ export const COLUMN_DEFS: readonly ColumnDef[] = [
     align: "center",
     isHideable: false,
     cell: (row) => String(row.position),
-  }),
-  defineColumn({
-    id: "clan",
-    labelKey: "leaderboard.clan",
-    headerVisual: { kind: "icon", src: guildIcon },
-    // Fits "WWWWW" — the widest 5-character tag — in the row font.
-    width: "80px",
-    align: "center",
-    kinds: ["player"],
-    cell: (row) => row.clanTag ?? "",
   }),
   defineColumn({
     id: "player",
@@ -281,22 +267,6 @@ export const COLUMN_DEFS: readonly ColumnDef[] = [
   ),
   unitColumn("sams", "leaderboard.sams", UnitType.SAMLauncher, samLauncherIcon),
   unitColumn("warships", "leaderboard.warships", UnitType.Warship, warshipIcon),
-  defineColumn({
-    id: "allies",
-    labelKey: "leaderboard.allies",
-    headerVisual: { kind: "icon", src: allianceIcon },
-    align: "center",
-    value: (player) => player.allies().length,
-    cell: (row) => renderNumber(row.value),
-  }),
-  defineColumn({
-    id: "betrayals",
-    labelKey: "leaderboard.betrayals",
-    headerVisual: { kind: "icon", src: traitorIcon },
-    align: "center",
-    value: (player) => player.betrayals(),
-    cell: (row) => renderNumber(row.value),
-  }),
 ];
 
 export function columnsFor(kind: StatsTableKind): readonly ColumnDef[] {

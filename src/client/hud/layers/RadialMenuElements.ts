@@ -31,7 +31,6 @@ import {
   BuildUnitIntentEvent,
   SendUpgradeStructureIntentEvent,
 } from "../../Transport";
-const allianceIcon = assetUrl("images/AllianceIconWhite.svg");
 const boatIcon = assetUrl("images/BoatIconWhite.svg");
 const buildIcon = assetUrl("images/BuildIconWhite.svg");
 const chatIcon = assetUrl("images/ChatIconWhite.svg");
@@ -41,7 +40,6 @@ const emojiIcon = assetUrl("images/EmojiIconWhite.svg");
 const infoIcon = assetUrl("images/InfoIcon.svg");
 const swordIcon = assetUrl("images/SwordIconWhite.svg");
 const targetIcon = assetUrl("images/TargetIconWhite.svg");
-const traitorIcon = assetUrl("images/TraitorIconWhite.svg");
 const xIcon = assetUrl("images/XIcon.svg");
 
 export interface MenuElementParams {
@@ -76,8 +74,6 @@ export interface MenuElement {
   action?: (params: MenuElementParams) => void; // For leaf items that perform actions
   subMenu?: (params: MenuElementParams) => MenuElement[]; // For non-leaf items that open submenus
 
-  renderType?: string;
-
   timerFraction?: (params: MenuElementParams) => number; // 0..1, for arc timer overlay
 }
 
@@ -98,8 +94,6 @@ export const COLORS = {
   boat: "#2a82c9",
   disabled: "#94a3b8",
   ally: "#4ade80",
-  breakAlly: "#dc2626",
-  breakAllyNoDebuff: "#d97706",
   delete: "#ef4444",
   info: "#475569",
   target: "#ef4444",
@@ -107,7 +101,6 @@ export const COLORS = {
   infoDetails: "#7f8c8d",
   infoEmoji: "#fbbf24",
   trade: "#0891b2",
-  embargo: "#7c3aed",
   tooltip: {
     cost: "#f59e0b",
     count: "#94a3b8",
@@ -167,7 +160,6 @@ const infoChatElement: MenuElement = {
       })),
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const allyTargetElement: MenuElement = {
   id: "ally_target",
   name: "target",
@@ -179,107 +171,6 @@ const allyTargetElement: MenuElement = {
   icon: targetIcon,
   action: (params: MenuElementParams) => {
     params.playerActionHandler.handleTargetPlayer(params.selected!.id());
-    params.closeMenu();
-  },
-};
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const allyTradeElement: MenuElement = {
-  id: "ally_trade",
-  name: "trade",
-  disabled: (params: MenuElementParams) =>
-    !!params.playerActions?.interaction?.canEmbargo,
-  displayed: (params: MenuElementParams) =>
-    !params.playerActions?.interaction?.canEmbargo,
-  color: COLORS.trade,
-  text: translateText("player_panel.start_trade"),
-  action: (params: MenuElementParams) => {
-    params.playerActionHandler.handleEmbargo(params.selected!, "stop");
-    params.closeMenu();
-  },
-};
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const allyEmbargoElement: MenuElement = {
-  id: "ally_embargo",
-  name: "embargo",
-  disabled: (params: MenuElementParams) =>
-    !params.playerActions?.interaction?.canEmbargo,
-  displayed: (params: MenuElementParams) =>
-    !!params.playerActions?.interaction?.canEmbargo,
-  color: COLORS.embargo,
-  text: translateText("player_panel.stop_trade"),
-  action: (params: MenuElementParams) => {
-    params.playerActionHandler.handleEmbargo(params.selected!, "start");
-    params.closeMenu();
-  },
-};
-
-const allyRequestElement: MenuElement = {
-  id: "ally_request",
-  name: "request",
-  disabled: (params: MenuElementParams) =>
-    !params.playerActions?.interaction?.canSendAllianceRequest,
-  displayed: (params: MenuElementParams) =>
-    !params.playerActions?.interaction?.canBreakAlliance,
-  color: COLORS.ally,
-  icon: allianceIcon,
-  action: (params: MenuElementParams) => {
-    params.playerActionHandler.handleAllianceRequest(
-      params.myPlayer,
-      params.selected!,
-    );
-    params.closeMenu();
-  },
-};
-
-const allyExtendElement: MenuElement = {
-  id: "ally_extend",
-  name: "extend",
-  displayed: (params: MenuElementParams) =>
-    !!params.playerActions?.interaction?.allianceInfo?.inExtensionWindow,
-  disabled: (params: MenuElementParams) =>
-    !params.playerActions?.interaction?.allianceInfo?.canExtend,
-  color: COLORS.ally,
-  icon: allianceIcon,
-  action: (params: MenuElementParams) => {
-    if (!params.playerActions?.interaction?.allianceInfo?.canExtend) return;
-    params.playerActionHandler.handleExtendAlliance(params.selected!);
-    params.closeMenu();
-  },
-  timerFraction: (params: MenuElementParams): number => {
-    const interaction = params.playerActions?.interaction;
-    if (!interaction?.allianceInfo) return 1;
-    const remaining = Math.max(
-      0,
-      interaction.allianceInfo.expiresAt - params.game.ticks(),
-    );
-    const extensionWindow = Math.max(
-      1,
-      params.game.config().allianceExtensionPromptOffset(),
-    );
-    return Math.max(0, Math.min(1, remaining / extensionWindow));
-  },
-  renderType: "allyExtend",
-};
-
-const allyBreakElement: MenuElement = {
-  id: "ally_break",
-  name: "break",
-  disabled: (params: MenuElementParams) =>
-    !params.playerActions?.interaction?.canBreakAlliance,
-  displayed: (params: MenuElementParams) =>
-    !!params.playerActions?.interaction?.canBreakAlliance,
-  color: (params: MenuElementParams) =>
-    params.selected?.isTraitor() || params.selected?.isDisconnected()
-      ? COLORS.breakAllyNoDebuff
-      : COLORS.breakAlly,
-  icon: traitorIcon,
-  action: (params: MenuElementParams) => {
-    params.playerActionHandler.handleBreakAlliance(
-      params.myPlayer,
-      params.selected!,
-    );
     params.closeMenu();
   },
 };
@@ -781,16 +672,12 @@ export const rootMenuElement: MenuElement = {
   icon: infoIcon,
   color: COLORS.info,
   subMenu: (params: MenuElementParams) => {
-    const isAllied = params.selected?.isAlliedWith(params.myPlayer);
     const isDisconnected = isDisconnectedTarget(params);
 
     const tileOwner = params.game.owner(params.tile);
     const isOwnTerritory =
       tileOwner.isPlayer() &&
       (tileOwner as PlayerView).id() === params.myPlayer.id();
-
-    const inExtensionWindow =
-      params.playerActions.interaction?.allianceInfo?.inExtensionWindow;
 
     // After game-over, nukes can target teammates in multiplayer (nukeSpawn allows it,
     // but not in singleplayer). Show the attack submenu so mobile users can access
@@ -806,10 +693,10 @@ export const rootMenuElement: MenuElement = {
     const menuItems: (MenuElement | null)[] = [
       infoMenuElement,
       ...(isOwnTerritory
-        ? [deleteUnitElement, allyRequestElement, buildMenuElement]
+        ? [deleteUnitElement, buildMenuElement]
         : [
-            isAllied && !isDisconnected ? allyBreakElement : boatMenuElement,
-            inExtensionWindow ? allyExtendElement : allyRequestElement,
+            boatMenuElement,
+            allyTargetElement,
             showDonateInsteadOfAttack
               ? donateGoldRadialElement
               : attackMenuElement,

@@ -9,8 +9,6 @@ import {
   HumansVsNations,
   PublicGameModifiers,
   Quads,
-  RANKED_FFA_MAX_PLAYERS,
-  RankedType,
   Trios,
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
@@ -73,7 +71,6 @@ type ModifierKey =
   | "startingGold5M"
   | "startingGold25M"
   | "goldMultiplier"
-  | "isAlliancesDisabled"
   | "isNukesDisabled"
   | "isSAMsDisabled"
   | "isPeaceTime"
@@ -91,7 +88,6 @@ const SPECIAL_MODIFIER_POOL: ModifierKey[] = [
   ...Array<ModifierKey>(4).fill("startingGold5M"),
   ...Array<ModifierKey>(3).fill("startingGold25M"),
   ...Array<ModifierKey>(6).fill("goldMultiplier"),
-  ...Array<ModifierKey>(1).fill("isAlliancesDisabled"),
   ...Array<ModifierKey>(1).fill("isNukesDisabled"),
   ...Array<ModifierKey>(1).fill("isSAMsDisabled"),
   ...Array<ModifierKey>(1).fill("isPeaceTime"),
@@ -223,7 +219,6 @@ export class MapPlaylist {
       bots: isCompact ? 100 : 400,
       spawnImmunityDuration: this.getSpawnImmunityDuration(playerTeams),
       disabledUnits: [],
-      disableClanTags: mode === GameMode.FFA ? true : undefined,
       // Overtime (the win threshold sinking after 30 minutes) is the default
       // for every public FFA game, so it carries no lobby modifier badge.
       overtime: mode === GameMode.FFA ? { enabled: true } : undefined,
@@ -259,11 +254,6 @@ export class MapPlaylist {
       playerTeams === Quads
     ) {
       excludedModifiers.push("isRandomSpawn");
-    }
-
-    // No gold multi on FourIslands team games - Too high chance of 3h long stalemates
-    if (map === GameMapType.FourIslands && mode === GameMode.Team) {
-      excludedModifiers.push("goldMultiplier");
     }
 
     // Hard nations modifier only applies when nations are present (not HvN, which is always hard)
@@ -334,7 +324,6 @@ export class MapPlaylist {
       isCompact,
       isRandomSpawn,
       goldMultiplier,
-      isAlliancesDisabled,
       isHardNations,
       isNukesDisabled,
       isSAMsDisabled,
@@ -352,7 +341,6 @@ export class MapPlaylist {
     if (appliedForced.has("startingGold5M")) startingGold = 5_000_000;
     if (appliedForced.has("startingGold25M")) startingGold = 25_000_000;
     if (appliedForced.has("goldMultiplier")) goldMultiplier = 2;
-    if (appliedForced.has("isAlliancesDisabled")) isAlliancesDisabled = true;
     if (appliedForced.has("isNukesDisabled")) isNukesDisabled = true;
     if (appliedForced.has("isSAMsDisabled")) isSAMsDisabled = true;
     if (appliedForced.has("isPeaceTime")) isPeaceTime = true;
@@ -374,7 +362,6 @@ export class MapPlaylist {
           !isHardNations &&
           startingGold === undefined &&
           goldMultiplier === undefined &&
-          !isAlliancesDisabled &&
           !isNukesDisabled &&
           !isSAMsDisabled &&
           !isPeaceTime &&
@@ -391,7 +378,6 @@ export class MapPlaylist {
             isCompact,
             startingGold,
             goldMultiplier,
-            isAlliancesDisabled,
             isNukesDisabled,
             isSAMsDisabled,
             isPeaceTime,
@@ -459,7 +445,6 @@ export class MapPlaylist {
         isHardNations,
         startingGold,
         goldMultiplier,
-        isAlliancesDisabled,
         isNukesDisabled,
         isSAMsDisabled,
         isPeaceTime,
@@ -479,7 +464,6 @@ export class MapPlaylist {
         : undefined,
       startingGold,
       goldMultiplier,
-      disableAlliances: isAlliancesDisabled ? true : undefined,
       difficulty:
         isHardNations || playerTeams === HumansVsNations
           ? Difficulty.Hard
@@ -498,148 +482,6 @@ export class MapPlaylist {
         this.getSpawnImmunityDuration(playerTeams, startingGold),
       disabledUnits,
       waterNukes: isWaterNukes ? true : undefined,
-      disableClanTags: mode === GameMode.FFA ? true : undefined,
-    } satisfies GameConfig;
-  }
-
-  public get1v1Config(): GameConfig {
-    const maps = [
-      GameMapType.Australia, // 40%
-      GameMapType.Australia,
-      GameMapType.Iceland, // 20%
-      GameMapType.Asia, // 20%
-      GameMapType.EuropeClassic, // 20%
-    ];
-    const isCompact = Math.random() < 0.2;
-    return {
-      donateGold: false,
-      donateTroops: false,
-      gameMap: maps[Math.floor(Math.random() * maps.length)],
-      maxPlayers: 2,
-      gameType: GameType.Public,
-      gameMapSize: isCompact ? GameMapSize.Compact : GameMapSize.Normal,
-      difficulty: Difficulty.Medium, // Doesn't matter, nations are disabled
-      rankedType: RankedType.OneVOne,
-      infiniteGold: false,
-      infiniteTroops: false,
-      maxTimerValue: isCompact ? 10 : 15,
-      instantBuild: false,
-      randomSpawn: false,
-      nations: "disabled",
-      gameMode: GameMode.FFA,
-      bots: isCompact ? 100 : 400,
-      spawnImmunityDuration: 30 * 10,
-      disabledUnits: [],
-    } satisfies GameConfig;
-  }
-
-  public get2v2Config(): GameConfig {
-    const maps = [
-      GameMapType.Australia, // 40%
-      GameMapType.Australia,
-      GameMapType.Iceland, // 20%
-      GameMapType.Asia, // 20%
-      GameMapType.EuropeClassic, // 20%
-    ];
-    const isCompact = Math.random() < 0.5;
-    return {
-      donateGold: true,
-      donateTroops: true,
-      gameMap: maps[Math.floor(Math.random() * maps.length)],
-      maxPlayers: 4,
-      gameType: GameType.Public,
-      gameMapSize: isCompact ? GameMapSize.Compact : GameMapSize.Normal,
-      difficulty: Difficulty.Medium, // Doesn't matter, nations are disabled
-      rankedType: RankedType.TwoVTwo,
-      infiniteGold: false,
-      infiniteTroops: false,
-      maxTimerValue: isCompact ? 10 : 15,
-      instantBuild: false,
-      randomSpawn: false,
-      nations: "disabled",
-      gameMode: GameMode.Team,
-      playerTeams: 2,
-      bots: isCompact ? 100 : 400,
-      spawnImmunityDuration: 60 * 10,
-      disabledUnits: [],
-    } satisfies GameConfig;
-  }
-
-  // maxPlayers is the most a match can have; the check-in lowers it to the
-  // size of the assigned match, so the game starts once everyone is in.
-  public getFfaConfig(): GameConfig {
-    const maps = [
-      GameMapType.Europe,
-      GameMapType.Asia,
-      GameMapType.Africa,
-      GameMapType.NorthAmerica,
-      GameMapType.SouthAmerica,
-      GameMapType.Australia,
-    ];
-    return {
-      donateGold: false,
-      donateTroops: false,
-      gameMap: maps[Math.floor(Math.random() * maps.length)],
-      maxPlayers: RANKED_FFA_MAX_PLAYERS,
-      gameType: GameType.Public,
-      gameMapSize: GameMapSize.Normal,
-      difficulty: Difficulty.Medium, // Doesn't matter, nations are disabled
-      rankedType: RankedType.FreeForAll,
-      infiniteGold: false,
-      infiniteTroops: false,
-      maxTimerValue: 20,
-      instantBuild: false,
-      randomSpawn: false,
-      nations: "disabled",
-      gameMode: GameMode.FFA,
-      bots: 400,
-      spawnImmunityDuration: 30 * 10,
-      disabledUnits: [],
-      // Same as public FFA: no tags to rally a clan around.
-      disableClanTags: true,
-    } satisfies GameConfig;
-  }
-
-  // A clan wars match is teamCount clans of playerCount / teamCount players
-  // each (2v2 up to four teams of 5). Small matches play the ranked 2v2 maps;
-  // bigger ones the continent maps ranked FFA uses.
-  public getClanWarsConfig(teamCount: number, playerCount: number): GameConfig {
-    const small = playerCount <= 6;
-    const maps = small
-      ? [
-          GameMapType.Australia,
-          GameMapType.Iceland,
-          GameMapType.Asia,
-          GameMapType.EuropeClassic,
-        ]
-      : [
-          GameMapType.Europe,
-          GameMapType.Asia,
-          GameMapType.Africa,
-          GameMapType.NorthAmerica,
-          GameMapType.SouthAmerica,
-          GameMapType.Australia,
-        ];
-    return {
-      donateGold: true,
-      donateTroops: true,
-      gameMap: maps[Math.floor(Math.random() * maps.length)],
-      maxPlayers: playerCount,
-      gameType: GameType.Public,
-      gameMapSize: GameMapSize.Normal,
-      difficulty: Difficulty.Medium, // Doesn't matter, nations are disabled
-      rankedType: RankedType.ClanWars,
-      infiniteGold: false,
-      infiniteTroops: false,
-      maxTimerValue: small ? 15 : 20,
-      instantBuild: false,
-      randomSpawn: false,
-      nations: "disabled",
-      gameMode: GameMode.Team,
-      playerTeams: teamCount,
-      bots: 400,
-      spawnImmunityDuration: 60 * 10,
-      disabledUnits: [],
     } satisfies GameConfig;
   }
 
@@ -838,7 +680,6 @@ export class MapPlaylist {
             ? 1_000_000
             : undefined,
       goldMultiplier: selected.has("goldMultiplier") ? 2 : undefined,
-      isAlliancesDisabled: selected.has("isAlliancesDisabled") || undefined,
       isNukesDisabled: selected.has("isNukesDisabled") || undefined,
       isSAMsDisabled: selected.has("isSAMsDisabled") || undefined,
       isPeaceTime: selected.has("isPeaceTime") || undefined,

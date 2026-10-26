@@ -19,11 +19,10 @@ import { createGame, L, W } from "./core/pathfinding/_fixtures";
 const TRAIN_GOLD: Record<string, bigint> = {
   self: 10_000n,
   team: 25_000n,
-  ally: 35_000n,
   other: 25_000n,
 };
 
-const MAX_TRADE_GOLD = Number(TRAIN_GOLD.ally); // denominator
+const MAX_TRADE_GOLD = Number(TRAIN_GOLD.team); // denominator
 
 // ── Factory helpers ──────────────────────────────────────────────────────────
 
@@ -53,7 +52,6 @@ function makePlayer(
   opts: {
     canTrade?: (n: any) => boolean;
     isOnSameTeam?: (n: any) => boolean;
-    isAlliedWith?: (n: any) => boolean;
   } = {},
 ): any {
   return {
@@ -61,7 +59,6 @@ function makePlayer(
     nearby: vi.fn(() => neighborList),
     canTrade: vi.fn((n: any) => opts.canTrade?.(n) ?? true),
     isOnSameTeam: vi.fn((n: any) => opts.isOnSameTeam?.(n) ?? false),
-    isAlliedWith: vi.fn((n: any) => opts.isAlliedWith?.(n) ?? false),
   };
 }
 
@@ -114,7 +111,6 @@ describe("NationStructurePlacement.startRound", () => {
 
 describe("NationStructurePlacement.buildReachableStations", () => {
   const selfWeight = Number(TRAIN_GOLD.self) / MAX_TRADE_GOLD;
-  const allyWeight = Number(TRAIN_GOLD.ally) / MAX_TRADE_GOLD;
   const teamWeight = Number(TRAIN_GOLD.team) / MAX_TRADE_GOLD;
   const otherWeight = Number(TRAIN_GOLD.other) / MAX_TRADE_GOLD;
 
@@ -181,7 +177,7 @@ describe("NationStructurePlacement.buildReachableStations", () => {
     expect(result).toHaveLength(0);
   });
 
-  it("excludes embargoed (canTrade = false) neighbors", () => {
+  it("excludes neighbors it can't trade with", () => {
     const unit = makeUnit(50);
     const station = makeStation(unit, null);
     const neighbor = makeNeighbor({ units: [unit] });
@@ -193,7 +189,7 @@ describe("NationStructurePlacement.buildReachableStations", () => {
     expect(result).toHaveLength(0);
   });
 
-  it("includes non-embargoed neutral neighbor with 'other' weight", () => {
+  it("includes a neutral neighbor with 'other' weight", () => {
     const unit = makeUnit(60);
     const cluster = new Cluster();
     const station = makeStation(unit, cluster);
@@ -201,7 +197,6 @@ describe("NationStructurePlacement.buildReachableStations", () => {
     const player = makePlayer([], [neighbor], {
       canTrade: () => true,
       isOnSameTeam: () => false,
-      isAlliedWith: () => false,
     });
     const behavior = makePlacement(makeGame([station]), player);
 
@@ -213,31 +208,13 @@ describe("NationStructurePlacement.buildReachableStations", () => {
     expect(result[0].weight).toBeCloseTo(otherWeight);
   });
 
-  it("uses 'ally' weight for allied neighbor", () => {
-    const unit = makeUnit(70);
-    const station = makeStation(unit, null);
-    const neighbor = makeNeighbor({ units: [unit] });
-    const player = makePlayer([], [neighbor], {
-      canTrade: () => true,
-      isOnSameTeam: () => false,
-      isAlliedWith: (n) => n === neighbor,
-    });
-    const behavior = makePlacement(makeGame([station]), player);
-
-    const result = (behavior as any).buildReachableStations();
-
-    expect(result).toHaveLength(1);
-    expect(result[0].weight).toBeCloseTo(allyWeight);
-  });
-
-  it("uses 'team' weight for team neighbor (team check precedes ally)", () => {
+  it("uses 'team' weight for team neighbor", () => {
     const unit = makeUnit(80);
     const station = makeStation(unit, null);
     const neighbor = makeNeighbor({ units: [unit] });
     const player = makePlayer([], [neighbor], {
       canTrade: () => true,
       isOnSameTeam: (n) => n === neighbor,
-      isAlliedWith: () => false,
     });
     const behavior = makePlacement(makeGame([station]), player);
 

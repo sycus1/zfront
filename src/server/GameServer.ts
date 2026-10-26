@@ -1,13 +1,5 @@
-import {
-  GameMode,
-  GameType,
-  HumansVsNations,
-  PlayerInfo,
-  PlayerType,
-  RANKED_FFA_MIN_PLAYERS,
-  RankedType,
-} from "@openfront/engine-api/game/GameTypes";
-import { maps } from "@openfront/engine-api/game/Maps.gen";
+import { GameType } from "@openfront/engine-api/game/GameTypes";
+
 import {
   AllPlayersStats,
   ClientID,
@@ -16,15 +8,10 @@ import {
   GameID,
   Intent,
   StampedIntent,
-  TeamCountConfig,
-  Tribe,
   Turn,
   Winner,
 } from "@openfront/engine-api/Schemas";
-import {
-  assignTeamsLobbyPreview,
-  resolveTeamsList,
-} from "@openfront/engine-lib/game/TeamAssignment";
+
 import { isAdminRole } from "@openfront/shared/ApiSchemas";
 import { CloseCode, CloseReason } from "@openfront/shared/CloseCodes";
 import { GameEnv } from "@openfront/shared/configuration/Env";
@@ -67,7 +54,6 @@ import { archive, finalizeGameRecord } from "./Archive";
 import { Client } from "./Client";
 import { applyGameConfigPatch, hostCheatsEnabled } from "./ConfigPatch";
 import { LiveStatsVote, voteKey, WinnerVote } from "./Consensus";
-import { fetchCustomTribes } from "./CustomTribes";
 import { DesyncDetector } from "./DesyncDetector";
 import { Gatekeeper, MatchGatekeeper, noopGatekeeper } from "./Gatekeeper";
 import {
@@ -140,7 +126,6 @@ const KICK_REASON_DUPLICATE_SESSION = "kick_reason.duplicate_session";
 const KICK_REASON_LOBBY_CREATOR = "kick_reason.lobby_creator";
 const KICK_REASON_ADMIN = "kick_reason.admin";
 const KICK_REASON_HOST_LEFT = "kick_reason.host_left";
-const KICK_REASON_MATCH_CANCELLED = "kick_reason.match_cancelled";
 
 export interface GameServerOptions {
   id: string;
@@ -153,8 +138,6 @@ export interface GameServerOptions {
   // Matchmade team split from the matchmaking assignment: publicIds per
   // team. At start each client is stamped with its team's index.
   matchmakingTeams?: string[][];
-  // Clan wars: the clan each matchmade team plays for, in team order.
-  matchmakingClanTags?: string[];
 }
 
 // Everything a GameServer reaches outside itself for. Production takes the
@@ -171,7 +154,6 @@ export interface GameServerDeps {
   replayWinner: WinnerReplayer;
   // Replays waiting or running on this worker, against LONE_VOTER_REPLAY_CAP.
   replayPending: () => number;
-  fetchTribes: typeof fetchCustomTribes;
   env: () => GameEnv;
   turnIntervalMs: () => number;
   gatekeeper: Gatekeeper;
@@ -195,7 +177,6 @@ export function defaultGameServerDeps(): GameServerDeps {
     archive: (record) => archive(finalizeGameRecord(record)),
     replayWinner: replayWinnerInChild,
     replayPending: () => winnerReplayMetrics.pending,
-    fetchTribes: fetchCustomTribes,
     env: () => ServerEnv.env(),
     turnIntervalMs: () => ServerEnv.turnIntervalMs(),
     gatekeeper: noopGatekeeper,
@@ -246,9 +227,8 @@ export class GameServer {
 
   // Note: This can be undefined if accessed before the game starts.
   private gameStartInfo!: WireGameStartInfo;
-  // Wire-only copy of gameStartInfo sent to clients. Identical to
-  // gameStartInfo unless disableClanTags is set, in which case clan tags
-  // are stripped from players. Archive uses the original gameStartInfo.
+  // Wire-only copy of gameStartInfo sent to clients, plus the listing flag.
+  // Archive uses the original gameStartInfo.
   private wireGameStartInfo!: WireGameStartInfo;
 
   // clientID dictionary for the binary wire, seeded from gameStartInfo.players
@@ -261,7 +241,6 @@ export class GameServer {
 
   // Purchased bot tribe names drawn for this game, set when the prestart
   // fetch lands (undefined until then / on fetch failure / non-public games).
-  private tribes?: Tribe[];
 
   // The end-of-game winner vote and the running live-stats vote: both
   // IP-weighted majorities among the players (see Consensus.ts).
@@ -309,10 +288,9 @@ export class GameServer {
   // Matchmade team split from the matchmaking assignment: publicIds per
   // team. At start each client is stamped with its team's index.
   private matchmakingTeams?: string[][];
-  private matchmakingClanTags?: string[];
   private readonly deps: GameServerDeps;
-  // Who may see whose real identity (anonymizeNames / pinned teams / admin
-  // clan-tag reveal); shapes the per-viewer lobby roster and start message.
+  // Who may see whose real identity (anonymizeNames / pinned teams); shapes
+  // the per-viewer lobby roster and start message.
   private readonly names: NameVisibility;
 
   constructor(opts: GameServerOptions, deps: Partial<GameServerDeps> = {}) {
@@ -323,7 +301,6 @@ export class GameServer {
     this.startsAt = opts.startsAt;
     this.publicGameType = opts.publicGameType;
     this.matchmakingTeams = opts.matchmakingTeams;
-    this.matchmakingClanTags = opts.matchmakingClanTags;
     this.deps = { ...defaultGameServerDeps(), ...deps };
     this.groupToken = this.deps.mintGroupToken();
     this.gatekeeper = this.deps.gatekeeper.matchOpened({ gameID: opts.id });
@@ -408,7 +385,6 @@ export class GameServer {
     const denied = authorizeIntent(intent, actor, {
       isPublic: this.isPublic(),
       isListed: this.isListed(),
-      isQueued: this.listing.isQueued(),
       hasStarted: this.hasStarted(),
     });
     if (denied !== null) {
@@ -527,14 +503,12 @@ export class GameServer {
   // Screened identity stored for this player's client record, or null if
   // the record (or its reconnect mapping) is gone. Lets the join path skip
   // re-screening a reconnect whose submitted identity is unchanged.
-  public storedIdentity(
-    persistentID: string,
-  ): { username: string; clanTag: string | null } | null {
+  public storedIdentity(persistentID: string): { username: string } | null {
     const clientID = this.getClientIdForPersistentId(persistentID);
     if (clientID === null) return null;
     const client = this.clients.get(clientID);
     if (client === undefined) return null;
-    return { username: client.username, clanTag: client.clanTag };
+    return { username: client.username };
   }
 
   public joinClient(client: Client): JoinResult {
@@ -725,7 +699,7 @@ export class GameServer {
     ws: WebSocket,
     persistentID: string,
     lastTurn: number = 0,
-    identityUpdate?: { username: string; clanTag: string | null },
+    identityUpdate?: { username: string },
   ): boolean {
     // As in joinClient: an ended game may still be in GameManager until its
     // next tick, and the roster still holds the reconnect mapping.
@@ -750,7 +724,6 @@ export class GameServer {
         delete client.cosmetics.verified;
       }
       client.username = identityUpdate.username;
-      client.clanTag = identityUpdate.clanTag;
     }
     client.lastPing = Date.now();
     this.markClientDisconnected(client.clientID, false);
@@ -897,45 +870,6 @@ export class GameServer {
     return this.desync.count();
   }
 
-  // Matchmade ranked games (1v1/2v2/clan wars) must start with full
-  // attendance: the roster freezes at start(), so a game missing a player
-  // would run short-handed only to be voided by the sim (2v2, clan wars) or
-  // hand out a walkover the absent player never contested (1v1). Ranked FFA
-  // starts without the missing players as long as RANKED_FFA_MIN_PLAYERS
-  // showed up, the fewest the API rates. Called at the start deadline;
-  // cancels the game and returns true when too few matched players connected.
-  public cancelShortHandedMatch(): boolean {
-    // Explicitly 1v1/2v2/FFA/clan wars only — a future ranked type must opt
-    // in rather than inherit pre-start cancellation.
-    const rankedType = this.gameConfig.rankedType;
-    let expected: number | undefined;
-    if (
-      rankedType === RankedType.OneVOne ||
-      rankedType === RankedType.TwoVTwo ||
-      rankedType === RankedType.ClanWars
-    ) {
-      expected = this.gameConfig.maxPlayers;
-    } else if (rankedType === RankedType.FreeForAll) {
-      expected = RANKED_FFA_MIN_PLAYERS;
-    } else {
-      return false;
-    }
-    if (expected === undefined || this.playerCount() >= expected) {
-      return false;
-    }
-    this.log.info("cancelling matchmade game, missing players at deadline", {
-      gameID: this.id,
-      connected: this.playerCount(),
-      expected,
-    });
-    for (const c of [...this.clients.active()]) {
-      this.kickClient(c.clientID, KICK_REASON_MATCH_CANCELLED);
-    }
-    // phase() reports Finished once ended, so GameManager's next tick prunes.
-    this.ended = true;
-    return true;
-  }
-
   // Nobody was connected when the delayed start came due. An empty roster at
   // that moment is not proof the game is abandoned: handleClientDisconnect
   // drops a client the instant its socket closes, blip or not, and the client
@@ -970,7 +904,6 @@ export class GameServer {
       return;
     }
     this.stage = "prestart";
-    this.fetchTribes();
 
     const prestartMsg = ServerPrestartMessageSchema.safeParse({
       type: "prestart",
@@ -995,37 +928,6 @@ export class GameServer {
         c.ws.send(msg);
       }
     });
-  }
-
-  // Public games draw purchased bot tribe names from the API at prestart —
-  // its 1.5s timeout fits the 2s prestart->start gap, so the pool is
-  // normally in hand when start() builds the game start info. Best effort:
-  // on timeout/error the game starts with organic bot names.
-  private fetchTribes(): void {
-    if (!this.isPublic() || this.gameConfig.bots === 0) {
-      return;
-    }
-    // Logged-in humans only — guests can't own tribe names.
-    const players = this.clients
-      .active()
-      .flatMap((c) =>
-        c.publicId !== undefined
-          ? [{ clientId: c.clientID, publicId: c.publicId }]
-          : [],
-      );
-    this.deps
-      .fetchTribes(players)
-      .then((tribes) => {
-        // One tribe per bot: with fewer bots than tribes, drop from the
-        // tail (the global-pool slice).
-        const used = tribes.slice(0, this.gameConfig.bots);
-        if (used.length > 0) {
-          this.tribes = used;
-        }
-      })
-      .catch((error) => {
-        this.log.warn(`failed to fetch custom tribes: ${error}`);
-      });
   }
 
   private startLobbyInfoBroadcast() {
@@ -1120,8 +1022,6 @@ export class GameServer {
     // if no client connects/pings.
     this.lastPingUpdate = Date.now();
 
-    this.convertClanOverflowToSpectators();
-
     const friendsFor = friendsLookup(this.clients.active());
 
     // allowedPublicIds / nameRevealPublicIds hold account publicIds and are
@@ -1137,14 +1037,12 @@ export class GameServer {
       config,
       players: this.clients.players().map((c) => ({
         username: c.username,
-        clanTag: this.startClanTag(c),
         clientID: c.clientID,
         cosmetics: c.cosmetics,
         isLobbyCreator: this.lobbyCreatorID === c.clientID,
         friends: friendsFor(c),
         teamIndex: this.matchmakingTeamIndex(c),
       })),
-      tribes: this.tribes,
     });
     if (!result.success) {
       const error = z.prettifyError(result.error);
@@ -1156,15 +1054,7 @@ export class GameServer {
       ...this.gameStartInfo,
       listed: this.listing.isListed(),
     };
-    this.wireGameStartInfo = this.gameConfig.disableClanTags
-      ? {
-          ...wireGameStartInfo,
-          players: this.gameStartInfo.players.map((p) => ({
-            ...p,
-            clanTag: null,
-          })),
-        }
-      : wireGameStartInfo;
+    this.wireGameStartInfo = wireGameStartInfo;
     // Seed the dictionary from the same players array, in the same order,
     // every client receives in the start message.
     this.zbinCtx = createGameWireContext(this.gameStartInfo.players);
@@ -1186,91 +1076,6 @@ export class GameServer {
   // everywhere a "player" is meant: the lobby cap, and gameStartInfo.
   private playerCount(): number {
     return this.clients.players().length;
-  }
-
-  private convertClanOverflowToSpectators(): void {
-    if (
-      this.gameConfig.gameMode !== GameMode.Team ||
-      this.gameConfig.playerTeams === undefined ||
-      this.gameConfig.playerTeams === HumansVsNations ||
-      this.matchmakingTeams !== undefined ||
-      this.gameConfig.rankedType !== undefined ||
-      this.gameConfig.disableClanTags === true ||
-      this.gameConfig.anonymizeNames === true
-    ) {
-      return;
-    }
-    const playerTeams = this.gameConfig.playerTeams;
-    const nationCount = this.resolveDefaultNationCount();
-    const convertedClientIDs = new Set<ClientID>();
-    let kickedClients = this.findClanOverflowKicks(playerTeams, nationCount);
-    while (kickedClients.length > 0) {
-      for (const client of kickedClients) {
-        client.spectator = true;
-        convertedClientIDs.add(client.clientID);
-        this.log.info("Converted clan overflow player to spectator", {
-          clientID: client.clientID,
-          clanTag: client.clanTag,
-        });
-      }
-      kickedClients = this.findClanOverflowKicks(playerTeams, nationCount);
-    }
-    if (convertedClientIDs.size > 0) {
-      this.intents = this.intents.filter(
-        (i) => !convertedClientIDs.has(i.clientID),
-      );
-    }
-  }
-
-  private resolveDefaultNationCount(): number {
-    if (typeof this.gameConfig.nations === "number") {
-      return this.gameConfig.nations;
-    }
-    if (this.gameConfig.nations === "default") {
-      const mapInfo = maps.find((m) => m.type === this.gameConfig.gameMap);
-      return mapInfo?.defaultNationCount ?? 0;
-    }
-    return 0;
-  }
-
-  private findClanOverflowKicks(
-    playerTeams: TeamCountConfig,
-    nationCount: number,
-  ): Client[] {
-    const playingClients = this.clients
-      .players()
-      .filter((c) => this.matchmakingTeamIndex(c) === undefined);
-    const totalPlayers = playingClients.length + nationCount;
-    let teams;
-    try {
-      teams = resolveTeamsList(playerTeams, totalPlayers);
-    } catch {
-      return [];
-    }
-    const playerInfos = playingClients.map(
-      (c) =>
-        new PlayerInfo(
-          c.username,
-          PlayerType.Human,
-          c.clientID,
-          c.clientID,
-          false,
-          c.clanTag ?? null,
-        ),
-    );
-    const preview = assignTeamsLobbyPreview(
-      playerInfos,
-      teams,
-      playerTeams,
-      nationCount,
-    );
-    const kickedIDs = new Set<ClientID>();
-    for (const [info, assignment] of preview.entries()) {
-      if (assignment === "kicked" && info.clanTag && info.clientID !== null) {
-        kickedIDs.add(info.clientID);
-      }
-    }
-    return playingClients.filter((c) => kickedIDs.has(c.clientID));
   }
 
   // ONE definition of who the allowlist admits, shared by every path that can
@@ -1409,16 +1214,6 @@ export class GameServer {
     return idx === -1 ? undefined : idx;
   }
 
-  // The clan tag a player starts with. In clan wars it is their team's clan
-  // from the assignment, whatever tag they joined with: the API rates the
-  // clans by the tags in the game record.
-  private startClanTag(c: Client): string | null {
-    const team = this.matchmakingTeamIndex(c);
-    const matchmade =
-      team === undefined ? undefined : this.matchmakingClanTags?.[team];
-    return matchmade ?? c.clanTag ?? null;
-  }
-
   private addIntent(intent: StampedIntent) {
     this.intents.push(intent);
   }
@@ -1452,8 +1247,6 @@ export class GameServer {
             turns: this.turns.slice(lastTurn),
             gameStartInfo: this.names.startInfoFor(
               client.clientID,
-              isAdminRole(client.role),
-              this.gameStartInfo,
               this.wireGameStartInfo,
             ),
             lobbyCreatedAt: this.createdAt,
@@ -1700,7 +1493,6 @@ export class GameServer {
       label: this.listing.lobbyLabel(),
       accent: this.listing.lobbyAccent(),
       featured: this.listing.isFeatured() ? true : undefined,
-      queued: this.listing.isQueued() ? true : undefined,
     };
   }
 
@@ -1750,21 +1542,6 @@ export class GameServer {
         this.hasReachedMaxPlayerCount = true;
       }
     }
-  }
-
-  public isQueued(): boolean {
-    return this.listing.isQueued();
-  }
-
-  public queuedAt(): number | undefined {
-    return this.listing.queuedAtTime();
-  }
-
-  // The host paid to put this listed lobby in the public Special queue. The
-  // worker then reports it as a Special lobby and the queue's countdown
-  // starts it; the listing deadline no longer applies.
-  public queueForPublic(): void {
-    this.listing.queue();
   }
 
   // Players (not spectators) currently seated in the lobby.
@@ -2092,7 +1869,6 @@ export class GameServer {
         return {
           clientID: player.clientID,
           username: player.username,
-          clanTag: player.clanTag,
           persistentID: this.clients.get(player.clientID)?.persistentID ?? "",
           stats,
           cosmetics: player.cosmetics,
@@ -2117,7 +1893,6 @@ export class GameServer {
         winner?.winner,
         this.createdAt,
         this.visibleAt,
-        this.gameStartInfo.tribes,
         [...this.reports.values()],
         this.publicGameType,
         statsAgreed,

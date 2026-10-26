@@ -3,13 +3,6 @@ import { describe, expect, it } from "vitest";
 import { normaliseMapKey, presenceMapKey } from "../../src/client/Utils";
 
 describe("normaliseMapKey", () => {
-  it("resolves tourney maps to their asset directory, not their display name", () => {
-    expect(normaliseMapKey(GameMapType.Tourney1)).toBe("tourney1");
-    expect(normaliseMapKey(GameMapType.Tourney2)).toBe("tourney2");
-    expect(normaliseMapKey(GameMapType.Tourney3)).toBe("tourney3");
-    expect(normaliseMapKey(GameMapType.Tourney4)).toBe("tourney4");
-  });
-
   it("matches the lowercased map id for every known map", () => {
     for (const map of maps) {
       expect(normaliseMapKey(map.type)).toBe(map.id.toLowerCase());
@@ -28,8 +21,7 @@ describe("presenceMapKey", () => {
   // exist, and Steam hides the whole status line when a token fails to
   // resolve rather than dropping that one field.
   it("normalises a map name to its translation key", () => {
-    expect(presenceMapKey(GameMapType.Europe)).toBe("europe");
-    expect(presenceMapKey(GameMapType.Tourney1)).toBe("tourney1");
+    expect(presenceMapKey(GameMapType.Britannia)).toBe("britannia");
   });
 
   it("produces a key containing only characters Steam allows in a token", () => {

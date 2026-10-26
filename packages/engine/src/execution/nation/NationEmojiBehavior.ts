@@ -25,12 +25,6 @@ import { EmojiExecution } from "../EmojiExecution";
 
 const emojiId = (e: (typeof flattenedEmojiTable)[number]) =>
   flattenedEmojiTable.indexOf(e);
-export const EMOJI_ASSIST_ACCEPT = (["👍", "🤝", "🎯"] as const).map(emojiId);
-export const EMOJI_ASSIST_RELATION_TOO_LOW = (["🥱", "🤦‍♂️"] as const).map(
-  emojiId,
-);
-export const EMOJI_ASSIST_TARGET_ME = (["🥺", "💀"] as const).map(emojiId);
-export const EMOJI_ASSIST_TARGET_ALLY = (["🕊️", "👎"] as const).map(emojiId);
 export const EMOJI_AGGRESSIVE_ATTACK = (["😈"] as const).map(emojiId);
 export const EMOJI_ATTACK = (["😡"] as const).map(emojiId);
 export const EMOJI_WARSHIP_RETALIATION = (["⛵"] as const).map(emojiId);
@@ -41,8 +35,6 @@ export const EMOJI_GOT_INSULTED = (["🖕", "😡", "🤡", "😞", "😭"] as c
 export const EMOJI_LOVE = (["❤️", "😊", "🥰"] as const).map(emojiId);
 export const EMOJI_CONFUSED = (["❓", "🤡"] as const).map(emojiId);
 export const EMOJI_BRAG = (["👑", "🥇", "💪"] as const).map(emojiId);
-export const EMOJI_CHARM_ALLIES = (["🤝", "😇", "💪"] as const).map(emojiId);
-export const EMOJI_CLOWN = (["🤡", "🤦‍♂️"] as const).map(emojiId);
 export const EMOJI_RAT = (["🐀"] as const).map(emojiId);
 export const EMOJI_OVERWHELMED = (
   ["💀", "🆘", "😱", "🥺", "😭", "😞", "🫡", "👋"] as const
@@ -101,8 +93,6 @@ export class NationEmojiBehavior {
     this.checkVerySmallAttack();
     this.congratulateWinner();
     this.brag();
-    this.charmAllies();
-    this.annoyTraitors();
     this.findRat();
     this.greetNearbyPlayers();
   }
@@ -195,42 +185,6 @@ export class NationEmojiBehavior {
     if (sorted.length === 0 || sorted[0] !== this.player) return;
 
     this.sendEmoji(AllPlayers, EMOJI_BRAG);
-  }
-
-  private charmAllies(): void {
-    if (!this.random.chance(250)) return;
-
-    const humanAllies = this.player
-      .allies()
-      .filter((p) => p.type() === PlayerType.Human);
-    if (humanAllies.length === 0) return;
-
-    const ally = this.random.randElement(humanAllies);
-    const emojiList = this.random.chance(3) ? EMOJI_LOVE : EMOJI_CHARM_ALLIES;
-    this.sendEmoji(ally, emojiList);
-  }
-
-  private annoyTraitors(): void {
-    if (!this.random.chance(3)) return;
-
-    for (const traitor of this.game.players()) {
-      if (traitor.type() !== PlayerType.Human || !traitor.isTraitor()) continue;
-      // Only one nation mocks each traitor, otherwise every nation on the map piles on
-      if (this.traitorMocker(traitor) !== this.player) continue;
-      this.sendEmoji(traitor, EMOJI_CLOWN);
-    }
-  }
-
-  // The most hostile nation (usually the betrayed one), first in player order on ties
-  private traitorMocker(traitor: Player): Player | null {
-    let mocker: Player | null = null;
-    for (const p of this.game.players()) {
-      if (p.type() !== PlayerType.Nation || p.isFriendly(traitor)) continue;
-      if (mocker === null || p.relation(traitor) < mocker.relation(traitor)) {
-        mocker = p;
-      }
-    }
-    return mocker;
   }
 
   private findRat(): void {

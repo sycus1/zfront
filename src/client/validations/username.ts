@@ -1,5 +1,4 @@
 import {
-  ClanTagSchema,
   MAX_USERNAME_LENGTH,
   MIN_USERNAME_LENGTH,
   RENDERABLE_NAME_CHARS,
@@ -9,8 +8,6 @@ import { z } from "zod";
 import { translateText } from "../Utils";
 
 export { MAX_USERNAME_LENGTH, MIN_USERNAME_LENGTH };
-export const MIN_CLAN_TAG_LENGTH = 2;
-export const MAX_CLAN_TAG_LENGTH = 5;
 
 export const MIN_ACCOUNT_USERNAME_LENGTH = 3;
 export const MAX_ACCOUNT_USERNAME_LENGTH = 20;
@@ -135,31 +132,6 @@ export function validateAccountUsername(username: string): {
     return {
       isValid: false,
       error: translateText("username.account_invalid_chars"),
-    };
-  }
-
-  return { isValid: true };
-}
-
-export function validateClanTag(clanTag: string): {
-  isValid: boolean;
-  error?: string;
-} {
-  if (clanTag.length === 0) {
-    return { isValid: true };
-  }
-  if (clanTag.length < MIN_CLAN_TAG_LENGTH) {
-    return { isValid: false, error: translateText("username.tag_too_short") };
-  }
-  if (clanTag.length > MAX_CLAN_TAG_LENGTH) {
-    return { isValid: false, error: translateText("username.tag_too_long") };
-  }
-
-  const parsed = ClanTagSchema.safeParse(clanTag);
-  if (!parsed.success) {
-    return {
-      isValid: false,
-      error: translateText("username.tag_invalid_chars"),
     };
   }
 

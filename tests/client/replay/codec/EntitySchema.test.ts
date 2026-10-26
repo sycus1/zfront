@@ -46,22 +46,15 @@ const basePlayer: PlayerState = {
   piracyGold: 0,
   goldEarned: 90_000,
   troops: 25_000,
-  isTraitor: false,
-  traitorRemainingTicks: 0,
   inDoomsdayClock: false,
   isDecaying: false,
   markedDoomsdayClockTick: -1,
-  betrayals: 0,
   hasSpawned: true,
   spawnTile: 4242,
   lastDeleteUnitTick: -1,
-  allies: [3],
-  embargoes: [],
   targets: [],
   outgoingAttacks: [],
   incomingAttacks: [],
-  outgoingAllianceRequests: [],
-  alliances: [],
   outgoingEmojis: [],
 };
 
@@ -77,17 +70,12 @@ const playerAlternatives: { [K in keyof PlayerFields]: PlayerFields[K] } = {
   piracyGold: 2 ** 40, // huge
   goldEarned: 95_000,
   troops: 24_990,
-  isTraitor: true,
-  traitorRemainingTicks: 300,
   inDoomsdayClock: true,
   isDecaying: true,
   markedDoomsdayClockTick: 9000,
-  betrayals: 2,
   hasSpawned: false,
   spawnTile: undefined,
   lastDeleteUnitTick: 70_000,
-  allies: [],
-  embargoes: [1, 2, 900],
   targets: [5],
   outgoingAttacks: [
     {
@@ -100,16 +88,6 @@ const playerAlternatives: { [K in keyof PlayerFields]: PlayerFields[K] } = {
   ],
   incomingAttacks: [
     { attackerID: 3, targetID: 7, troops: 99, id: "atk2", retreating: true },
-  ],
-  outgoingAllianceRequests: ["player_9"],
-  alliances: [
-    {
-      id: 11,
-      other: "player_3",
-      createdAt: 100,
-      expiresAt: 3100,
-      hasExtensionRequest: true,
-    },
   ],
   outgoingEmojis: [
     { message: "🤝", senderID: 7, recipientID: "AllPlayers", createdAt: 55 },

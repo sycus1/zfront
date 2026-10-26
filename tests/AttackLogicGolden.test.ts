@@ -26,7 +26,6 @@ function defender(
 ): Defender {
   return {
     type: PlayerType.Human,
-    isTraitor: false,
     isDisconnectedTeammate: false,
     ...o,
   };
@@ -93,9 +92,6 @@ describe("attackLogic golden values", () => {
       "no fallout": pvp({ falloutRatio: null }),
       "fallout 10%": pvp({ falloutRatio: 0.1 }),
       "fallout 100%": pvp({ falloutRatio: 1 }),
-      "defender is traitor": pvp({
-        defender: defender({ ...base, isTraitor: true }),
-      }),
       "human attacks bot": pvp({
         defender: defender({ ...base, type: PlayerType.Bot }),
       }),
@@ -113,11 +109,10 @@ describe("attackLogic golden values", () => {
       "disconnected teammate": pvp({
         defender: defender({ ...base, isDisconnectedTeammate: true }),
       }),
-      "defense post + fallout + traitor (stacking)": pvp({
+      "defense post + fallout (stacking)": pvp({
         terrain: TerrainType.Mountain,
         defenderHasDefensePost: true,
         falloutRatio: 0.5,
-        defender: defender({ ...base, isTraitor: true }),
       }),
     };
     expect(cases).toMatchSnapshot();

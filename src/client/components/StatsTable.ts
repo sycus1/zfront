@@ -15,7 +15,6 @@ import type { GameView } from "../view";
 export interface StatsRow {
   key: string;
   name: string;
-  clanTag?: string | null;
   values: ReadonlyMap<ColumnId, number>;
   emphasized?: boolean;
   pinned?: boolean;

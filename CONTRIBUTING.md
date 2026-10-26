@@ -1,185 +1,58 @@
-# Contributing to OpenFront.io
+# Contributing to zfront
 
-First off, thank you for considering contributing to OpenFront.io! It's people like you that make OpenFront such a great game.
+zfront is a base-builder and tower-defence game against zombie hordes, played on real terrain in the browser. It is a hard fork of [OpenFront](https://github.com/openfrontio/OpenFrontIO) and builds on its deterministic engine and WebGL renderer.
 
-We welcome contributions from everyone. By participating in this project, you agree to abide by our code of conduct and treat all community members with respect.
+Start with the design docs in [`docs/zfront/`](docs/zfront/): `research.md`, `requirements-draft.md` and `spike-plan.md`.
 
-## Quick Links
+## Ground rules
 
-- **Game**: [https://openfront.io/](https://openfront.io/)
-- **Discord**: [Join the Development Discord](https://discord.gg/K9zernJB5z)
-- **Translations**: [Crowdin Project](https://crowdin.com/project/openfront-mls)
-- **Issues**: [GitHub Issues](https://github.com/openfrontio/OpenFrontIO/issues)
+- **Licence.** zfront is AGPL-3.0 with OpenFront's Section 7 terms (see `LICENSE` and `LICENSE-ASSETS`). Keep "© OpenFront and Contributors" visible in-game. Never add OpenFront's proprietary assets or branding.
+- **Upstream.** `origin` is `sycus1/zfront`. `upstream` (`openfrontio/OpenFrontIO`) is fetch-only: never open PRs or issues there.
+- **New gameplay code** goes in clearly named modules (for example `packages/engine/src/horde/`) rather than being spread through OpenFront files, so cherry-picking from upstream stays possible.
+- **Determinism.** The engine runs on every client and must stay bit-identical. Use the seeded PRNG and `packages/engine-lib/src/DetMath.ts`, never `Math.random`, `Date.now` or the approximated `Math` functions. Oxlint enforces this.
+- **Tests.** Every change to `packages/engine`, `packages/engine-api` or `packages/engine-lib` needs tests. Test the simulation directly with `tests/util/Setup.ts` rather than with mocks.
+- **Text.** All user-visible text goes through `translateText()` with an entry in `resources/lang/en.json`. Don't edit the other translation files.
 
-## Project Governance
-
-- The project maintainer ([evan](https://github.com/evanpelle)) has final authority on all code changes and design decisions.
-- All pull requests require maintainer approval before merging.
-- The maintainer reserves the right to reject contributions that don't align with the project's vision or quality standards.
-
-## Contribution Path for New Contributors
-
-To ensure code quality and project stability, we use a progressive contribution system:
-
-1. **New Contributors**: Limited to UI improvements and small bug fixes only.
-   - This helps you become familiar with the codebase.
-   - UI changes are easier to review and less likely to break core functionality.
-   - Small, focused PRs have a higher chance of being accepted.
-2. **Established Contributors**: After several successful PRs and demonstrating understanding of the codebase, you may work on more complex features.
-3. **Core Contributors**: Only those with extensive experience with the project may modify critical game systems.
-
-## Finding Something to Work On
-
-Before writing any code:
-
-1. Request to join the development [Discord](https://discord.gg/K9zernJB5z).
-2. Find an issue labelled [`approved`](https://github.com/openfrontio/OpenFrontIO/issues?q=is%3Aissue%20state%3Aopen%20label%3Aapproved), or open a new issue and wait for it to be labelled `approved`.
-3. Comment on the issue asking to be assigned.
-4. Wait to be assigned before investing significant time.
-
-### PRs Without an Approved Issue
-
-Pull requests that do not link to an issue labelled `approved` will be **automatically closed**. The only exception is small bug fixes, which may be submitted directly without a pre-approved issue.
-
-If your PR is closed for this reason, open an issue describing the change, wait for it to be labelled `approved`, comment asking to be assigned, and then resubmit once you've been assigned.
-
-### AI-Generated PRs
-
-Pull requests that appear to be AI-generated without genuine author understanding will be **closed**.
-
-Using AI tools is fine — but you **MUST** understand the code you are submitting and be able to explain why each decision was made. If you cannot defend the design choices, justify the approach, or answer questions about how the code works in review, the PR will be closed.
-
-## Getting Started
+## Getting started
 
 ### Prerequisites
 
-- **Node.js**: Version 24.15.0 or newer in the Node 24 release line.
-- **npm**: Version 12.1.0 or newer in the npm 12 release line. If Node.js bundled an older version, run `npm install --global --ignore-scripts npm@12.1.0` before installing project dependencies.
-- **Git**: For version control.
-- **Editor**: The project type-checks with TypeScript 7, which has no JavaScript API for editor extensions to drive. In VS Code, install the [TypeScript 7 native preview extension](https://marketplace.visualstudio.com/items?itemName=TypeScriptTeam.native-preview) to get language support for the workspace.
+- Node.js 24.15.0 or newer in the Node 24 line.
+- npm 12.1.0 or newer. If Node bundled an older one, run `npm install --global --ignore-scripts npm@12.1.0` first.
+- Go, only if you regenerate maps (`npm run gen-maps`).
+- A browser with WebGL2.
+- For editor support, the [TypeScript 7 native preview extension](https://marketplace.visualstudio.com/items?itemName=TypeScriptTeam.native-preview) in VS Code.
 
-### Installation
-
-1. **Fork the repository** on GitHub.
-2. **Clone your fork** locally:
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/OpenFrontIO.git
-   cd OpenFrontIO
-   ```
-3. **Install dependencies**:
-
-   > **Important**: Use `npm run inst` instead of `npm install`. This runs `npm ci --ignore-scripts` to ensure a consistent and secure environment.
-
-   ```bash
-   npm run inst
-   ```
-
-   Dependency releases must be at least seven days old. Git, remote URL, local tarball, and directory dependencies are rejected; any security exception requires explicit maintainer review.
-
-### Running the Game
-
-- **Full Development Mode** (Client + Server):
-  ```bash
-  npm run dev
-  ```
-  This starts the dev server and the game server, and opens your browser.
-- **Client Only**:
-  ```bash
-  npm run start:client
-  ```
-- **Server Only**:
-  ```bash
-  npm run start:server-dev
-  ```
-
-## Development Workflow
-
-### Branching
-
-Create a new branch for each feature or bug fix:
+### Install and run
 
 ```bash
-git checkout -b feature/your-feature-name
-# or
-git checkout -b fix/issue-number-bug-name
+git clone https://github.com/sycus1/zfront.git
+cd zfront
+npm run inst   # npm ci --ignore-scripts; do NOT use npm install
+npm run dev    # client and server with hot reload
 ```
 
-### Coding Standards
+Dependency releases must be at least seven days old. Git, URL, tarball and directory dependencies are rejected.
 
-We enforce code quality using Oxlint and Oxfmt. All code must follow existing style patterns, and new features should not break existing functionality.
+## Workflow
 
-- **Format Code**: `npm run format`
-- **Lint Code**: `npm run lint`
-- **Lint & Fix**: `npm run lint:fix`
+1. Branch from `main` (`feature/…` or `fix/…`).
+2. Keep each PR to one change, with tests and, for UI changes, a screenshot.
+3. Before pushing, run:
 
-### Testing
-
-All new features and bug fixes should include relevant tests. We use **Vitest**.
-
-- **Run Tests**: `npm test`
-- **Run Coverage**: `npm run test:coverage`
-
-**Note**: All code changes in `packages/engine`, `packages/engine-api` and `packages/engine-lib` **MUST** be tested to ensure game logic stability.
-
-## Submitting a Pull Request
-
-1. **Commit your changes** with a clear, present-tense message ("Add feature", not "Added feature"):
    ```bash
-   git commit -m "Add new map rendering logic"
+   npm run format
+   npm run lint
+   npm run typecheck
+   npm test
    ```
-2. **Push to your fork**:
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-3. **Open a Pull Request** against the original repository:
-   - Fill out the **PR Template** completely.
-   - Link the approved issue (e.g., `Resolves #123`).
-   - Keep PRs focused on a single feature or bug fix.
-   - Include screenshots for UI changes.
-   - Describe what testing you've performed.
-   - Be responsive to feedback and requested changes.
 
-### PR Checklist
+4. Commit messages are in the present tense ("Add wall unit", not "Added wall unit").
 
-Before submitting, ensure you have:
+## Architecture
 
-- [ ] Linked the relevant approved issue (e.g., `Resolves #123`).
-- [ ] Added screenshots for any UI changes.
-- [ ] Processed text through `translateText()` and added strings to `en.json`.
-- [ ] Added/Updated tests in the `tests/` directory.
-- [ ] Verified that `npm test` passes.
-- [ ] Provided your Discord username in the PR description for communication.
+See [`CLAUDE.md`](CLAUDE.md) and [`docs/Architecture.md`](docs/Architecture.md) for the package layout (`engine-api`, `engine-lib`, `engine`, `shared`, `zbin`), the import rules that `tests/LayerBoundaries.test.ts` enforces, and the intent → execution flow.
 
-## Communication
+## Maps
 
-- Be respectful and constructive in all project interactions.
-- Questions are welcome, but please search existing issues first.
-- For major changes, discuss in an issue before starting work.
-
-## Translations
-
-Translators are welcome! We use Crowdin for translations. To help translate OpenFront.io:
-
-1. Join the [Translation Discord](https://discord.gg/3zZzacjWFr).
-2. Visit our [Crowdin Project](https://crowdin.com/project/openfront-mls).
-3. Sign up or log in, then join the project.
-4. Select the language you want to translate. If your language isn't listed, click "Request New Language".
-5. Translate the strings.
-
-Each language carries a flag, set by the `svg` string in the `lang` section and
-matched to a file in `resources/flags/`. Where a language isn't tied to a single
-country, use a script or community icon rather than a national flag — for example
-`zh-hant` (the glyph 繁) for Traditional Chinese, alongside `catalonia`, `eo` and
-`toki_pona`.
-
-Feel free to ask questions in the translation Discord server!
-
-## License
-
-By contributing, you agree that your contributions will be licensed under the [GNU Affero General Public License v3.0 (AGPL v3.0)](LICENSE).
-
-## Final Notes
-
-Remember that maintaining this project requires significant effort. The maintainer appreciates your contributions but must prioritize long-term project health and stability. Not all contributions will be accepted, and that's okay.
-
-Thank you for helping make OpenFront better!
+Map sources live in `map-generator/assets/maps/<map>/` (an `image.png` plus `info.json`). `npm run gen-maps` builds `resources/maps/`, `Maps.gen.ts` and the map names in `en.json`. zfront currently ships only Britannia; an England map from OS Terrain 50 is planned.

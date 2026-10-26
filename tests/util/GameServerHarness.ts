@@ -136,7 +136,6 @@ export function makeClient(opts: ClientOpts = {}): Client {
     undefined,
     opts.ip ?? `10.0.${Math.floor(n / 256)}.${n % 256}`,
     opts.username ?? `user_${clientID}`,
-    opts.clanTag ?? null,
     (opts.ws ?? makeMockWs()) as any,
     opts.cosmetics,
     opts.publicId,
@@ -160,7 +159,6 @@ export interface GameOpts {
   startsAt?: number;
   publicGameType?: PublicGameType;
   matchmakingTeams?: string[][];
-  matchmakingClanTags?: string[];
   // Overrides for what the game reaches outside itself for. By default the
   // archive upload and the tribe fetch are inert spies: pass your own
   // `archive` to read the record a game produced.
@@ -176,7 +174,6 @@ export function makeGame(opts: GameOpts = {}): GameServer {
     replayWinner: vi.fn(async () => null),
     // An empty replay queue, whatever other tests left in the real one.
     replayPending: () => 0,
-    fetchTribes: vi.fn(async () => []),
   };
   Object.assign(deps, opts.deps);
   return new GameServer(
@@ -189,7 +186,6 @@ export function makeGame(opts: GameOpts = {}): GameServer {
       startsAt: opts.startsAt,
       publicGameType: opts.publicGameType,
       matchmakingTeams: opts.matchmakingTeams,
-      matchmakingClanTags: opts.matchmakingClanTags,
     },
     deps,
   );

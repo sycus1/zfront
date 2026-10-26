@@ -36,14 +36,7 @@ import { DonateTroopsExecution } from "../DonateTroopExecution";
 import { TransportShipExecution } from "../TransportShipExecution";
 import { AiAttackBehavior, BoatRoute } from "../utils/AiAttackBehavior";
 import { planBotAttacks, walledInBots } from "./BotAnnexation";
-import { NationAllianceBehavior } from "./NationAllianceBehavior";
-import {
-  EMOJI_ASSIST_ACCEPT,
-  EMOJI_ASSIST_RELATION_TOO_LOW,
-  EMOJI_ASSIST_TARGET_ALLY,
-  EMOJI_ASSIST_TARGET_ME,
-  NationEmojiBehavior,
-} from "./NationEmojiBehavior";
+import { NationEmojiBehavior } from "./NationEmojiBehavior";
 import { findJuiciestTarget, findRunawayLeader } from "./NationUtils";
 import type { NationWarshipBehavior } from "./NationWarshipBehavior";
 
@@ -74,7 +67,6 @@ export class NationAttackBehavior extends AiAttackBehavior {
     triggerRatio: number,
     reserveRatio: number,
     expandRatio: number,
-    private allianceBehavior: NationAllianceBehavior,
     private emojiBehavior: NationEmojiBehavior,
     private warshipBehavior: NationWarshipBehavior,
   ) {
@@ -91,12 +83,10 @@ export class NationAttackBehavior extends AiAttackBehavior {
     r: SnapshotReader,
     random: PseudoRandom,
     player: Player,
-    allianceBehavior: NationAllianceBehavior,
     emojiBehavior: NationEmojiBehavior,
     warshipBehavior: NationWarshipBehavior,
   ): void {
     const s = this.restoreRecord(raw, r, random, player);
-    this.allianceBehavior = allianceBehavior;
     this.emojiBehavior = emojiBehavior;
     this.warshipBehavior = warshipBehavior;
     // Only set during a maybeAttack call, so always null between ticks.
@@ -214,8 +204,6 @@ export class NationAttackBehavior extends AiAttackBehavior {
         this.attackWithRandomBoat(borderingEnemies);
         return;
       }
-
-      this.allianceBehavior.maybeSendAllianceRequests(borderingEnemies);
     }
 
     this.attackBestTarget(borderingFriends, borderingEnemies);
@@ -455,16 +443,6 @@ export class NationAttackBehavior extends AiAttackBehavior {
 
     const bots = (): boolean => this.attackBots();
 
-    const assist = (): boolean => this.assistAllies();
-
-    const traitor = (): boolean => {
-      const traitor = pick((enemies) => this.findTraitor(enemies));
-      if (traitor) {
-        return this.sendAttack(traitor);
-      }
-      return false;
-    };
-
     const afk = (): boolean => {
       // Groups are sorted by troops (ascending), so the first match is the weakest afk enemy
       const afk = pick(
@@ -480,9 +458,6 @@ export class NationAttackBehavior extends AiAttackBehavior {
       }
       return false;
     };
-
-    const betray = (): boolean =>
-      this.maybeBetrayAndAttack(borderingFriends, borderingEnemies);
 
     const nuked = (): boolean => {
       if (this.isBorderingNukedTerritory()) {
@@ -564,17 +539,17 @@ export class NationAttackBehavior extends AiAttackBehavior {
       case Difficulty.Easy:
         // So dumb, they cant even find islanders
         // prettier-ignore
-        return [nuked, bots, retaliate, assist, betray, hated, weakest];
+        return [nuked, bots, retaliate, hated, weakest];
       case Difficulty.Medium:
         // prettier-ignore
-        return [bots, nuked, assist, betray, hated, afk, traitor, crown, weakest, island, donate];
+        return [bots, nuked, hated, afk, crown, weakest, island, donate];
       case Difficulty.Hard:
         // Strong veryWeak and juicy strats after the distracting hated strat, to make the nations weaker than impossible
         // prettier-ignore
-        return [bots, assist, betray, nuked, traitor, afk, hated, veryWeak, juicy, victim, crown, weakest, island, donate];
+        return [bots, nuked, afk, hated, veryWeak, juicy, victim, crown, weakest, island, donate];
       case Difficulty.Impossible:
         // prettier-ignore
-        return [bots, veryWeak, betray, assist, victim, crown, traitor, juicy, afk, nuked, hated, weakest, island, donate];
+        return [bots, veryWeak, victim, crown, juicy, afk, nuked, hated, weakest, island, donate];
       default:
         assertNever(difficulty);
     }
@@ -800,73 +775,6 @@ export class NationAttackBehavior extends AiAttackBehavior {
     }
   }
 
-  private assistAllies(): boolean {
-    if (this.game.config().disableAlliances()) return false;
-
-    for (const ally of this.player.allies()) {
-      if (ally.targets().length === 0) continue;
-      if (this.player.relation(ally) < Relation.Friendly) {
-        this.emojiBehavior.sendEmoji(ally, EMOJI_ASSIST_RELATION_TOO_LOW);
-        continue;
-      }
-      for (const target of ally.targets()) {
-        if (target === this.player) {
-          this.emojiBehavior.sendEmoji(ally, EMOJI_ASSIST_TARGET_ME);
-          continue;
-        }
-        if (this.player.isFriendly(target)) {
-          this.emojiBehavior.sendEmoji(ally, EMOJI_ASSIST_TARGET_ALLY);
-          continue;
-        }
-        if (!this.sendAttack(target)) continue;
-        this.player.updateRelation(ally, -20);
-        this.emojiBehavior.sendEmoji(ally, EMOJI_ASSIST_ACCEPT);
-        return true;
-      }
-    }
-    return false;
-  }
-
-  // Find a traitor who isn't significantly stronger than us
-  private findTraitor(enemies: Player[]): Player | null {
-    if (this.game.config().disableAlliances()) return null;
-
-    // enemies is already sorted by troops (ascending), so first match is weakest traitor
-    return (
-      enemies.find(
-        (enemy) =>
-          enemy.isTraitor() &&
-          (!this.isFFA() || enemy.troops() < this.player.troops() * 1.2),
-      ) ?? null
-    );
-  }
-
-  private maybeBetrayAndAttack(
-    borderingFriends: Player[],
-    borderingEnemies: Player[],
-  ): boolean {
-    if (this.game.config().disableAlliances()) return false;
-
-    if (borderingFriends.length > 0) {
-      // Computed once here, not per friend below - it doesn't depend on which one.
-      const juiciestAlly =
-        this.allianceBehavior.findJuiciestAlly(borderingFriends);
-      for (const friend of borderingFriends) {
-        if (
-          this.allianceBehavior.maybeBetray(
-            friend,
-            juiciestAlly,
-            borderingFriends,
-            borderingEnemies,
-          )
-        ) {
-          return this.sendAttack(friend, true);
-        }
-      }
-    }
-    return false;
-  }
-
   private isBorderingNukedTerritory(): boolean {
     if (this.game.config().isUnitDisabled(UnitType.MissileSilo)) {
       return false;
@@ -1031,10 +939,9 @@ export class NationAttackBehavior extends AiAttackBehavior {
 
   override shouldAttack(other: Player | TerraNullius): boolean {
     if (
-      // Always attack Terra Nullius, non-humans and traitors
+      // Always attack Terra Nullius and non-humans
       other.isPlayer() === false ||
       other.type() !== PlayerType.Human ||
-      other.isTraitor() ||
       // Always attack in an HvN game
       this.game.config().gameConfig().playerTeams === HumansVsNations
     ) {
@@ -1475,7 +1382,6 @@ export class NationAttackBehavior extends AiAttackBehavior {
           type: bot.type(),
           numTiles: bot.numTilesOwned(),
           troops: bot.troops(),
-          isTraitor: bot.isTraitor(),
           isDisconnectedTeammate: false,
         },
         defenderHasDefensePost: false,

@@ -28,7 +28,7 @@ function makeGameStartInfo(): GameStartInfo {
     gameID: "gameID12",
     lobbyCreatedAt: 1000,
     config: {
-      gameMap: "Africa",
+      gameMap: "Britannia",
       difficulty: "Medium",
       donateGold: false,
       donateTroops: false,
@@ -46,7 +46,6 @@ function makeGameStartInfo(): GameStartInfo {
       {
         clientID: CLIENT_ID,
         username: "TestUser",
-        clanTag: null,
       },
     ],
   } as GameStartInfo;

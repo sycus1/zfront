@@ -20,7 +20,6 @@ export interface PlayerStatic {
   id: string;
   name: string;
   displayName: string;
-  clanTag: string | null;
   clientID: string | null;
   playerType: PlayerTypeEnum;
   team: string | null;
@@ -41,14 +40,6 @@ export interface AttackData {
   troops: number;
   id: string;
   retreating: boolean;
-}
-
-export interface AllianceData {
-  id: number;
-  other: string;
-  createdAt: number;
-  expiresAt: number;
-  hasExtensionRequest: boolean;
 }
 
 export interface EmojiData {
@@ -75,23 +66,16 @@ export interface PlayerState {
   /** Cumulative gold received from all sources (live). */
   goldEarned: number;
   troops: number;
-  isTraitor: boolean;
-  traitorRemainingTicks: number;
   inDoomsdayClock: boolean;
   isDecaying: boolean;
   markedDoomsdayClockTick: number;
-  betrayals: number;
   hasSpawned: boolean;
   /** TileRef the player picked as their spawn (undefined if not yet spawned). */
   spawnTile?: number;
   lastDeleteUnitTick: number;
-  allies: number[];
-  embargoes: number[];
   targets: number[];
   outgoingAttacks: AttackData[];
   incomingAttacks: AttackData[];
-  outgoingAllianceRequests: string[];
-  alliances: AllianceData[];
   outgoingEmojis: EmojiData[];
 }
 
@@ -205,21 +189,14 @@ export interface NameEntry {
 /** Per-player status data for the GPU name/status-icon passes. */
 export interface PlayerStatusData {
   crown: boolean;
-  traitor: boolean;
   disconnected: boolean;
-  alliance: boolean;
-  allianceReq: boolean;
   target: boolean;
-  embargo: boolean;
   nukeActive: boolean;
   nukeTargetsMe: boolean;
   inDoomsdayClock: boolean;
   doomsdayClockDraining: boolean;
   doomsdayClockDecaying: boolean;
   doomsdayClockWarnProgress: number;
-  traitorRemainingTicks: number;
-  allianceFraction: number;
-  allianceRemainingTicks: number;
 }
 
 /** Ghost structure preview data for build-mode visualization. */
@@ -245,7 +222,7 @@ export interface GhostPreviewData {
   upgradeTargetTile: number | null;
   /** Range radius in tiles for the placement circle (0 = no circle). */
   rangeRadius: number;
-  /** True if placing here would carry a penalty (e.g. nuking an ally → traitor). */
+  /** True if placing here would carry a penalty (draws the range circle red). */
   rangeWarning: boolean;
 }
 

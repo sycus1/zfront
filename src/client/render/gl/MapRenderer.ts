@@ -378,10 +378,6 @@ export class MapRenderer {
 
   // ---- SAM radius ----
 
-  setSAMAllianceClusters(clusters: Map<number, number>): void {
-    this.renderer?.setSAMAllianceClusters(clusters);
-  }
-
   // ---- Other ----
 
   setLocalPlayerID(id: number): void {

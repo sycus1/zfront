@@ -102,13 +102,6 @@ export class Config {
     return this._spectator;
   }
 
-  traitorDefenseDebuff(): number {
-    return 0.5;
-  }
-  traitorDuration(): number {
-    return 30 * 10; // 30 seconds
-  }
-
   // Doomsday Clock config, resolved against defaults. One read per tick.
   doomsdayClockConfig(): typeof DOOMSDAY_CLOCK_DEFAULTS {
     const c = this._gameConfig.doomsdayClock;
@@ -181,14 +174,6 @@ export class Config {
   }
   instantBuild(): boolean {
     return this._gameConfig.instantBuild;
-  }
-  disableAlliances(): boolean {
-    // customAllianceDuration === 0 disables alliances (the "custom alliances"
-    // control at 0). The legacy boolean is still honored for older configs.
-    return (
-      this._gameConfig.customAllianceDuration === 0 ||
-      (this._gameConfig.disableAlliances ?? false)
-    );
   }
   isRandomSpawn(): boolean {
     return this._gameConfig.randomSpawn;
@@ -278,16 +263,6 @@ export class Config {
 
   deleteUnitCooldown(): Tick {
     return 30 * 10;
-  }
-  allianceRequestDuration(): Tick {
-    return 20 * 10;
-  }
-  allianceDuration(): Tick {
-    // Host can set a custom alliance duration in minutes (1-15); 0 disables
-    // alliances (see disableAlliances). Falls back to the 5 minute default.
-    const m = this._gameConfig.customAllianceDuration;
-    if (typeof m === "number" && m > 0) return m * 60 * 10;
-    return 300 * 10; // 5 minutes.
   }
 
   percentageTilesOwnedToWin(elapsedGameSeconds: number): number {
@@ -413,7 +388,7 @@ export class Config {
     throw new Error(`Unknown nuke type: ${unitType}`);
   }
 
-  nukeAllianceBreakThreshold(): number {
+  nukeAngerThreshold(): number {
     return 100;
   }
 
@@ -434,9 +409,5 @@ export class Config {
    *  health. Integer-only to keep the engine deterministic (no float constants). */
   warshipVeterancyHealthBonus(): number {
     return 20;
-  }
-
-  allianceExtensionPromptOffset(): number {
-    return 300; // 30 seconds before expiration
   }
 }

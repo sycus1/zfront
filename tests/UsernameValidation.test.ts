@@ -64,7 +64,7 @@ describe("free-form username length", () => {
       token: "123e4567-e89b-12d3-a456-426614174000",
       gameID: "abcd1234",
       username: "a".repeat(MAX_USERNAME_LENGTH),
-      clanTag: null,
+
       turnstileToken: null,
     };
     expect(ClientJoinMessageSchema.safeParse(baseJoin).success).toBe(true);

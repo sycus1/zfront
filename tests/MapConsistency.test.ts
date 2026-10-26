@@ -24,19 +24,7 @@ const EN_JSON = path.join(ROOT, "resources", "lang", "en.json");
 const allMapKeys = Object.keys(GameMapType) as GameMapName[];
 
 // Maps excluded from the frequency requirement (not part of regular playlists).
-const FREQUENCY_EXEMPTIONS: Set<GameMapName> = new Set([
-  "GiantWorldMap",
-  "Oceania",
-  "BaikalNukeWars",
-  "Tourney1",
-  "Tourney2",
-  "Tourney3",
-  "Tourney4",
-  "EuropeClassic",
-  "BritanniaClassic",
-  "ChoppingBlock",
-  "Luna",
-]);
+const FREQUENCY_EXEMPTIONS: Set<GameMapName> = new Set([]);
 
 // The API (openfrontio/infra `GameMapTypeSchema`, and the `maps.name`
 // varchar(29) column) rejects a game record whose map name breaks these.
@@ -45,12 +33,7 @@ const API_MAP_NAME_MAX_LENGTH = 29;
 
 // Maps whose folder isn't their name without spaces and punctuation; the
 // site Worker's link previews list them in infra `src/site/lib/GameMeta.ts`.
-const PREVIEW_FOLDER_EXCEPTIONS: Set<GameMapName> = new Set([
-  "Tourney1",
-  "Tourney2",
-  "Tourney3",
-  "Tourney4",
-]);
+const PREVIEW_FOLDER_EXCEPTIONS: Set<GameMapName> = new Set([]);
 
 // Keys in the en.json "map" section that are UI strings, not map names.
 const EN_JSON_META_KEYS = new Set([

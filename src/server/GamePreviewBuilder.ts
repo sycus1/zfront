@@ -1,9 +1,5 @@
-import {
-  formatPlayerDisplayName,
-  GameMode,
-  maps,
-} from "@openfront/engine-api/game/GameTypes";
-import { ClanTagSchema, UsernameSchema } from "@openfront/engine-api/Schemas";
+import { GameMode, maps } from "@openfront/engine-api/game/GameTypes";
+import { UsernameSchema } from "@openfront/engine-api/Schemas";
 import { buildAssetUrl } from "@openfront/shared/AssetPaths";
 import { GameInfo } from "@openfront/shared/WireSchemas";
 import { z } from "zod";
@@ -13,7 +9,6 @@ import { ServerEnv } from "./ServerEnv";
 export const PlayerInfoSchema = z.object({
   clientID: z.string().optional(),
   username: UsernameSchema.optional(),
-  clanTag: ClanTagSchema,
   stats: z.unknown().optional(),
 });
 
@@ -94,10 +89,7 @@ function parseWinner(
   if (!winnerArray || winnerArray.length < 2) return undefined;
 
   const idToName = new Map(
-    (players ?? []).map((p) => [
-      p.clientID,
-      p.username ? formatPlayerDisplayName(p.username, p.clanTag) : undefined,
-    ]),
+    (players ?? []).map((p) => [p.clientID, p.username]),
   );
 
   if (winnerArray[0] === "team" && winnerArray.length >= 3) {
@@ -251,9 +243,7 @@ export async function buildPreview(
       // Show host
       const hostClient = lobby.clients?.[0];
       if (hostClient?.username) {
-        sections.push(
-          `Host: ${formatPlayerDisplayName(hostClient.username, hostClient.clanTag)}`,
-        );
+        sections.push(`Host: ${hostClient.username}`);
       }
 
       const gameOptions: string[] = [];

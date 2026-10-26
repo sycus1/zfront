@@ -221,7 +221,7 @@ export function planSamSalvo(
 
   for (const targetSam of sortedSams) {
     const targetTile = targetSam.tile();
-    // Hitting an ally's land would break the alliance
+    // Never hit a teammate's land
     if (blastHitsFriendlyLand(game, player, targetTile, UnitType.AtomBomb)) {
       continue;
     }

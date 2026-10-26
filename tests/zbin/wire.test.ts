@@ -49,7 +49,7 @@ function ctxPair() {
 }
 
 const CONFIG: GameConfig = {
-  gameMap: GameMapType.World,
+  gameMap: GameMapType.Britannia,
   difficulty: Difficulty.Medium,
   donateGold: true,
   donateTroops: true,
@@ -72,10 +72,6 @@ const SAMPLE_INTENTS: StampedIntent[] = [
   { type: "cancel_attack", clientID: P1, attackID: "a1b2c3d4" },
   { type: "boat", clientID: P2, troops: 100.5, dst: 998877 },
   { type: "cancel_boat", clientID: P2, unitID: 42 },
-  { type: "allianceRequest", clientID: P1, recipient: P3 },
-  { type: "allianceReject", clientID: P3, requestor: P1 },
-  { type: "allianceExtension", clientID: P1, recipient: P3 },
-  { type: "breakAlliance", clientID: P1, recipient: P3 },
   { type: "targetPlayer", clientID: P2, target: P1 },
   { type: "emoji", clientID: P1, recipient: "AllPlayers", emoji: 3 },
   { type: "emoji", clientID: P1, recipient: P2, emoji: 0 },
@@ -94,8 +90,6 @@ const SAMPLE_INTENTS: StampedIntent[] = [
     unit: UnitType.City,
     unitId: 88,
   },
-  { type: "embargo", clientID: P1, targetID: P2, action: "start" },
-  { type: "embargo_all", clientID: P1, action: "stop" },
   { type: "move_warship", clientID: P3, unitIds: [1, 2, 3], tile: 555 },
   { type: "delete_unit", clientID: P3, unitId: 9 },
   { type: "mark_disconnected", clientID: P1, isDisconnected: true },
@@ -126,7 +120,7 @@ const SERVER_MESSAGES: ServerMessage[] = [
   },
   {
     type: "prestart",
-    gameMap: GameMapType.Europe,
+    gameMap: GameMapType.Britannia,
     gameMapSize: GameMapSize.Compact,
   },
   {
@@ -139,19 +133,17 @@ const SERVER_MESSAGES: ServerMessage[] = [
       lobbyCreatedAt: 1_700_000_000_000,
       config: CONFIG,
       players: [
-        { clientID: P1, username: "alpha", clanTag: "ABC" },
+        { clientID: P1, username: "alpha" },
         {
           clientID: P2,
           username: "bravo",
-          clanTag: null,
           isLobbyCreator: true,
           teamIndex: 1,
           friends: [P1],
           cosmetics: { flag: "flag:mars", verified: true },
         },
-        { clientID: P3, username: "charlie", clanTag: null },
+        { clientID: P3, username: "charlie" },
       ],
-      tribes: [{ name: "Wolves" }],
     },
   },
   {
@@ -173,8 +165,8 @@ const SERVER_MESSAGES: ServerMessage[] = [
       startsAt: 1_700_000_030_000,
       gameConfig: CONFIG,
       clients: [
-        { clientID: P1, username: "alpha", clanTag: null, teamIndex: 0 },
-        { clientID: P2, username: "bravo", clanTag: "XY", verified: true },
+        { clientID: P1, username: "alpha", teamIndex: 0 },
+        { clientID: P2, username: "bravo", verified: true },
       ],
       lobbyCreatorClientID: P1,
     },
@@ -197,7 +189,6 @@ const CLIENT_MESSAGES: ClientMessage[] = [
     token: TOKEN,
     gameID: "gM3xQ1zR",
     username: "alpha",
-    clanTag: "ABC",
     turnstileToken: null,
     cosmetics: {
       flag: "country:us",
@@ -225,7 +216,7 @@ const CLIENT_MESSAGES: ClientMessage[] = [
         kills: [{ victim: P2, tick: 400n }],
         units: { city: [3n, 0n, 0n, 0n, 1n] },
       },
-      [P2]: { betrayals: 1n, finalTiles: 5000n },
+      [P2]: { peakTroops: 1n, finalTiles: 5000n },
     },
   },
   {
@@ -474,7 +465,7 @@ describe("zbin wire: client messages", () => {
     const msg: ClientMessage = {
       type: "winner",
       winner: ["team", "Red", P1],
-      allPlayersStats: { [P1]: { gold: [huge], betrayals: -7n } },
+      allPlayersStats: { [P1]: { gold: [huge], peakTroops: -7n } },
     };
     const decoded = decodeClientMessage(encodeClientMessage(msg, cctx), sctx);
     expect(decoded).toEqual(msg);
@@ -487,11 +478,11 @@ describe("zbin wire: client messages", () => {
     const asBigint: ClientMessage = {
       type: "winner",
       winner: undefined,
-      allPlayersStats: { [P1]: { betrayals: 42n } },
+      allPlayersStats: { [P1]: { peakTroops: 42n } },
     };
     const asString = {
       ...asBigint,
-      allPlayersStats: { [P1]: { betrayals: "42" } },
+      allPlayersStats: { [P1]: { peakTroops: "42" } },
     };
     expect(
       encodeClientMessage(asString as unknown as ClientMessage, cctx),

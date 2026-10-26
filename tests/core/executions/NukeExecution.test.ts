@@ -3,6 +3,7 @@ import {
   MessageType,
   PlayerInfo,
   PlayerType,
+  Relation,
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
 import { OTHER_INDEX_DESTROY } from "@openfront/engine-api/StatsSchemas";
@@ -33,7 +34,7 @@ describe("NukeExecution", () => {
       inner: 10,
       outer: 10,
     }));
-    (game.config() as TestConfig).nukeAllianceBreakThreshold = vi.fn(() => 5);
+    (game.config() as TestConfig).nukeAngerThreshold = vi.fn(() => 5);
 
     player = game.player("player_id");
     otherPlayer = game.player("other_id");
@@ -136,10 +137,7 @@ describe("NukeExecution", () => {
     );
   });
 
-  test("nuke should break alliances on launch", async () => {
-    const req = player.createAllianceRequest(otherPlayer);
-    req!.accept();
-
+  test("nuke angers the players it would hit on launch", async () => {
     player.conquer(game.ref(1, 1));
     player.buildUnit(UnitType.MissileSilo, game.ref(1, 1), {});
 
@@ -157,8 +155,7 @@ describe("NukeExecution", () => {
     game.executeNextTick(); // init
     game.executeNextTick(); // exec
 
-    expect(player.isTraitor()).toBe(true);
-    expect(player.isAlliedWith(otherPlayer)).toBe(false);
+    expect(otherPlayer.relation(player)).toBe(Relation.Hostile);
   });
 
   test("AtomBomb detonation emits NUKE_DETONATED to each impacted player", () => {
@@ -254,12 +251,7 @@ describe("NukeExecution", () => {
     displayMessageSpy.mockRestore();
   });
 
-  test("nuke should break alliance when destroying ally's building even with few tiles", async () => {
-    const req = player.createAllianceRequest(otherPlayer);
-    req!.accept();
-
-    expect(player.isAlliedWith(otherPlayer)).toBe(true);
-
+  test("nuke angers a player whose building it destroys, even with few tiles", async () => {
     player.conquer(game.ref(1, 1));
     player.buildUnit(UnitType.MissileSilo, game.ref(1, 1), {});
 
@@ -272,8 +264,8 @@ describe("NukeExecution", () => {
 
     expect(otherPlayer.units(UnitType.Port)).toHaveLength(1);
 
-    // Nuke targeting the ally's port - this should break alliance
-    // even though the tile count is below threshold
+    // Nuke targeting the port: this angers the owner even though the tile
+    // count is below the threshold
     game.addExecution(
       new NukeExecution(UnitType.AtomBomb, player, game.ref(50, 50), null),
     );
@@ -281,9 +273,7 @@ describe("NukeExecution", () => {
     game.executeNextTick(); // init
     game.executeNextTick(); // exec
 
-    // Alliance should be broken because we're destroying ally's building
-    expect(player.isTraitor()).toBe(true);
-    expect(player.isAlliedWith(otherPlayer)).toBe(false);
+    expect(otherPlayer.relation(player)).toBe(Relation.Hostile);
   });
 
   test("drainNukeImpacts returns all queued tiles after detonation and empty on subsequent drain", () => {
@@ -584,21 +574,15 @@ describe("NukeExecution kill credit", () => {
     return { g, launcher };
   }
 
-  test("credits only the enemy's units, not the launcher's own or an ally's", async () => {
+  test("credits only the enemy's units, not the launcher's own", async () => {
     const { g, launcher } = await nukeGame(GameMode.FFA, [
       new PlayerInfo("launcher", PlayerType.Human, "c1", "launcher_id"),
-      new PlayerInfo("ally", PlayerType.Human, "c2", "ally_id"),
       new PlayerInfo("enemy", PlayerType.Human, "c3", "enemy_id"),
     ]);
-    const ally = g.player("ally_id");
     const enemy = g.player("enemy_id");
-    launcher.createAllianceRequest(ally)!.accept();
 
     launcher.buildUnit(UnitType.Warship, g.ref(50, 52), {
       patrolTile: g.ref(50, 52),
-    });
-    ally.buildUnit(UnitType.Warship, g.ref(52, 50), {
-      patrolTile: g.ref(52, 50),
     });
     enemy.buildUnit(UnitType.Warship, g.ref(48, 50), {
       patrolTile: g.ref(48, 50),
@@ -610,9 +594,7 @@ describe("NukeExecution kill credit", () => {
     executeTicks(g, 200);
 
     expect(launcher.units(UnitType.Warship)).toHaveLength(0);
-    expect(ally.units(UnitType.Warship)).toHaveLength(0);
     expect(enemy.units(UnitType.Warship)).toHaveLength(0);
-    expect(launcher.isAlliedWith(ally)).toBe(true);
     expect(warshipsDestroyed(g, launcher)).toBe(1n);
   });
 
@@ -624,20 +606,14 @@ describe("NukeExecution kill credit", () => {
         "c1",
         "launcher_id",
         false,
-        "ALPHA",
+        [],
+        0,
       ),
-      new PlayerInfo("mate", PlayerType.Human, "c2", "mate_id", false, "ALPHA"),
-      new PlayerInfo("afk", PlayerType.Human, "c3", "afk_id", false, "ALPHA"),
-      new PlayerInfo(
-        "enemy",
-        PlayerType.Human,
-        "c4",
-        "enemy_id",
-        false,
-        "BETA",
-      ),
-      new PlayerInfo("e2", PlayerType.Human, "c5", "e2_id", false, "BETA"),
-      new PlayerInfo("e3", PlayerType.Human, "c6", "e3_id", false, "BETA"),
+      new PlayerInfo("mate", PlayerType.Human, "c2", "mate_id", false, [], 0),
+      new PlayerInfo("afk", PlayerType.Human, "c3", "afk_id", false, [], 0),
+      new PlayerInfo("enemy", PlayerType.Human, "c4", "enemy_id", false, [], 1),
+      new PlayerInfo("e2", PlayerType.Human, "c5", "e2_id", false, [], 1),
+      new PlayerInfo("e3", PlayerType.Human, "c6", "e3_id", false, [], 1),
     ]);
     const mate = g.player("mate_id");
     const afk = g.player("afk_id");

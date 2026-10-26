@@ -155,7 +155,6 @@ async function main(): Promise<void> {
     lobbyCreatedAt: info.lobbyCreatedAt,
     config: info.config,
     players,
-    tribes: info.tribes,
   });
 
   console.log(
@@ -181,7 +180,6 @@ async function main(): Promise<void> {
         p.clientID,
         random.nextID(),
         p.isLobbyCreator ?? false,
-        p.clanTag,
         p.friends ?? [],
         p.teamIndex ?? null,
       ),
@@ -206,12 +204,7 @@ async function main(): Promise<void> {
   let fatalError: string | undefined;
   const runner = new GameRunner(
     game,
-    new Executor(
-      game,
-      gameStart.gameID,
-      undefined,
-      gameStart.tribes?.map((t) => t.name),
-    ),
+    new Executor(game, gameStart.gameID, undefined),
     (gu) => {
       if ("errMsg" in gu) {
         fatalError = `${gu.errMsg}\n${gu.stack ?? ""}`;

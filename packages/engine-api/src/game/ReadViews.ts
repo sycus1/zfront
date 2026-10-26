@@ -9,7 +9,7 @@ import {
 
 /*
  * Read-only views of game state that rules code (Config, UnitGrid,
- * execution/NukeAlliance) runs on. The engine's Player/Unit/Game and the client's
+ * execution/NukeBlast) runs on. The engine's Player/Unit/Game and the client's
  * PlayerView/UnitView/GameView both satisfy them, so the same rules run on
  * either side without the rules importing the engine or the client.
  *

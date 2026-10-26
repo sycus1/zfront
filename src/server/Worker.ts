@@ -40,25 +40,21 @@ import { Client } from "./Client";
 import { gameApiCors } from "./GameApiCors";
 import { GameManager } from "./GameManager";
 import { registerGamePreviewRoute } from "./GamePreviewRoute";
-import { GamePhase, type GameServer } from "./GameServer";
+import { type GameServer } from "./GameServer";
 import {
-  isSteamAuthenticated,
   type JoinVerifyResponse,
   planJoinVerify,
   verifyJoin,
 } from "./JoinVerify";
 import { getUserMe, userMeFailureClose, verifyClientToken } from "./jwt";
 import { levelBadgeForPlayer } from "./LevelBadge";
-import { payForLobbyQueue, queueListedLobby } from "./LobbyQueuePayment";
 import { logger } from "./Logger";
 import { registerPlayerProfileRoute } from "./PlayerProfileRoute";
 import { resolveVerifiedJoin } from "./Privilege";
 
 import { loadGatekeeper } from "./Gatekeeper";
-import { MapPlaylist } from "./MapPlaylist";
 import { setNoStoreHeaders } from "./NoStoreHeaders";
 import { PrivilegeRefresher } from "./PrivilegeRefresher";
-import { startRankedCheckinLoops } from "./RankedCheckin";
 import { rejoinOrClose } from "./Rejoin";
 import { ServerEnv } from "./ServerEnv";
 import { SingleplayerPresence } from "./SingleplayerPresence";
@@ -72,7 +68,6 @@ const log = logger.child({ comp: `w_${workerId}` });
 
 // The WebSocket server's max payload.
 const MAX_WEBSOCKET_PAYLOAD_BYTES = 1024 * 1024;
-const playlist = new MapPlaylist();
 
 export function clampApprovedUsername(username: string): string {
   return username.length > MAX_USERNAME_LENGTH
@@ -89,18 +84,17 @@ export function isSocketClosed(
 }
 
 export type JoinOutcome =
-  | { action: "admit"; username: string; clanTag: string | null }
+  | { action: "admit"; username: string }
   | { action: "reject"; reason: string; errorCodes?: string[] };
 
 export function resolveJoinVerdict(
   verdict: JoinVerifyResponse,
-  fallback: { username: string; clanTag: string | null },
+  fallback: { username: string },
 ): JoinOutcome {
   if (verdict.status === "approved") {
     return {
       action: "admit",
       username: clampApprovedUsername(verdict.username),
-      clanTag: verdict.clanTag,
     };
   }
   if (verdict.status === "rejected") {
@@ -117,7 +111,6 @@ export function resolveJoinVerdict(
     username: verdict.identity
       ? clampApprovedUsername(verdict.identity.username)
       : fallback.username,
-    clanTag: verdict.identity ? verdict.identity.clanTag : fallback.clanTag,
   };
 }
 
@@ -301,22 +294,6 @@ export async function startWorker() {
   const lobbyService = new WorkerLobbyService(server, wss, gm, log);
   const singleplayerPresence = new SingleplayerPresence();
 
-  setTimeout(
-    () => {
-      // The ranked loop follows the deployment-active flag the master pushes
-      // to this worker (OPE-469): a draining, standby or fenced server keeps
-      // the games it has but stops offering new matches.
-      startRankedCheckinLoops({
-        gm,
-        playlist,
-        workerId,
-        log,
-        isActive: () => lobbyService.isDeploymentActive(),
-      });
-    },
-    1000 + Math.random() * 2000,
-  );
-
   if (ServerEnv.otelEnabled()) {
     initWorkerMetrics(gm, lobbyService, singleplayerPresence);
   }
@@ -324,7 +301,6 @@ export async function startWorker() {
   const privilegeRefresher = new PrivilegeRefresher(
     ServerEnv.jwtIssuer() + "/cosmetics.json",
     ServerEnv.apiKey(),
-    ServerEnv.jwtIssuer() + "/reserved_clan_tags",
     log,
   );
   void privilegeRefresher.start();
@@ -484,50 +460,6 @@ export async function startWorker() {
   });
 
   registerListingRoute({ app, gm, lobbyService, log });
-
-  // The host of a listed lobby pays (plutonium, charged by the API with the
-  // host's token) to put it in the public Special queue, right behind the
-  // lobby that's counting down.
-  app.post("/api/game/:id/queue", async (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith("Bearer ")) {
-      return res.status(400).json({ error: "Authorization header required" });
-    }
-    const token = authHeader.substring("Bearer ".length);
-    const auth = await verifyClientToken(token);
-    if (auth.type !== "success") {
-      return res.status(401).json({ error: "Invalid token" });
-    }
-
-    const game = gm.game(req.params.id);
-    if (game === null) {
-      return res.status(404).json({ error: "Game not found" });
-    }
-    const outcome = await queueListedLobby(
-      {
-        isCreator: (id) => game.isCreator(id),
-        isPublic: () => game.isPublic(),
-        isListed: () => game.isListed(),
-        isQueued: () => game.isQueued(),
-        inLobby: () => game.phase() === GamePhase.Lobby && !game.hasStarted(),
-        startsAt: () => game.gameInfo().startsAt,
-        autoStartAt: () => game.autoStartAt(),
-        queueForPublic: () => game.queueForPublic(),
-      },
-      auth.persistentId,
-      // Dev has no payment backend; skip the charge so the feature is
-      // testable locally (same precedent as the listing subscription check).
-      ServerEnv.env() === GameEnv.Dev
-        ? async () => ({ type: "success" })
-        : () => payForLobbyQueue(token, game.id),
-    );
-    if (outcome.status === 502) {
-      log.warn("lobby queue payment failed", { gameID: game.id });
-    } else if (outcome.status === 200) {
-      log.info("lobby queued for public play", { gameID: game.id });
-    }
-    res.status(outcome.status).json(outcome.body);
-  });
 
   // Singleplayer games run in the browser; the client beats here once a
   // minute so the worker can export how many are in progress (see
@@ -702,14 +634,11 @@ export async function startWorker() {
         // join_verify doesn't cover: Dev and API failure (fail-open joins).
         // An approved join_verify overwrites it with the API's display-ready
         // pair below.
-        let { username, clanTag } = censorPlayer(
-          clientMsg.username,
-          clientMsg.clanTag ?? null,
-        );
+        let { username } = censorPlayer(clientMsg.username);
 
         // Gate the join and screen the display name in one API call: status
         // is the Turnstile verdict, and the response carries the
-        // display-ready (username, clanTag) pair, so a banned name is never
+        // display-ready username, so a banned name is never
         // visible — not even in the lobby. Turnstile gates the FIRST join
         // only: an already-admitted player who reconnects or refreshes must
         // not be re-challenged — their original token is single-use and was
@@ -730,29 +659,16 @@ export async function startWorker() {
         );
         if (ServerEnv.env() !== GameEnv.Dev) {
           const stored = game?.storedIdentity(persistentId) ?? null;
-          const steamAuthed = isSteamAuthenticated(claims);
           // SECURITY: the reject/skip/verify split (first joins must
           // present a token, only re-admits may omit it) lives in
-          // planJoinVerify — see its doc comment. Steam-authenticated first
-          // joins are the one sanctioned null-token first join: Steam
-          // ownership (a signed, unforgeable provider="steam" claim) stands
-          // in for the bot check, and the name check still runs.
+          // planJoinVerify — see its doc comment.
           const plan = planJoinVerify({
             isReadmit,
             gameStarted: game?.hasStarted() ?? false,
             turnstileToken: clientMsg.turnstileToken ?? null,
             identityUnchanged:
-              stored !== null &&
-              stored.username === clientMsg.username &&
-              stored.clanTag === (clientMsg.clanTag ?? null),
-            steamAuthed,
+              stored !== null && stored.username === clientMsg.username,
           });
-          if (steamAuthed && !isReadmit) {
-            log.info(
-              "Steam-authed join: skipping Turnstile siteverify (name check still runs)",
-              { persistentID: persistentId, gameID: clientMsg.gameID },
-            );
-          }
           if (plan.action === "reject") {
             log.warn("Unauthorized: missing Turnstile token", {
               persistentID: persistentId,
@@ -766,7 +682,6 @@ export async function startWorker() {
               ip,
               plan.token,
               clientMsg.username,
-              clientMsg.clanTag ?? null,
               persistentId,
             );
             if (verdict.status === "approved" || verdict.status === "error") {
@@ -775,10 +690,7 @@ export async function startWorker() {
             if (isSocketClosed(ws)) {
               return;
             }
-            const resolved = resolveJoinVerdict(verdict, {
-              username,
-              clanTag,
-            });
+            const resolved = resolveJoinVerdict(verdict, { username });
             if (resolved.action === "reject") {
               log.warn("Unauthorized: Turnstile token rejected", {
                 persistentID: persistentId,
@@ -792,7 +704,6 @@ export async function startWorker() {
               return;
             }
             username = resolved.username;
-            clanTag = resolved.clanTag;
 
             if (verdict.status === "error") {
               const fields = {
@@ -824,7 +735,7 @@ export async function startWorker() {
             persistentId,
             clientMsg.gameID,
             0,
-            verifySkipped ? undefined : { username, clanTag },
+            verifySkipped ? undefined : { username },
           )
         ) {
           return;
@@ -833,7 +744,6 @@ export async function startWorker() {
         let flares: string[] | undefined;
         let publicId: string | undefined;
         let friends: string[] = [];
-        let ownedClanTags: string[] = [];
         let trusted = false;
         let levelBadge: LevelBadge | undefined;
         let accountUsername:
@@ -871,7 +781,6 @@ export async function startWorker() {
           flares = result.response.player.flares;
           publicId = result.response.player.publicId;
           friends = result.response.player.friends;
-          ownedClanTags = result.response.player.clans?.map((c) => c.tag) ?? [];
           accountUsername = result.response.player;
           trusted = result.response.player.trustTier === "trusted";
           // Display-only: the roster badge comes from this lookup alone, never
@@ -892,21 +801,6 @@ export async function startWorker() {
             }
           }
         }
-
-        // Enforce clan tag ownership: a player can wear a tag only if they're
-        // a member; a real clan they're not in (or an unverifiable tag) is
-        // dropped to prevent impersonation. Fictional tags pass through.
-        const resolution = privilegeRefresher
-          .get()
-          .resolveClanTag(clanTag, ownedClanTags);
-        if (resolution.dropped) {
-          log.warn("Dropped clan tag: player is not a member", {
-            persistentID: persistentId,
-            gameID: clientMsg.gameID,
-            clanTag,
-          });
-        }
-        const resolvedClanTag = resolution.tag;
 
         const cosmeticResult = privilegeRefresher
           .get()
@@ -955,7 +849,6 @@ export async function startWorker() {
           flares,
           ip,
           username,
-          resolvedClanTag,
           ws,
           cosmeticResult.cosmetics,
           publicId,

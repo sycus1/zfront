@@ -5,7 +5,6 @@ import {
   Relation,
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
-import { AllianceView } from "@openfront/engine-api/game/GameUpdates";
 import { UnitLike } from "@openfront/engine-api/game/ReadViews";
 import { renderNumber, renderTroops } from "@openfront/engine-lib/Format";
 import { assetUrl } from "@openfront/shared/AssetUrls";
@@ -16,8 +15,6 @@ import { Controller } from "../../Controller";
 import {
   ContextMenuEvent,
   DoBoatAttackEvent,
-  DoBreakAllianceEvent,
-  DoRequestAllianceEvent,
   DoTargetPlayerEvent,
   MouseMoveEvent,
   TouchEvent,
@@ -29,7 +26,6 @@ import { UserSettings } from "../../UserSettings";
 import {
   formatKeyForDisplay,
   getTranslatedPlayerTeamLabel,
-  renderDuration,
   translateText,
 } from "../../Utils";
 import { GameView, PlayerView, UnitView } from "../../view";
@@ -46,13 +42,9 @@ import { CloseRadialMenuEvent } from "./RadialMenu";
 import "./RelationSmiley";
 import { SpawnBarVisibleEvent } from "./SpawnTimer";
 const soldierIconAquarius = assetUrl("images/SoldierIconAquarius.svg");
-const allianceIcon = assetUrl("images/AllianceIcon.svg");
-const traitorIcon = assetUrl("images/TraitorIcon.svg");
 const warshipIcon = assetUrl("images/BattleshipIconWhite.svg");
 const emojiIcon = assetUrl("images/EmojiIconWhite.svg");
 const chatIcon = assetUrl("images/ChatIconWhite.svg");
-const requestAllianceIcon = assetUrl("images/AllianceIconWhite.svg");
-const breakAllianceIcon = assetUrl("images/TraitorIconWhite.svg");
 const targetIcon = assetUrl("images/TargetIconWhite.svg");
 const boatIcon = assetUrl("images/BoatIconWhite.svg");
 const cityIcon = assetUrl("images/CityIconWhite.svg");
@@ -101,8 +93,6 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
   /** What I can do to the hovered player, for its action buttons. */
   @state() private playerActions: {
     player: PlayerView;
-    requestAlliance: boolean;
-    breakAlliance: boolean;
     target: boolean;
     boat: boolean;
   } | null = null;
@@ -164,12 +154,6 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
     this.eventBus.on(ImmunityBarVisibleEvent, (e) => {
       this.immunityBarVisible = e.visible;
     });
-    this.eventBus.on(DoRequestAllianceEvent, (e) =>
-      this.markActionTaken(e.tile, "requestAlliance"),
-    );
-    this.eventBus.on(DoBreakAllianceEvent, (e) =>
-      this.markActionTaken(e.tile, "breakAlliance"),
-    );
     this.eventBus.on(DoTargetPlayerEvent, (e) =>
       this.markActionTaken(e.tile, "target"),
     );
@@ -181,10 +165,7 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
   // would still offer it. The next refresh, a second later, shows the real
   // state. A keybind (no tile) acts under the cursor, which is the shown
   // player unless the pointer is on the panel.
-  private markActionTaken(
-    tile: TileRef | undefined,
-    action: "requestAlliance" | "breakAlliance" | "target",
-  ) {
+  private markActionTaken(tile: TileRef | undefined, action: "target") {
     const actions = this.playerActions;
     if (!actions || actions.player !== this.player) return;
     const onShownPlayer =
@@ -257,7 +238,7 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
   }
 
   // Asks what I can do to the hovered player when it changes, and at most
-  // once a second while it stays (alliances and boat reach change in play).
+  // once a second while it stays (boat reach changes in play).
   private refreshPlayerActions(player: PlayerView, tile: TileRef) {
     const myPlayer = this.game.myPlayer();
     if (!myPlayer || player === myPlayer || !this.showShortcutButtons()) {
@@ -289,8 +270,6 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
         const can = actions.interaction;
         this.playerActions = {
           player,
-          requestAlliance: can?.canSendAllianceRequest ?? false,
-          breakAlliance: can?.canBreakAlliance ?? false,
           target: can?.canTarget ?? false,
           boat: actions.buildableUnits.some(
             (u) => u.type === UnitType.TransportShip && u.canBuild !== false,
@@ -362,16 +341,6 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
       : "";
   }
 
-  private allianceExpirationText(alliance: AllianceView) {
-    const { expiresAt } = alliance;
-    const remainingTicks = expiresAt - this.game.ticks();
-    let remainingSeconds = 0;
-    if (remainingTicks > 0) {
-      remainingSeconds = Math.max(0, Math.floor(remainingTicks / 10)); // 10 ticks per second
-    }
-    return renderDuration(remainingSeconds);
-  }
-
   private renderPlayerNameIcons(icons: ReturnType<typeof getPlayerIcons>) {
     if (icons.length === 0) {
       return html``;
@@ -400,36 +369,21 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
     nameLength: number;
     iconCount: number;
     hasFlag: boolean;
-    hasBetrayal: boolean;
-    hasAlliance: boolean;
     typeAndTeamLen: number;
-  }): { fontSize: string; isAllianceWrapped: boolean } {
-    const {
-      nameLength,
-      iconCount,
-      hasFlag,
-      hasBetrayal,
-      hasAlliance,
-      typeAndTeamLen,
-    } = params;
+  }): { fontSize: string } {
+    const { nameLength, iconCount, hasFlag, typeAndTeamLen } = params;
 
     // Approximate char-widths each element occupies at --text-lg.
     const DESKTOP_PRESSURE = {
       perIcon: 2.0,
       icon: 0.5,
       flag: 3.5,
-      betrayal: 4.2,
-      alliance: 6.7,
-      allianceWrapped: 3.9,
     } as const;
 
     const MOBILE_PRESSURE = {
       perIcon: 2.2,
       icon: 0.5,
       flag: 4.2,
-      betrayal: 4.6,
-      alliance: 8.6,
-      allianceWrapped: 4.8,
     } as const;
 
     const width = window.innerWidth;
@@ -448,8 +402,7 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
       typeAndTeamPressure +
       iconCount * PRESSURE.perIcon +
       (iconCount ? PRESSURE.icon : 0) +
-      (hasFlag ? PRESSURE.flag : 0) +
-      (hasBetrayal ? PRESSURE.betrayal : 0);
+      (hasFlag ? PRESSURE.flag : 0);
 
     let capacity: number;
 
@@ -473,22 +426,12 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
       capacity = 31.1;
     }
 
-    let isAllianceWrapped = false;
-    let alliancePressure = hasAlliance ? PRESSURE.alliance : 0;
-    let scale = (capacity - (basePressure + alliancePressure)) / nameLength;
-
-    // If alliance active and font scale < 0.85
-    // word-wrap alliance (icon & duration) to reduce width.
-    if (hasAlliance && scale < 0.85) {
-      isAllianceWrapped = true;
-      alliancePressure = PRESSURE.allianceWrapped;
-      scale = (capacity - (basePressure + alliancePressure)) / nameLength;
-    }
+    const scale = (capacity - basePressure) / nameLength;
 
     const textSize = isDesktop ? "lg" : "sm";
     const fontSize = `clamp(var(--text-${textSize}) * .65, var(--text-${textSize}) * ${scale.toFixed(3)}, var(--text-${textSize}))`;
 
-    return { fontSize, isAllianceWrapped };
+    return { fontSize };
   }
 
   private renderShortcutButton(
@@ -524,10 +467,6 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
   private renderPlayerInfo(player: PlayerView) {
     const myPlayer = this.game.myPlayer();
     const isFriendly = myPlayer?.isFriendly(player);
-    const isAllied = myPlayer?.isAlliedWith(player);
-    const traitorTicks = player.getTraitorRemainingTicks();
-    let allianceHtml: TemplateResult | null = null;
-    let betrayalHtml: TemplateResult | null = null;
     const firstPlace = getFirstPlacePlayer(this.game);
     const playerIcons = getPlayerIcons({ game: this.game, player, firstPlace });
     const maxTroops = this.game.config().maxTroops(player);
@@ -549,74 +488,21 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
         playerType = translateText("player_type.player");
         break;
     }
-    const clanTag = this.game.teamClanTag(player.team());
-    const playerTeam = getTranslatedPlayerTeamLabel(player.team(), clanTag);
+    const playerTeam = getTranslatedPlayerTeamLabel(player.team());
 
     const typeLen = playerType.length;
     const hasTeam = playerTeam !== "" && player.type() !== PlayerType.Bot;
-    const teamStr = clanTag ?? playerTeam;
-    const teamLen = hasTeam ? teamStr.length + 2 : 0; // +2 for brackets
+    const teamLen = hasTeam ? playerTeam.length + 2 : 0; // +2 for brackets
 
     // The column width is determined by the longest string in the flex-col
     const typeAndTeamLen = Math.max(typeLen, teamLen);
 
-    const { fontSize, isAllianceWrapped } = this.getNameFontSize({
+    const { fontSize } = this.getNameFontSize({
       nameLength: player.displayName().length,
       iconCount: playerIcons.length,
       hasFlag: !!player.cosmetics.flag,
-      hasBetrayal: traitorTicks > 0,
-      hasAlliance: isAllied ?? false,
       typeAndTeamLen,
     });
-
-    if (isAllied) {
-      const alliance = myPlayer
-        ?.alliances()
-        .find((alliance) => alliance.other === player.id());
-      if (alliance !== undefined) {
-        allianceHtml = isAllianceWrapped
-          ? html`<div
-              class="${
-                traitorTicks === 0 ? "ml-auto" : ""
-              } flex flex-col items-center gap-0 text-xs font-bold leading-none shrink-0"
-            >
-              <img
-                src=${allianceIcon}
-                width="14"
-                height="14"
-                class="shrink-0"
-              />
-              <span class="text-[10px] leading-tight"
-                >${this.allianceExpirationText(alliance)}</span
-              >
-            </div>`
-          : html`<div
-              class="${
-                traitorTicks === 0 ? "ml-auto" : ""
-              } flex items-center mr-0 gap-1 text-xs font-bold leading-tight shrink-0"
-            >
-              <img
-                src=${allianceIcon}
-                width="18"
-                height="18"
-                class="shrink-0"
-              />
-              <span>${this.allianceExpirationText(alliance)}</span>
-            </div>`;
-      }
-    }
-
-    if (traitorTicks > 0) {
-      betrayalHtml = html`<span class="flex ml-auto items-center shrink-0 "
-        ><img src=${traitorIcon} alt="" class="w-4 h-4 shrink-0" />
-        <span
-          class="text-sm text-red-900 
-          drop-shadow-[-.2px_-.2px_.8px_rgba(0,0,0,.7),.2px_.2px_.8px_rgba(0,0,0,.7)]"
-        >
-          ${renderDuration(Math.floor(traitorTicks / 10))} </span
-        ><span></span
-      ></span>`;
-    }
 
     const keybinds = this.userSettings.keybinds(Platform.isMac);
 
@@ -722,7 +608,7 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
                           .current()
                           .teamColor(player.team()!)
                           .toHex()}"
-                        >${clanTag ?? playerTeam}</span
+                        >${playerTeam}</span
                       >]</span
                     >
                   </div>`
@@ -731,8 +617,7 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
                     >${playerType}</span
                   >`
             }
-            ${this.renderPlayerNameIcons(playerIcons)} ${betrayalHtml ?? ""}
-            ${allianceHtml ?? ""}
+            ${this.renderPlayerNameIcons(playerIcons)}
           </div>
           <div class="flex gap-0.5 lg:gap-1 items-center mt-0.5">
             ${this.displayUnitCount(player, UnitType.City, cityIcon)}
@@ -760,8 +645,7 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
     `;
   }
 
-  // Right side: what I can do to the player, each with its keybind. Request
-  // and break alliance share a slot, as only one applies at a time. The
+  // Right side: what I can do to the player, each with its keybind. The
   // column keeps its width when empty, so the panel doesn't shift.
   private renderActionButtons(
     player: PlayerView,
@@ -774,26 +658,6 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
         : null;
     const tile = this.tile ?? undefined;
     const buttons: TemplateResult[] = [];
-    if (can?.requestAlliance) {
-      buttons.push(
-        this.renderShortcutButton(
-          requestAllianceIcon,
-          translateText("player_panel.send_alliance"),
-          keybinds.requestAlliance,
-          () =>
-            this.eventBus.emit(new DoRequestAllianceEvent(tile, player.id())),
-        ),
-      );
-    } else if (can?.breakAlliance) {
-      buttons.push(
-        this.renderShortcutButton(
-          breakAllianceIcon,
-          translateText("player_panel.break_alliance"),
-          keybinds.breakAlliance,
-          () => this.eventBus.emit(new DoBreakAllianceEvent(tile, player.id())),
-        ),
-      );
-    }
     if (can?.target) {
       buttons.push(
         this.renderShortcutButton(

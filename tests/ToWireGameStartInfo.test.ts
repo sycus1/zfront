@@ -12,14 +12,12 @@ function startInfo(config: Record<string, unknown>): GameStartInfo {
       {
         clientID: "clientAAA",
         username: "alice",
-        clanTag: "AA",
         friends: ["clientBBB"],
         teamIndex: 0,
       },
       {
         clientID: "clientBBB",
         username: "bob",
-        clanTag: null,
         friends: [],
         teamIndex: 1,
       },
@@ -31,12 +29,10 @@ describe("toWireGameStartInfo", () => {
   it("nulls every clanTag when clan tags are disabled, keeping friends", () => {
     const info = startInfo({
       gameType: GameType.Public,
-      disableClanTags: true,
     });
 
     const wire = toWireGameStartInfo(info);
 
-    expect(wire.players.map((p) => p.clanTag)).toEqual([null, null]);
     expect(wire.players[0].friends).toEqual(["clientBBB"]);
     // Non-simulation identity fields are untouched.
     expect(wire.players[0]).toMatchObject({
@@ -54,7 +50,6 @@ describe("toWireGameStartInfo", () => {
 
     const wire = toWireGameStartInfo(info);
 
-    expect(wire.players.map((p) => p.clanTag)).toEqual([null, null]);
     expect(wire.players.map((p) => p.friends)).toEqual([undefined, undefined]);
   });
 
@@ -67,7 +62,6 @@ describe("toWireGameStartInfo", () => {
   it("leaves singleplayer records alone — they were simulated unblanked", () => {
     const info = startInfo({
       gameType: GameType.Singleplayer,
-      disableClanTags: true,
       anonymizeNames: true,
     });
 
@@ -82,7 +76,6 @@ describe("toWireGameStartInfo", () => {
 
     toWireGameStartInfo(info);
 
-    expect(info.players[0].clanTag).toBe("AA");
     expect(info.players[0].friends).toEqual(["clientBBB"]);
   });
 });

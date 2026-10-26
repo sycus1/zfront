@@ -45,10 +45,7 @@ import { flattenedEmojiTable } from "@openfront/engine-api/Schemas";
 import { EventBus } from "@openfront/shared/EventBus";
 import { actionButton } from "../../../../src/client/components/ui/ActionButton";
 import { PlayerPanel } from "../../../../src/client/hud/layers/PlayerPanel";
-import {
-  SendEmbargoIntentEvent,
-  SendEmojiIntentEvent,
-} from "../../../../src/client/Transport";
+import { SendEmojiIntentEvent } from "../../../../src/client/Transport";
 import { PlayerView } from "../../../../src/client/view";
 
 const mockActionButton = actionButton as unknown as ReturnType<typeof vi.fn>;
@@ -84,52 +81,6 @@ function makeGame() {
     gameOver: () => false,
   };
 }
-
-describe("PlayerPanel - embargo intents", () => {
-  let panel: PlayerPanel;
-  let eventBus: EventBus;
-
-  beforeEach(() => {
-    panel = new PlayerPanel();
-    (panel as any).requestUpdate = vi.fn();
-    (panel as any).isVisible = true;
-    (panel as any).g = makeGame();
-    eventBus = new EventBus();
-    panel.eventBus = eventBus;
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
-  test("start-embargo button emits a start SendEmbargoIntentEvent and closes the panel", () => {
-    const events: SendEmbargoIntentEvent[] = [];
-    eventBus.on(SendEmbargoIntentEvent, (e) => events.push(e));
-
-    (panel as any).handleEmbargoClick({ stopPropagation: vi.fn() }, my, other);
-
-    expect(events).toHaveLength(1);
-    expect(events[0].target).toBe(other);
-    expect(events[0].action).toBe("start");
-    expect(panel.isVisible).toBe(false);
-  });
-
-  test("stop-embargo button emits a stop SendEmbargoIntentEvent and closes the panel", () => {
-    const events: SendEmbargoIntentEvent[] = [];
-    eventBus.on(SendEmbargoIntentEvent, (e) => events.push(e));
-
-    (panel as any).handleStopEmbargoClick(
-      { stopPropagation: vi.fn() },
-      my,
-      other,
-    );
-
-    expect(events).toHaveLength(1);
-    expect(events[0].target).toBe(other);
-    expect(events[0].action).toBe("stop");
-    expect(panel.isVisible).toBe(false);
-  });
-});
 
 describe("PlayerPanel - emoji intents", () => {
   let panel: PlayerPanel;
@@ -198,13 +149,9 @@ describe("PlayerPanel - action buttons follow PlayerActions capability flags", (
   test("all capability flags enabled renders every action for another player", () => {
     (panel as any).actions = {
       canSendEmojiAllPlayers: false,
-      canEmbargoAll: true,
       interaction: {
         canSendEmoji: true,
         canTarget: true,
-        canEmbargo: true,
-        canBreakAlliance: true,
-        canSendAllianceRequest: true,
         canDonateGold: true,
         canDonateTroops: true,
       },
@@ -217,31 +164,22 @@ describe("PlayerPanel - action buttons follow PlayerActions capability flags", (
     expect(labels).toContain("player_panel.target");
     expect(labels).toContain("player_panel.troops");
     expect(labels).toContain("player_panel.gold");
-    // canEmbargo picks the stop-trade button (start-trade otherwise).
-    expect(labels).toContain("player_panel.stop_trade");
-    expect(labels).not.toContain("player_panel.start_trade");
-    expect(labels).toContain("player_panel.break_alliance");
-    expect(labels).toContain("player_panel.send_alliance");
   });
 
-  test("no capability flags renders only chat and the start-trade toggle", () => {
+  test("no capability flags renders only chat", () => {
     (panel as any).actions = { interaction: {} };
 
     (panel as any).renderActions(my, other);
 
     const labels = renderedLabels();
     expect(labels).toContain("player_panel.chat");
-    expect(labels).toContain("player_panel.start_trade");
     expect(labels).not.toContain("player_panel.emotes");
     expect(labels).not.toContain("player_panel.target");
-    expect(labels).not.toContain("player_panel.break_alliance");
-    expect(labels).not.toContain("player_panel.send_alliance");
   });
 
   test("own panel uses canSendEmojiAllPlayers instead of the interaction flag", () => {
     (panel as any).actions = {
       canSendEmojiAllPlayers: true,
-      canEmbargoAll: true,
       interaction: { canSendEmoji: false },
     };
 
@@ -252,7 +190,6 @@ describe("PlayerPanel - action buttons follow PlayerActions capability flags", (
     mockActionButton.mockClear();
     (panel as any).actions = {
       canSendEmojiAllPlayers: false,
-      canEmbargoAll: true,
       interaction: { canSendEmoji: true },
     };
 

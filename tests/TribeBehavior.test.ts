@@ -4,8 +4,6 @@ import {
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
-import { AllianceExtensionExecution } from "@openfront/engine/execution/alliance/AllianceExtensionExecution";
-import { AllianceRequestExecution } from "@openfront/engine/execution/alliance/AllianceRequestExecution";
 import { AttackExecution } from "@openfront/engine/execution/AttackExecution";
 import { DeleteUnitExecution } from "@openfront/engine/execution/DeleteUnitExecution";
 import { TribeAttackBehavior } from "@openfront/engine/execution/TribeAttackBehavior";
@@ -57,46 +55,6 @@ function tribeExecution(): TribeExecution {
 }
 
 describe("Tribe attacks", () => {
-  it("attacks a neighboring traitor, though it spares humans", async () => {
-    await setupStripes([
-      ["human", PlayerType.Human],
-      ["tribe", PlayerType.Bot],
-      ["traitor", PlayerType.Human],
-    ]);
-    game.player("traitor").markTraitor();
-    const exec = tribeExecution();
-    // Every die roll comes up: attack the traitor, spare the humans
-    vi.spyOn(exec["random"], "chance").mockReturnValue(true);
-    const spy = vi.spyOn(game, "addExecution");
-
-    playTwoRounds(exec);
-
-    expect(attackTargets(spy)).toEqual(["traitor"]);
-  });
-
-  it("breaks its alliance with a neighbor that turns traitor, then attacks it", async () => {
-    await setupStripes([
-      ["tribe", PlayerType.Bot],
-      ["traitor", PlayerType.Human],
-    ]);
-    const traitor = game.player("traitor");
-    game.addExecution(new AllianceRequestExecution(traitor, tribe.id()));
-    game.executeNextTick();
-    game.addExecution(new AllianceRequestExecution(tribe, traitor.id()));
-    game.executeNextTick();
-    expect(tribe.isAlliedWith(traitor)).toBe(true);
-    traitor.markTraitor();
-    const exec = tribeExecution();
-    vi.spyOn(exec["random"], "chance").mockReturnValue(true);
-    const spy = vi.spyOn(game, "addExecution");
-
-    playTwoRounds(exec);
-
-    expect(tribe.isAlliedWith(traitor)).toBe(false);
-    expect(tribe.isTraitor()).toBe(false);
-    expect(attackTargets(spy)).toEqual(["traitor"]);
-  });
-
   it("retaliates against the biggest incoming attack", async () => {
     await setupStripes([
       ["small", PlayerType.Human],
@@ -162,26 +120,5 @@ describe("Tribe upkeep", () => {
       (c) => c[0] instanceof DeleteUnitExecution,
     );
     expect(deletions).toHaveLength(1);
-  });
-
-  it("renews an alliance when its ally asks", async () => {
-    await setupStripes([
-      ["tribe", PlayerType.Bot],
-      ["human", PlayerType.Human],
-    ]);
-    const human = game.player("human");
-    game.addExecution(new AllianceRequestExecution(human, tribe.id()));
-    game.executeNextTick();
-    game.addExecution(new AllianceRequestExecution(tribe, human.id()));
-    game.executeNextTick();
-    game.addExecution(new AllianceExtensionExecution(human, tribe.id()));
-    game.executeNextTick();
-    const alliance = tribe.allianceWith(human)!;
-    const expiresAt = alliance.expiresAt();
-
-    playTwoRounds(tribeExecution());
-    game.executeNextTick();
-
-    expect(alliance.expiresAt()).toBeGreaterThan(expiresAt);
   });
 });

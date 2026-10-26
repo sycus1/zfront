@@ -53,7 +53,6 @@ describe("Bot annexation", () => {
       0, // triggerRatio
       0, // reserveRatio
       0, // expandRatio
-      { maybeBetray: vi.fn() } as any,
       { maybeSendAttackEmoji: vi.fn(), sendEmoji: vi.fn() } as any,
       {} as any,
     );

@@ -10,8 +10,6 @@ export type SoundEffect =
   | "hydrogen-hit"
   | "hydrogen-launch"
   | "mirv-launch"
-  | "alliance-suggested"
-  | "alliance-broken"
   | "build-port"
   | "build-city"
   | "build-defense-post"
@@ -24,8 +22,6 @@ export type SoundEffect =
   | "click-2"
   | "click-3"
   | "slider"
-  | "alliance-accepted"
-  | "alliance-declined"
   | "build-factory"
   | "build-train-station"
   | "transport-ship"
@@ -43,24 +39,19 @@ export const soundEffectUrls: ReadonlyMap<SoundEffect, string> = new Map([
   ["hydrogen-hit", assetUrl("sounds/effects/hydrogen-hit.mp3")],
   ["hydrogen-launch", assetUrl("sounds/effects/hydrogen-launch.mp3")],
   ["mirv-launch", assetUrl("sounds/effects/mirv-launch.mp3")],
-  ["alliance-suggested", assetUrl("sounds/effects/alliance-suggested.mp3")],
-  ["alliance-broken", assetUrl("sounds/effects/alliance-broken.mp3")],
   ["build-port", assetUrl("sounds/effects/build-port.mp3")],
   ["build-city", assetUrl("sounds/effects/build-city.mp3")],
   ["build-defense-post", assetUrl("sounds/effects/build-defense-post.mp3")],
   ["build-warship", assetUrl("sounds/effects/build-warship.mp3")],
   ["sam-built", assetUrl("sounds/effects/sam-built.mp3")],
   ["silo-built", assetUrl("sounds/effects/silo-built.mp3")],
-  // Same morse-code cue as the alliance request, per the designer's notes.
-  // One asset, two registry entries, rather than two identical files.
+  // OpenFront's alliance-request cue; zfront kept it for chat messages.
   ["message", assetUrl("sounds/effects/alliance-suggested.mp3")],
   ["click", assetUrl("sounds/effects/click.mp3")],
   ["click-1", assetUrl("sounds/effects/click-1.mp3")],
   ["click-2", assetUrl("sounds/effects/click-2.mp3")],
   ["click-3", assetUrl("sounds/effects/click-3.mp3")],
   ["slider", assetUrl("sounds/effects/slider.mp3")],
-  ["alliance-accepted", assetUrl("sounds/effects/alliance-accepted.mp3")],
-  ["alliance-declined", assetUrl("sounds/effects/alliance-declined.mp3")],
   ["build-factory", assetUrl("sounds/effects/build-factory.mp3")],
   ["build-train-station", assetUrl("sounds/effects/build-train-station.mp3")],
   ["transport-ship", assetUrl("sounds/effects/transport-ship.mp3")],
@@ -102,10 +93,6 @@ const CUE_CATEGORY: Record<SoundEffect, Exclude<CueCategory, "ambience">> = {
   // Alerts — things the player needs to know, which is why they stay audible
   // when the window is unfocused unless that is turned off.
   "nuke-warning": "alerts",
-  "alliance-suggested": "alerts",
-  "alliance-accepted": "alerts",
-  "alliance-declined": "alerts",
-  "alliance-broken": "alerts",
   message: "alerts",
 
   // Effects — the world and the player's own actions.

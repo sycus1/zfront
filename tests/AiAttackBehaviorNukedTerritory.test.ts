@@ -6,7 +6,6 @@ import {
 } from "@openfront/engine-api/game/GameTypes";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import { AttackExecution } from "@openfront/engine/execution/AttackExecution";
-import { NationAllianceBehavior } from "@openfront/engine/execution/nation/NationAllianceBehavior";
 import { NationAttackBehavior } from "@openfront/engine/execution/nation/NationAttackBehavior";
 import { NationEmojiBehavior } from "@openfront/engine/execution/nation/NationEmojiBehavior";
 import { NationWarshipBehavior } from "@openfront/engine/execution/nation/NationWarshipBehavior";
@@ -150,12 +149,6 @@ async function setupBehavior(
     game,
     nation,
   );
-  const allianceBehavior = new NationAllianceBehavior(
-    new PseudoRandom(42),
-    game,
-    nation,
-    emojiBehavior,
-  );
   const attackBehavior = new NationAttackBehavior(
     new PseudoRandom(42),
     game,
@@ -163,7 +156,6 @@ async function setupBehavior(
     0.0, // triggerRatio — always ready so strategy selection is deterministic
     0.0, // reserveRatio
     0.0, // expandRatio
-    allianceBehavior,
     emojiBehavior,
     new NationWarshipBehavior(
       new PseudoRandom(42),

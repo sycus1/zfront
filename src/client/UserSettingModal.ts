@@ -486,11 +486,6 @@ export class UserSettingModal extends BaseModal {
     this.requestUpdate();
   }
 
-  private sliderNukeAllianceSafetyDuration(e: CustomEvent<{ value: number }>) {
-    this.userSettings.setNukeAllianceSafetyDuration(e.detail.value);
-    this.requestUpdate();
-  }
-
   private toggleGoToPlayer() {
     this.userSettings.toggleGoToPlayer();
 
@@ -1146,26 +1141,6 @@ export class UserSettingModal extends BaseModal {
       </h2>
 
       <setting-keybind
-        action="requestAlliance"
-        label=${translateText("user_setting.request_alliance")}
-        description=${translateText("user_setting.request_alliance_desc")}
-        defaultKey=${this.defaultKeybinds.requestAlliance}
-        .value=${this.getKeyValue("requestAlliance")}
-        .display=${this.getKeyChar("requestAlliance")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="breakAlliance"
-        label=${translateText("user_setting.break_alliance")}
-        description=${translateText("user_setting.break_alliance_desc")}
-        defaultKey=${this.defaultKeybinds.breakAlliance}
-        .value=${this.getKeyValue("breakAlliance")}
-        .display=${this.getKeyChar("breakAlliance")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
         action="targetPlayer"
         label=${translateText("user_setting.target_player")}
         description=${translateText("user_setting.target_player_desc")}
@@ -1573,22 +1548,6 @@ export class UserSettingModal extends BaseModal {
         .value=${String(this.userSettings.attackRatioIncrement())}
         @change=${this.changeAttackRatioIncrement}
       ></setting-select>
-
-      <setting-slider
-        label="${translateText("user_setting.nuke_alliance_safety_label")}"
-        description="${translateText("user_setting.nuke_alliance_safety_desc")}"
-        min="0"
-        max="30"
-        .value=${this.userSettings.nukeAllianceSafetyDuration()}
-        .formatValue=${(val: number) =>
-          val > 0
-            ? translateText("user_setting.nuke_alliance_safety_duration", {
-                count: val,
-                seconds: (val / 10).toFixed(1),
-              })
-            : translateText("user_setting.off")}
-        @change=${this.sliderNukeAllianceSafetyDuration}
-      ></setting-slider>
 
       ${
         this.showEasterEggSettings

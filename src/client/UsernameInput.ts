@@ -104,14 +104,6 @@ export class UsernameInput extends LitElement {
     return this.resolvedName().name;
   }
 
-  public getClanTag(): string | null {
-    return null;
-  }
-
-  public getClanCheck(): Promise<string | null> | undefined {
-    return undefined;
-  }
-
   /** Resolves once the name is ready; always immediate with local names. */
   public whenSeeded(): Promise<void> {
     return Promise.resolve();

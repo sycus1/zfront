@@ -33,14 +33,6 @@ export class TribeAttackBehavior extends AiAttackBehavior {
       if (this.sendAttack(incomingAttackPlayer, true)) return;
     }
 
-    // Select a traitor as an enemy
-    const toAttack = this.getNeighborTraitorToAttack();
-    if (toAttack !== null) {
-      if (this.random.chance(3)) {
-        if (this.sendAttack(toAttack)) return;
-      }
-    }
-
     // Choose a new enemy randomly
     const neighbors = this.player.nearby();
     for (const neighbor of this.random.shuffleArray(neighbors)) {
@@ -56,20 +48,5 @@ export class TribeAttackBehavior extends AiAttackBehavior {
       }
       if (this.sendAttack(neighbor)) return;
     }
-  }
-
-  // Allies only for a caller that breaks the alliance before attacking
-  getNeighborTraitorToAttack(includeAllies = false): Player | null {
-    if (this.game.config().disableAlliances()) return null;
-
-    const traitors = this.player
-      .nearby()
-      .filter(
-        (n): n is Player =>
-          n.isPlayer() &&
-          (includeAllies || !this.player.isFriendly(n)) &&
-          n.isTraitor(),
-      );
-    return traitors.length > 0 ? this.random.randElement(traitors) : null;
   }
 }

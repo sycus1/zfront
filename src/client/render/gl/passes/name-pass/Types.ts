@@ -71,21 +71,14 @@ export interface PlayerSlot {
 
   // Status flags (individual booleans, written as 1.0/0.0 to GPU)
   crown: boolean;
-  traitor: boolean;
   disconnected: boolean;
-  alliance: boolean;
-  allianceReq: boolean;
   target: boolean;
-  embargo: boolean;
   nukeActive: boolean;
   nukeTargetsMe: boolean;
   inDoomsdayClock: boolean;
   doomsdayClockDraining: boolean;
   doomsdayClockDecaying: boolean;
   doomsdayClockWarnProgress: number;
-  traitorRemainingTicks: number;
-  allianceFraction: number;
-  allianceRemainingTicks: number;
 }
 
 // ---------------------------------------------------------------------------

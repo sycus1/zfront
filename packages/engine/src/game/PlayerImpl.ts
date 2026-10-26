@@ -1,6 +1,5 @@
 import { TileRef } from "@openfront/engine-api/game/GameMap";
 import {
-  AllianceInfo,
   AllPlayers,
   BuildableUnit,
   Cell,
@@ -24,7 +23,6 @@ import {
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
 import {
-  AllianceView,
   ATTACK_DELTA_INCOMING,
   ATTACK_DELTA_OUTGOING,
   AttackUpdate,
@@ -66,17 +64,7 @@ import type {
   SnapshotWriter,
 } from "../snapshot/SnapshotContext";
 import { AttackImpl } from "./AttackImpl";
-import {
-  Alliance,
-  AllianceRequest,
-  Attack,
-  DisconnectSnapshot,
-  Embargo,
-  MutableAlliance,
-  Player,
-  Unit,
-  UnitParams,
-} from "./Game";
+import { Attack, DisconnectSnapshot, Player, Unit, UnitParams } from "./Game";
 import { GameImpl } from "./GameImpl";
 import { diffPlayerUpdate, packAttackTroopDeltas } from "./GameUpdateUtils";
 import {
@@ -109,14 +97,10 @@ class Donation {
 // comparison and avoids per-player-per-tick allocations. The arrays are
 // frozen so accidental in-worker mutation throws instead of silently
 // corrupting every player's updates; updates crossing to the main thread
-// are structured-cloned (clones are mutable). Sets cannot be frozen
-// (Set.add ignores freeze) — EMPTY_EMBARGOES must never be mutated.
+// are structured-cloned (clones are mutable).
 const EMPTY_NUMBER_ARRAY: number[] = [];
-const EMPTY_STRING_ARRAY: string[] = [];
 const EMPTY_ATTACK_UPDATES: AttackUpdate[] = [];
-const EMPTY_ALLIANCE_VIEWS: AllianceView[] = [];
 const EMPTY_EMOJIS: EmojiMessage[] = [];
-const EMPTY_EMBARGOES = new Set<string>();
 // Reusable buffers for hot loops. The simulation is single-threaded and these
 // are fully consumed before any re-entrant call, so sharing is safe.
 const NEIGHBOR_SCRATCH: TileRef[] = [0, 0, 0, 0];
@@ -126,9 +110,7 @@ const TYPE_SET_SCRATCH = new Set<UnitType>();
 const SHORE_DIRECTIONS_DX = [0, 0, -1, 1];
 const SHORE_DIRECTIONS_DY = [-1, 1, 0, 0];
 Object.freeze(EMPTY_NUMBER_ARRAY);
-Object.freeze(EMPTY_STRING_ARRAY);
 Object.freeze(EMPTY_ATTACK_UPDATES);
-Object.freeze(EMPTY_ALLIANCE_VIEWS);
 Object.freeze(EMPTY_EMOJIS);
 
 export class PlayerImpl implements Player {
@@ -150,13 +132,9 @@ export class PlayerImpl implements Player {
   /** Cumulative gold received from all sources (incremented in addGold). */
   private _goldEarned: bigint = 0n;
 
-  markedTraitorTick = -1;
   markedDoomsdayClockTick = -1;
   /** Tick territory rot last took land from this player (-1 = never). */
   private rottedAtTick = -1;
-  private _betrayalCount: number = 0;
-
-  private embargoes = new Map<PlayerID, Embargo>();
 
   public _borderTiles = new TileSet();
 
@@ -175,9 +153,6 @@ export class PlayerImpl implements Player {
   >();
   public _tiles = new TileSet();
 
-  public pastOutgoingAllianceRequests: AllianceRequest[] = [];
-  private _expiredAlliances: Alliance[] = [];
-
   private targets_: Target[] = [];
 
   private outgoingEmojis_: EmojiMessage[] = [];
@@ -188,13 +163,10 @@ export class PlayerImpl implements Player {
   private relations = new Map<Player, number>();
 
   private lastDeleteUnitTick: Tick = -1;
-  private lastEmbargoAllTick: Tick = -1;
 
   public _incomingAttacks: Attack[] = [];
   public _outgoingAttacks: Attack[] = [];
   public _outgoingLandAttacks: Attack[] = [];
-
-  public _alliances: MutableAlliance[] = [];
 
   private _spawnTile: TileRef | undefined;
   private _isDisconnected = false;
@@ -289,43 +261,6 @@ export class PlayerImpl implements Player {
     // This runs for every player every tick; most collections are empty for
     // most players. The singletons are never mutated — updates are
     // structured-cloned before leaving the worker.
-    let outgoingAllianceRequests = EMPTY_STRING_ARRAY;
-    for (const ar of this.mg.allianceRequests) {
-      if (ar.requestor() === this) {
-        if (outgoingAllianceRequests === EMPTY_STRING_ARRAY) {
-          outgoingAllianceRequests = [];
-        }
-        outgoingAllianceRequests.push(ar.recipient().id());
-      }
-    }
-
-    const alliances = this.alliances();
-    let allies = EMPTY_NUMBER_ARRAY;
-    let allianceViews = EMPTY_ALLIANCE_VIEWS;
-    if (alliances.length > 0) {
-      allies = alliances.map((a) => a.other(this).smallID());
-      const extensionCutoff =
-        this.mg.ticks() + this.mg.config().allianceExtensionPromptOffset();
-      allianceViews = alliances.map(
-        (a) =>
-          ({
-            id: a.id(),
-            other: a.other(this).id(),
-            createdAt: a.createdAt(),
-            expiresAt: a.expiresAt(),
-            hasExtensionRequest: a.expiresAt() <= extensionCutoff,
-          }) satisfies AllianceView,
-      );
-    }
-
-    let embargoes = EMPTY_EMBARGOES;
-    if (this.embargoes.size > 0) {
-      embargoes = new Set<string>();
-      for (const id of this.embargoes.keys()) {
-        embargoes.add(id.toString());
-      }
-    }
-
     let targets = EMPTY_NUMBER_ARRAY;
     if (this.targets_.length > 0) {
       const t = this.targets();
@@ -381,7 +316,6 @@ export class PlayerImpl implements Player {
       clientID: this.clientID(),
       name: this.name(),
       displayName: this.displayName(),
-      clanTag: this.clanTag(),
       nationFlag: this.nationFlag(),
       id: this.id(),
       team: this.team() ?? undefined,
@@ -398,10 +332,6 @@ export class PlayerImpl implements Player {
       piracyGold: this._piracyGold,
       goldEarned: this._goldEarned,
       troops: this.troops(),
-      allies: allies,
-      embargoes: embargoes,
-      isTraitor: this.isTraitor(),
-      traitorRemainingTicks: this.getTraitorRemainingTicks(),
       inDoomsdayClock: this.inDoomsdayClock(),
       isDecaying: this.isDecaying(),
       markedDoomsdayClockTick: this.markedDoomsdayClockTick,
@@ -409,11 +339,8 @@ export class PlayerImpl implements Player {
       outgoingEmojis: outgoingEmojis,
       outgoingAttacks: outgoingAttacks,
       incomingAttacks: incomingAttacks,
-      outgoingAllianceRequests: outgoingAllianceRequests,
-      alliances: allianceViews,
       hasSpawned: this.hasSpawned(),
       spawnTile: this._spawnTile,
-      betrayals: this._betrayalCount,
       lastDeleteUnitTick: this.lastDeleteUnitTick,
       isLobbyCreator: this.isLobbyCreator(),
     };
@@ -428,9 +355,6 @@ export class PlayerImpl implements Player {
   }
   displayName(): string {
     return this.playerInfo.displayName;
-  }
-  clanTag(): string | null {
-    return this.playerInfo.clanTag;
   }
   nationFlag(): string | null {
     return this.playerInfo.nationFlag;
@@ -750,143 +674,6 @@ export class PlayerImpl implements Player {
     return this._spawnTile;
   }
 
-  incomingAllianceRequests(): AllianceRequest[] {
-    return this.mg.allianceRequests.filter((ar) => ar.recipient() === this);
-  }
-
-  outgoingAllianceRequests(): AllianceRequest[] {
-    return this.mg.allianceRequests.filter((ar) => ar.requestor() === this);
-  }
-
-  alliances(): MutableAlliance[] {
-    return this._alliances;
-  }
-
-  expiredAlliances(): Alliance[] {
-    return [...this._expiredAlliances];
-  }
-
-  allies(): Player[] {
-    return this.alliances().map((a) => a.other(this));
-  }
-
-  isAlliedWith(other: Player): boolean {
-    if (other === this) {
-      return false;
-    }
-    return this.allianceWith(other) !== null;
-  }
-
-  allianceWith(other: Player): MutableAlliance | null {
-    if (other === this) {
-      return null;
-    }
-    return (
-      this.alliances().find(
-        (a) => a.recipient() === other || a.requestor() === other,
-      ) ?? null
-    );
-  }
-
-  allianceInfo(other: Player): AllianceInfo | null {
-    const alliance = this.allianceWith(other);
-    if (!alliance) {
-      return null;
-    }
-    const inExtensionWindow =
-      alliance.expiresAt() <=
-      this.mg.ticks() + this.mg.config().allianceExtensionPromptOffset();
-    const canExtend =
-      !this.isDisconnected() &&
-      !other.isDisconnected() &&
-      this.isAlive() &&
-      other.isAlive() &&
-      inExtensionWindow &&
-      !alliance.agreedToExtend(this);
-    return {
-      expiresAt: alliance.expiresAt(),
-      inExtensionWindow,
-      myPlayerAgreedToExtend: alliance.agreedToExtend(this),
-      otherAgreedToExtend: alliance.agreedToExtend(other),
-      canExtend,
-    };
-  }
-
-  canSendAllianceRequest(other: Player): boolean {
-    if (this.mg.config().disableAlliances()) {
-      return false;
-    }
-    if (other === this) {
-      return false;
-    }
-    if (this.isDisconnected() || other.isDisconnected()) {
-      // Disconnected players are marked as not-friendly even if they are allies,
-      // so we need to return early if either player is disconnected.
-      // Otherwise we could end up sending an alliance request to someone
-      // we are already allied with.
-      return false;
-    }
-    if (this.isFriendly(other) || !this.isAlive()) {
-      return false;
-    }
-
-    const hasPending = this.outgoingAllianceRequests().some(
-      (ar) => ar.recipient() === other,
-    );
-
-    if (hasPending) {
-      return false;
-    }
-
-    const hasIncoming = this.incomingAllianceRequests().some(
-      (ar) => ar.requestor() === other,
-    );
-
-    if (hasIncoming) {
-      return true;
-    }
-
-    const recent = this.pastOutgoingAllianceRequests
-      .filter((ar) => ar.recipient() === other)
-      .sort((a, b) => b.createdAt() - a.createdAt());
-
-    if (recent.length === 0) {
-      return true;
-    }
-
-    const delta = this.mg.ticks() - recent[0].createdAt();
-
-    return delta >= this.mg.config().allianceRequestCooldown();
-  }
-
-  breakAlliance(alliance: MutableAlliance): void {
-    this.mg.breakAlliance(this, alliance);
-  }
-
-  removeAllAlliances(): void {
-    this.mg.removeAlliancesByPlayerSilently(this);
-  }
-
-  isTraitor(): boolean {
-    return this.getTraitorRemainingTicks() > 0;
-  }
-
-  getTraitorRemainingTicks(): number {
-    if (this.markedTraitorTick < 0) return 0;
-    const elapsed = this.mg.ticks() - this.markedTraitorTick;
-    const duration = this.mg.config().traitorDuration();
-    const remaining = duration - elapsed;
-    return remaining > 0 ? remaining : 0;
-  }
-
-  markTraitor(): void {
-    this.markedTraitorTick = this.mg.ticks();
-    this._betrayalCount++; // Keep count for Nations too
-
-    // Record stats (only for real Humans)
-    this.mg.stats().betray(this);
-  }
-
   // A dead player is never "in doomsday clock": nothing clears the mark on death
   // (the execution only processes alive contenders), so gate on isAlive() to
   // avoid a stuck skull/panel and per-tick update churn for eliminated players.
@@ -923,17 +710,6 @@ export class PlayerImpl implements Player {
   isDecaying(): boolean {
     if (!this.inDoomsdayClock() || this.rottedAtTick < 0) return false;
     return this.mg.ticks() - this.rottedAtTick <= DECAY_CUE_GRACE_TICKS;
-  }
-
-  betrayals(): number {
-    return this._betrayalCount;
-  }
-
-  createAllianceRequest(recipient: Player): AllianceRequest | null {
-    if (this.isAlliedWith(recipient)) {
-      throw new Error(`cannot create alliance request, already allies`);
-    }
-    return this.mg.createAllianceRequest(this, recipient satisfies Player);
   }
 
   relation(other: Player): Relation {
@@ -1017,11 +793,7 @@ export class PlayerImpl implements Player {
   }
 
   transitiveTargets(): Player[] {
-    const ts = this.alliances()
-      .map((a) => a.other(this))
-      .flatMap((ally) => ally.targets());
-    ts.push(...this.targets());
-    return [...new Set(ts)] satisfies Player[];
+    return [...new Set(this.targets())] satisfies Player[];
   }
 
   sendEmoji(recipient: Player | typeof AllPlayers, emoji: string): void {
@@ -1201,80 +973,8 @@ export class PlayerImpl implements Player {
     this.lastDeleteUnitTick = this.mg.ticks();
   }
 
-  canEmbargoAll(): boolean {
-    // Cooldown gate
-    if (
-      this.mg.ticks() - this.lastEmbargoAllTick <
-      this.mg.config().embargoAllCooldown()
-    ) {
-      return false;
-    }
-    // At least one eligible player exists
-    for (const p of this.mg.players()) {
-      if (p.id() === this.id()) continue;
-      if (p.type() === PlayerType.Bot) continue;
-      if (this.isOnSameTeam(p)) continue;
-      if (this.isAlliedWith(p)) continue;
-      return true;
-    }
-    return false;
-  }
-
-  recordEmbargoAll(): void {
-    this.lastEmbargoAllTick = this.mg.ticks();
-  }
-
-  hasEmbargoAgainst(other: Player): boolean {
-    return this.embargoes.has(other.id());
-  }
-
-  hasManualEmbargoAgainst(other: Player): boolean {
-    return this.embargoes.get(other.id())?.isTemporary === false;
-  }
-
   canTrade(other: Player): boolean {
-    const embargo =
-      other.hasEmbargoAgainst(this) || this.hasEmbargoAgainst(other);
-    return !embargo && other.id() !== this.id();
-  }
-
-  getEmbargoes(): Embargo[] {
-    return [...this.embargoes.values()];
-  }
-
-  addEmbargo(other: Player, isTemporary: boolean): void {
-    const embargo = this.embargoes.get(other.id());
-    if (embargo !== undefined && !embargo.isTemporary) return;
-
-    this.mg.addUpdate({
-      type: GameUpdateType.EmbargoEvent,
-      event: "start",
-      playerID: this.smallID(),
-      embargoedID: other.smallID(),
-    });
-
-    this.embargoes.set(other.id(), {
-      createdAt: this.mg.ticks(),
-      isTemporary: isTemporary,
-      target: other,
-    });
-  }
-
-  stopEmbargo(other: Player): void {
-    this.embargoes.delete(other.id());
-    this.mg.addUpdate({
-      type: GameUpdateType.EmbargoEvent,
-      event: "stop",
-      playerID: this.smallID(),
-      embargoedID: other.smallID(),
-    });
-  }
-
-  endTemporaryEmbargo(other: Player): void {
-    const embargo = this.embargoes.get(other.id());
-    if (embargo !== undefined && !embargo.isTemporary) return;
-
-    this.stopEmbargo(other);
+    return other.id() !== this.id();
   }
 
   tradingPartners(): Player[] {
@@ -1307,7 +1007,7 @@ export class PlayerImpl implements Player {
     if (other.isDisconnected() && !treatAFKFriendly) {
       return false;
     }
-    return this.isOnSameTeam(other) || this.isAlliedWith(other);
+    return this.isOnSameTeam(other);
   }
 
   gold(): Gold {
@@ -1878,7 +1578,6 @@ export class PlayerImpl implements Player {
           relation,
         ]),
       ),
-      alliances: this.alliances().map((a) => a.other(this).smallID()),
     };
     return rel;
   }
@@ -1984,25 +1683,12 @@ export class PlayerImpl implements Player {
       trainGold: this._trainGold,
       piracyGold: this._piracyGold,
       goldEarned: this._goldEarned,
-      markedTraitorTick: this.markedTraitorTick,
       markedDoomsdayClockTick: this.markedDoomsdayClockTick,
       rottedAtTick: this.rottedAtTick,
-      betrayalCount: this._betrayalCount,
-      embargoes: [...this.embargoes.values()].map((e) => ({
-        target: w.player(e.target),
-        createdAt: e.createdAt,
-        isTemporary: e.isTemporary,
-      })),
       tiles: w.tiles(this._tiles),
       borderTiles: w.tiles(this._borderTiles),
       units: this._units.map((u) => w.unit(u)),
       unitsVersion: this._myUnitsVersion,
-      pastOutgoingAllianceRequests: this.pastOutgoingAllianceRequests.map((r) =>
-        w.allianceRequest(r),
-      ),
-      expiredAlliances: this._expiredAlliances.map((a) =>
-        w.alliance(a as MutableAlliance),
-      ),
       targets: this.targets_.map((t) => ({
         tick: t.tick,
         target: w.player(t.target),
@@ -2015,11 +1701,9 @@ export class PlayerImpl implements Player {
       })),
       relations: [...this.relations].map(([p, r]) => [w.player(p), r]),
       lastDeleteUnitTick: this.lastDeleteUnitTick,
-      lastEmbargoAllTick: this.lastEmbargoAllTick,
       incomingAttacks: this._incomingAttacks.map((a) => w.attack(a)),
       outgoingAttacks: this._outgoingAttacks.map((a) => w.attack(a)),
       outgoingLandAttacks: this._outgoingLandAttacks.map((a) => w.attack(a)),
-      alliances: this._alliances.map((a) => w.alliance(a)),
       spawnTile: this._spawnTile ?? null,
       isDisconnected: this._isDisconnected,
       disconnectSnapshot: this._disconnectSnapshot
@@ -2056,18 +1740,8 @@ export class PlayerImpl implements Player {
     this._trainGold = s.trainGold;
     this._piracyGold = s.piracyGold;
     this._goldEarned = s.goldEarned;
-    this.markedTraitorTick = s.markedTraitorTick;
     this.markedDoomsdayClockTick = s.markedDoomsdayClockTick;
     this.rottedAtTick = s.rottedAtTick;
-    this._betrayalCount = s.betrayalCount;
-    this.embargoes = new Map();
-    for (const e of s.embargoes) {
-      this.embargoes.set(r.playerID(e.target), {
-        target: r.player(e.target),
-        createdAt: e.createdAt,
-        isTemporary: e.isTemporary,
-      });
-    }
     this._tiles = new TileSet(s.tiles);
     this._borderTiles = new TileSet(s.borderTiles);
     this._units = s.units.map((u) => r.unit(u));
@@ -2075,10 +1749,6 @@ export class PlayerImpl implements Player {
     this.myUnitsMemo = new Map();
     this.myUnitCountMemo = new Map();
     this.myUnitsOwnedMemo = new Map();
-    this.pastOutgoingAllianceRequests = s.pastOutgoingAllianceRequests.map(
-      (i) => r.allianceRequest<AllianceRequest>(i),
-    );
-    this._expiredAlliances = s.expiredAlliances.map((i) => r.alliance(i));
     this.targets_ = s.targets.map((t) => ({
       tick: t.tick,
       target: r.player(t.target),
@@ -2092,11 +1762,9 @@ export class PlayerImpl implements Player {
       s.relations.map(([p, rel]) => [r.player(p), rel] as const),
     );
     this.lastDeleteUnitTick = s.lastDeleteUnitTick;
-    this.lastEmbargoAllTick = s.lastEmbargoAllTick;
     this._incomingAttacks = s.incomingAttacks.map((i) => r.attack(i));
     this._outgoingAttacks = s.outgoingAttacks.map((i) => r.attack(i));
     this._outgoingLandAttacks = s.outgoingLandAttacks.map((i) => r.attack(i));
-    this._alliances = s.alliances.map((i) => r.alliance(i));
     this._spawnTile = s.spawnTile ?? undefined;
     this._isDisconnected = s.isDisconnected;
     this._disconnectSnapshot = s.disconnectSnapshot
@@ -2131,23 +1799,12 @@ export const PlayerSnapshot = snapshotType({
     trainGold: z.bigint(),
     piracyGold: z.bigint(),
     goldEarned: z.bigint(),
-    markedTraitorTick: zInt(),
     markedDoomsdayClockTick: zInt(),
     rottedAtTick: zInt(),
-    betrayalCount: zInt(),
-    embargoes: z.array(
-      z.object({
-        target: zPlayerRef(),
-        createdAt: zInt(),
-        isTemporary: z.boolean(),
-      }),
-    ),
     tiles: zTiles(),
     borderTiles: zTiles(),
     units: z.array(zRef()),
     unitsVersion: zInt(),
-    pastOutgoingAllianceRequests: z.array(zRef()),
-    expiredAlliances: z.array(zRef()),
     targets: z.array(z.object({ tick: zInt(), target: zPlayerRef() })),
     outgoingEmojis: z.array(
       z.object({
@@ -2161,11 +1818,9 @@ export const PlayerSnapshot = snapshotType({
     sentDonations: z.array(z.object({ recipient: zPlayerRef(), tick: zInt() })),
     relations: z.array(z.tuple([zPlayerRef(), zNum()])),
     lastDeleteUnitTick: zInt(),
-    lastEmbargoAllTick: zInt(),
     incomingAttacks: z.array(zRef()),
     outgoingAttacks: z.array(zRef()),
     outgoingLandAttacks: z.array(zRef()),
-    alliances: z.array(zRef()),
     spawnTile: zTile().nullable(),
     isDisconnected: z.boolean(),
     disconnectSnapshot: z

@@ -18,6 +18,9 @@ import {
   WarshipState,
 } from "./GameTypes";
 
+/** zfront: where a horde game stands. */
+export type HordeOutcome = "playing" | "won" | "lost";
+
 /**
  * zfront: the horde as the renderer sees it. The worker attaches one to the
  * last update of each batch, and its buffer is transferred, not copied.
@@ -34,6 +37,12 @@ export interface HordeFrame {
   alive: number;
   elites: number;
   wave: number;
+  /** Waves to survive to win; 0 means endless. */
+  wavesToWin: number;
+  /** Zombies and elites killed so far. */
+  killed: number;
+  structuresDestroyed: number;
+  outcome: HordeOutcome;
   /** The first human player's HQ health (0 once it has fallen). */
   hqHp: number;
   hqMaxHp: number;
@@ -122,11 +131,6 @@ export enum GameUpdateType {
   Player,
   DisplayEvent,
   DisplayChatEvent,
-  AllianceRequest,
-  AllianceRequestReply,
-  BrokeAlliance,
-  AllianceExpired,
-  AllianceExtension,
   TargetPlayer,
   Emoji,
   Win,
@@ -137,7 +141,6 @@ export enum GameUpdateType {
   RailroadConstructionEvent,
   RailroadSnapEvent,
   ConquestEvent,
-  EmbargoEvent,
   SpawnPhaseEnd,
   GamePaused,
   DonateEvent,
@@ -146,10 +149,6 @@ export enum GameUpdateType {
 export type GameUpdate =
   | UnitUpdate
   | PlayerUpdate
-  | AllianceRequestUpdate
-  | AllianceRequestReplyUpdate
-  | BrokeAllianceUpdate
-  | AllianceExpiredUpdate
   | DisplayMessageUpdate
   | DisplayChatMessageUpdate
   | TargetPlayerUpdate
@@ -157,13 +156,11 @@ export type GameUpdate =
   | WinUpdate
   | HashUpdate
   | UnitIncomingUpdate
-  | AllianceExtensionUpdate
   | BonusEventUpdate
   | RailroadConstructionUpdate
   | RailroadDestructionUpdate
   | RailroadSnapUpdate
   | ConquestUpdate
-  | EmbargoUpdate
   | SpawnPhaseEndUpdate
   | GamePausedUpdate
   | DonateEventUpdate;
@@ -267,7 +264,6 @@ export interface PlayerUpdate {
   clientID?: ClientID | null;
   name?: string;
   displayName?: string;
-  clanTag?: string | null;
   nationFlag?: string | null;
   team?: Team;
   smallID?: number;
@@ -287,10 +283,6 @@ export interface PlayerUpdate {
   /** Cumulative gold received from all sources (workers, trade, ...). */
   goldEarned?: Gold;
   troops?: number;
-  allies?: number[];
-  embargoes?: Set<PlayerID>;
-  isTraitor?: boolean;
-  traitorRemainingTicks?: number;
   inDoomsdayClock?: boolean;
   isDecaying?: boolean;
   markedDoomsdayClockTick?: number;
@@ -298,53 +290,10 @@ export interface PlayerUpdate {
   outgoingEmojis?: EmojiMessage[];
   outgoingAttacks?: AttackUpdate[];
   incomingAttacks?: AttackUpdate[];
-  outgoingAllianceRequests?: PlayerID[];
-  alliances?: AllianceView[];
   hasSpawned?: boolean;
   spawnTile?: TileRef;
-  betrayals?: number;
   lastDeleteUnitTick?: Tick;
   isLobbyCreator?: boolean;
-}
-
-export interface AllianceView {
-  id: number;
-  other: PlayerID;
-  createdAt: Tick;
-  expiresAt: Tick;
-  hasExtensionRequest: boolean;
-}
-
-export interface AllianceRequestUpdate {
-  type: GameUpdateType.AllianceRequest;
-  requestorID: number;
-  recipientID: number;
-  createdAt: Tick;
-}
-
-export interface AllianceRequestReplyUpdate {
-  type: GameUpdateType.AllianceRequestReply;
-  request: AllianceRequestUpdate;
-  accepted: boolean;
-}
-
-export interface BrokeAllianceUpdate {
-  type: GameUpdateType.BrokeAlliance;
-  traitorID: number;
-  betrayedID: number;
-  allianceID: number;
-}
-
-export interface AllianceExpiredUpdate {
-  type: GameUpdateType.AllianceExpired;
-  player1ID: number;
-  player2ID: number;
-}
-
-export interface AllianceExtensionUpdate {
-  type: GameUpdateType.AllianceExtension;
-  playerID: number;
-  allianceID: number;
 }
 
 export interface TargetPlayerUpdate {
@@ -397,13 +346,6 @@ export interface UnitIncomingUpdate {
   message: string;
   messageType: MessageType;
   playerID: number;
-}
-
-export interface EmbargoUpdate {
-  type: GameUpdateType.EmbargoEvent;
-  event: "start" | "stop";
-  playerID: number;
-  embargoedID: number;
 }
 
 export interface SpawnPhaseEndUpdate {

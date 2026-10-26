@@ -16,7 +16,6 @@ describe("Win Attribution Bug Fix", () => {
       "clientA",
       "pA",
       false,
-      null,
       [],
       0,
     );
@@ -26,7 +25,6 @@ describe("Win Attribution Bug Fix", () => {
       "clientB",
       "pB",
       false,
-      null,
       [],
       0,
     );
@@ -36,7 +34,6 @@ describe("Win Attribution Bug Fix", () => {
       "clientC",
       "pC",
       false,
-      null,
       [],
       1,
     );
@@ -46,7 +43,6 @@ describe("Win Attribution Bug Fix", () => {
       "clientD",
       "pD",
       false,
-      null,
       [],
       1,
     );

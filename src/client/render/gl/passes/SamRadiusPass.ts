@@ -2,8 +2,8 @@
  * SAMRadiusPass — renders rotating dashed circles around SAM launchers
  * when the player is in build mode (ghost preview active).
  *
- * Allied SAM ranges are merged via circle union: overlapping circles from
- * the same alliance group show as a single combined shape rather than
+ * Friendly SAM ranges are merged via circle union: overlapping circles from
+ * the same group show as a single combined shape rather than
  * overlapping rings. Each circle's visible (uncovered) arcs are emitted
  * as separate instances.
  *
@@ -43,7 +43,7 @@ interface SAMCircle {
   g: number;
   b: number;
   alpha: number;
-  group: number; // alliance group: 0 = friendly, 1 = enemy
+  group: number; // 0 = friendly, 1 = enemy
   spin: number; // 1.0 = spinning, 0.0 = static
 }
 
@@ -181,7 +181,6 @@ export class SAMRadiusPass {
   // Owner-color mode fields
   private paletteData: Float32Array | null = null;
   private colorMode: "perspective" | "owner" = "perspective";
-  private allianceClusters: Map<number, number> = new Map();
   private lastStructures: Map<number, UnitState> | null = null;
 
   constructor(
@@ -279,10 +278,6 @@ export class SAMRadiusPass {
     this.rebuild();
   }
 
-  setAllianceClusters(clusters: Map<number, number>): void {
-    this.allianceClusters = clusters;
-  }
-
   setTick(tick: number): void {
     if (tick === this.currentTick) return;
     this.currentTick = tick;
@@ -323,11 +318,7 @@ export class SAMRadiusPass {
   }
 
   private getSAMBaseGroup(u: UnitState, isFriendly: boolean): number {
-    return this.colorMode === "owner"
-      ? (this.allianceClusters.get(u.ownerID) ?? u.ownerID)
-      : isFriendly
-        ? 0
-        : 1;
+    return this.colorMode === "owner" ? u.ownerID : isFriendly ? 0 : 1;
   }
 
   private getSAMColor(ownerID: number, isFriendly: boolean): number[] {

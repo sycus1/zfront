@@ -22,17 +22,12 @@ export function applyStateUpdate(target: PlayerState, pu: PlayerUpdate): void {
   if (pu.piracyGold !== undefined) target.piracyGold = Number(pu.piracyGold);
   if (pu.goldEarned !== undefined) target.goldEarned = Number(pu.goldEarned);
   if (pu.troops !== undefined) target.troops = pu.troops;
-  if (pu.isTraitor !== undefined) target.isTraitor = pu.isTraitor;
-  if (pu.traitorRemainingTicks !== undefined) {
-    target.traitorRemainingTicks = Math.max(0, pu.traitorRemainingTicks);
-  }
   if (pu.inDoomsdayClock !== undefined)
     target.inDoomsdayClock = pu.inDoomsdayClock;
   if (pu.markedDoomsdayClockTick !== undefined) {
     target.markedDoomsdayClockTick = pu.markedDoomsdayClockTick;
   }
   if (pu.isDecaying !== undefined) target.isDecaying = pu.isDecaying;
-  if (pu.betrayals !== undefined) target.betrayals = pu.betrayals;
   if (pu.hasSpawned !== undefined) target.hasSpawned = pu.hasSpawned;
   if (pu.spawnTile !== undefined) target.spawnTile = pu.spawnTile;
   if (pu.lastDeleteUnitTick !== undefined) {
@@ -40,18 +35,13 @@ export function applyStateUpdate(target: PlayerState, pu: PlayerUpdate): void {
   }
   // Slice() to detach from the wire object — accumulated state mustn't share
   // mutable arrays with per-tick update payloads.
-  if (pu.allies !== undefined) target.allies = pu.allies.slice();
   if (pu.targets !== undefined) target.targets = pu.targets.slice();
-  if (pu.outgoingAllianceRequests !== undefined) {
-    target.outgoingAllianceRequests = pu.outgoingAllianceRequests.slice();
-  }
   if (pu.outgoingAttacks !== undefined) {
     target.outgoingAttacks = pu.outgoingAttacks;
   }
   if (pu.incomingAttacks !== undefined) {
     target.incomingAttacks = pu.incomingAttacks;
   }
-  if (pu.alliances !== undefined) target.alliances = pu.alliances;
   if (pu.outgoingEmojis !== undefined)
     target.outgoingEmojis = pu.outgoingEmojis;
 }

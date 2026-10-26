@@ -36,21 +36,14 @@ function ps(overrides: Partial<PlayerState> = {}): PlayerState {
     piracyGold: 0,
     goldEarned: 0,
     troops: 0,
-    isTraitor: false,
-    traitorRemainingTicks: 0,
     inDoomsdayClock: false,
     isDecaying: false,
     markedDoomsdayClockTick: -1,
-    betrayals: 0,
     hasSpawned: true,
     lastDeleteUnitTick: 0,
-    allies: [],
-    embargoes: [],
     targets: [],
     outgoingAttacks: [],
     incomingAttacks: [],
-    outgoingAllianceRequests: [],
-    alliances: [],
     outgoingEmojis: [],
     ...overrides,
   };
@@ -128,15 +121,6 @@ describe("computePlayerStatus — replay mode (no localPlayerSmallID)", () => {
     expect(status.has(1)).toBe(false);
   });
 
-  it("traitor + traitorRemainingTicks flow through", () => {
-    const players = playersMap(
-      ps({ smallID: 1, isTraitor: true, traitorRemainingTicks: 42 }),
-    );
-    const status = computePlayerStatus(players, unitsMap());
-    expect(status.get(1)?.traitor).toBe(true);
-    expect(status.get(1)?.traitorRemainingTicks).toBe(42);
-  });
-
   it("disconnected flag flows through", () => {
     const players = playersMap(ps({ smallID: 1, isDisconnected: true }));
     const status = computePlayerStatus(players, unitsMap());
@@ -162,31 +146,18 @@ describe("computePlayerStatus — replay mode (no localPlayerSmallID)", () => {
     expect(status.has(1)).toBe(false);
   });
 
-  it("relative flags (alliance/target/embargo/nukeTargetsMe) are always false in replay mode", () => {
+  it("relative flags (target/nukeTargetsMe) are always false in replay mode", () => {
     const players = playersMap(
-      ps({ smallID: 1, allies: [2], targets: [2], embargoes: [2] }),
+      ps({ smallID: 1, targets: [2] }),
       ps({ smallID: 2, tilesOwned: 1 }), // crown so an entry exists
     );
     const status = computePlayerStatus(players, unitsMap());
-    expect(status.get(2)?.alliance).toBe(false);
     expect(status.get(2)?.target).toBe(false);
-    expect(status.get(2)?.embargo).toBe(false);
     expect(status.get(2)?.nukeTargetsMe).toBe(false);
   });
 });
 
 describe("computePlayerStatus — live mode (localPlayerSmallID set)", () => {
-  it("alliance: local has them as ally → alliance true", () => {
-    const players = playersMap(
-      ps({ smallID: 1, allies: [2] }), // me
-      ps({ smallID: 2 }),
-    );
-    const status = computePlayerStatus(players, unitsMap(), {
-      localPlayerSmallID: 1,
-    });
-    expect(status.get(2)?.alliance).toBe(true);
-  });
-
   it("target: local has them in targets → target true", () => {
     const players = playersMap(
       ps({ smallID: 1, targets: [2] }), // me
@@ -198,41 +169,12 @@ describe("computePlayerStatus — live mode (localPlayerSmallID set)", () => {
     expect(status.get(2)?.target).toBe(true);
   });
 
-  it("embargo is bilateral: true if I embargo them OR they embargo me", () => {
-    // I embargo them.
-    let status = computePlayerStatus(
-      playersMap(ps({ smallID: 1, embargoes: [2] }), ps({ smallID: 2 })),
-      unitsMap(),
-      { localPlayerSmallID: 1 },
-    );
-    expect(status.get(2)?.embargo).toBe(true);
-
-    // They embargo me.
-    status = computePlayerStatus(
-      playersMap(ps({ smallID: 1 }), ps({ smallID: 2, embargoes: [1] })),
-      unitsMap(),
-      { localPlayerSmallID: 1 },
-    );
-    expect(status.get(2)?.embargo).toBe(true);
-
-    // Neither.
-    status = computePlayerStatus(
-      playersMap(ps({ smallID: 1 }), ps({ smallID: 2, tilesOwned: 1 })),
-      unitsMap(),
-      { localPlayerSmallID: 1 },
-    );
-    // Player 2 only has crown — embargo should be false.
-    expect(status.get(2)?.embargo).toBe(false);
-  });
-
   it("relative flags are NOT set for the local player itself (no self-relationships)", () => {
     const players = playersMap(
       ps({
         smallID: 1,
         tilesOwned: 100,
-        allies: [1],
         targets: [1],
-        embargoes: [1],
       }),
       ps({ smallID: 2 }),
     );
@@ -241,9 +183,7 @@ describe("computePlayerStatus — live mode (localPlayerSmallID set)", () => {
     });
     // Player 1 (local) gets crown but no relative flags vs. self.
     expect(status.get(1)?.crown).toBe(true);
-    expect(status.get(1)?.alliance).toBe(false);
     expect(status.get(1)?.target).toBe(false);
-    expect(status.get(1)?.embargo).toBe(false);
   });
 
   it("nukeTargetsMe: requires tileState — without it, stays false", () => {
@@ -314,65 +254,27 @@ describe("computePlayerStatus — live mode (localPlayerSmallID set)", () => {
 
   it("entry is emitted when only a relative flag is true (even with no base flags)", () => {
     const players = playersMap(
-      ps({ smallID: 1, allies: [2] }), // me
+      ps({ smallID: 1, targets: [2] }), // me
       ps({ smallID: 2 }), // no other flags
     );
     const status = computePlayerStatus(players, unitsMap(), {
       localPlayerSmallID: 1,
     });
-    // Without local-mode, player 2 wouldn't get an entry — alliance is the
+    // Without local-mode, player 2 wouldn't get an entry — the target is the
     // only reason it shows up here.
     expect(status.get(2)).toBeDefined();
-    expect(status.get(2)?.alliance).toBe(true);
+    expect(status.get(2)?.target).toBe(true);
   });
 
   it("localPlayerSmallID = 0 (no local player) behaves like replay mode", () => {
     const players = playersMap(
-      ps({ smallID: 1, allies: [2] }),
+      ps({ smallID: 1, targets: [2] }),
       ps({ smallID: 2, tilesOwned: 1 }),
     );
     const status = computePlayerStatus(players, unitsMap(), {
       localPlayerSmallID: 0,
     });
-    expect(status.get(2)?.alliance).toBe(false);
-  });
-
-  it("allianceReq and allianceFraction are not computed (deferred)", () => {
-    const players = playersMap(
-      ps({ smallID: 1, allies: [2] }),
-      ps({ smallID: 2 }),
-    );
-    const status = computePlayerStatus(players, unitsMap(), {
-      localPlayerSmallID: 1,
-    });
-    expect(status.get(2)?.allianceReq).toBe(false);
-    expect(status.get(2)?.allianceFraction).toBe(0);
-  });
-
-  it("allianceFraction and allianceRemainingTicks come from the alliance expiry", () => {
-    const players = playersMap(
-      ps({ smallID: 1, allies: [2] }),
-      ps({
-        smallID: 2,
-        alliances: [
-          {
-            id: 1,
-            other: "me",
-            createdAt: 100,
-            expiresAt: 700,
-            hasExtensionRequest: false,
-          },
-        ],
-      }),
-    );
-    const status = computePlayerStatus(players, unitsMap(), {
-      localPlayerSmallID: 1,
-      localPlayerID: "me",
-      tick: 400,
-      allianceDuration: 600,
-    });
-    expect(status.get(2)?.allianceFraction).toBe(0.5);
-    expect(status.get(2)?.allianceRemainingTicks).toBe(300);
+    expect(status.get(2)?.target).toBe(false);
   });
 });
 

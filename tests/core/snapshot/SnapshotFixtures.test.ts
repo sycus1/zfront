@@ -1,7 +1,12 @@
 import {
+  MIN_SNAPSHOT_FORMAT_VERSION,
   readSnapshotHeader,
   SNAPSHOT_FORMAT_VERSION,
 } from "@openfront/engine/snapshot/GameSnapshot";
+import {
+  decodeSnapshotValue,
+  encodeSnapshotValue,
+} from "@openfront/engine/snapshot/SnapshotCodec";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -56,6 +61,18 @@ describe("snapshot fixtures from earlier builds", { timeout: 120_000 }, () => {
     expect(fixtures().length).toBeGreaterThan(0);
   });
 
+  // Format 1 still had alliance tables and executions, which zfront removed.
+  test("a snapshot older than the oldest supported format is refused", () => {
+    const [name] = fixtures();
+    const root = decodeSnapshotValue(
+      new Uint8Array(gunzipSync(fs.readFileSync(path.join(DIR, name)))),
+    ) as { format: number };
+    root.format = MIN_SNAPSHOT_FORMAT_VERSION - 1;
+    expect(() => readSnapshotHeader(encodeSnapshotValue(root))).toThrow(
+      "older than this build supports",
+    );
+  });
+
   test.each(fixtures())("%s restores and keeps playing", async (name) => {
     const bytes = new Uint8Array(
       gunzipSync(fs.readFileSync(path.join(DIR, name))),
@@ -87,9 +104,7 @@ describe("snapshot fixtures from earlier builds", { timeout: 120_000 }, () => {
           gameID: "RESUMED01",
           lobbyCreatedAt: 0,
           config: header.gameConfig,
-          players: [
-            { clientID: human.clientID, username: "loader", clanTag: null },
-          ],
+          players: [{ clientID: human.clientID, username: "loader" }],
         },
         bytes,
       );

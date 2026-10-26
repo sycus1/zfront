@@ -80,7 +80,6 @@ function recordGame(name: string, gameID: string): TraceGame {
         lobbyCreatedAt: info.lobbyCreatedAt,
         config: info.config,
         players: info.players,
-        tribes: info.tribes,
       });
       return { gameStart, turns: record.turns };
     },
@@ -124,8 +123,7 @@ const GAMES: TraceGame[] = [
   recordGame("1v1", "dYgXAeSUug"),
   recordGame("team", "dEKTPuqCtD"),
   recordGame("ffa", "dFHzwiiARh"),
-  nationsOnlyGame("nations-europe", GameMapType.Europe),
-  nationsOnlyGame("nations-world", GameMapType.World),
+  nationsOnlyGame("nations-britannia", GameMapType.Britannia),
 ];
 
 interface TraceLine {

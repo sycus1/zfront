@@ -31,9 +31,7 @@ import { goldRateTracker } from "./hud/layers/lib/GoldRateTracker";
 import {
   AutoUpgradeEvent,
   DoBoatAttackEvent,
-  DoBreakAllianceEvent,
   DoGroundAttackEvent,
-  DoRequestAllianceEvent,
   DoRetaliateAttackEvent,
   DoTargetPlayerEvent,
   InputHandler,
@@ -65,11 +63,8 @@ import { GoToPlayerEvent } from "./TransformHandler";
 import {
   counterAttackTroops,
   MoveWarshipIntentEvent,
-  SendAllianceExtensionIntentEvent,
-  SendAllianceRequestIntentEvent,
   SendAttackIntentEvent,
   SendBoatAttackIntentEvent,
-  SendBreakAllianceIntentEvent,
   SendHashEvent,
   SendSpawnIntentEvent,
   SendTargetPlayerIntentEvent,
@@ -89,10 +84,6 @@ import { WorkerClient } from "./WorkerClient";
 export interface LobbyConfig {
   cosmetics: PlayerCosmeticRefs;
   playerName: string;
-  playerClanTag: string | null;
-  // In-flight clan-tag ownership check; resolves to the tag to submit (null if
-  // it failed). Runs parallel to the WS handshake — only the join waits on it.
-  clanTagCheck?: Promise<string | null>;
   playerRole: string | null;
   gameID: GameID;
   turnstileToken: string | null;
@@ -530,7 +521,6 @@ async function createClientGame(
     gameMap,
     clientID,
     lobbyConfig.playerName,
-    lobbyConfig.playerClanTag,
     lobbyConfig.gameStartInfo.gameID,
     lobbyConfig.gameStartInfo.players,
     lobbyConfig.snapshot !== undefined,
@@ -590,7 +580,6 @@ async function createClientGame(
       `${USER_SETTINGS_CHANGED_EVENT}:settings.anonymousNames`,
       () => {
         webglBuilder.refreshNames(gameView);
-        gameView.invalidateTeamClanTags();
       },
       { signal: graphicsListenerAbort.signal },
     );
@@ -807,14 +796,6 @@ export class ClientGameRunner {
     this.eventBus.on(
       DoRetaliateAttackEvent,
       this.doRetaliateAttackMostRecent.bind(this),
-    );
-    this.eventBus.on(
-      DoRequestAllianceEvent,
-      this.doRequestAllianceUnderCursor.bind(this),
-    );
-    this.eventBus.on(
-      DoBreakAllianceEvent,
-      this.doBreakAllianceUnderCursor.bind(this),
     );
     this.eventBus.on(
       DoTargetPlayerEvent,
@@ -1265,72 +1246,6 @@ export class ClientGameRunner {
       this.renderer.uiState.attackRatio * this.myPlayer.troops(),
     );
     this.eventBus.emit(new SendAttackIntentEvent(attacker.id(), counterTroops));
-  }
-
-  private doRequestAllianceUnderCursor(e: DoRequestAllianceEvent): void {
-    const tile = this.actionTile(e.tile);
-    if (tile === null) return;
-
-    if (this.myPlayer === null) {
-      if (!this.clientID) return;
-      const myPlayer = this.gameView.playerByClientID(this.clientID);
-      if (myPlayer === null) return;
-      this.myPlayer = myPlayer;
-    }
-
-    const myPlayer = this.myPlayer;
-
-    const tileOwner = this.gameView.owner(tile);
-    if (!tileOwner.isPlayer()) return;
-    if (e.playerID !== undefined && tileOwner.id() !== e.playerID) return;
-    const recipient = tileOwner as PlayerView;
-
-    myPlayer
-      .actions(tile)
-      .then((actions) => {
-        if (actions.interaction?.canSendAllianceRequest) {
-          this.eventBus.emit(
-            new SendAllianceRequestIntentEvent(myPlayer, recipient),
-          );
-        } else if (actions.interaction?.allianceInfo?.canExtend) {
-          this.eventBus.emit(new SendAllianceExtensionIntentEvent(recipient));
-        }
-      })
-      .catch((error) => {
-        console.warn("Failed to check alliance actions:", error);
-      });
-  }
-
-  private doBreakAllianceUnderCursor(e: DoBreakAllianceEvent): void {
-    const tile = this.actionTile(e.tile);
-    if (tile === null) return;
-
-    if (this.myPlayer === null) {
-      if (!this.clientID) return;
-      const myPlayer = this.gameView.playerByClientID(this.clientID);
-      if (myPlayer === null) return;
-      this.myPlayer = myPlayer;
-    }
-
-    const myPlayer = this.myPlayer;
-
-    const tileOwner = this.gameView.owner(tile);
-    if (!tileOwner.isPlayer()) return;
-    if (e.playerID !== undefined && tileOwner.id() !== e.playerID) return;
-    const recipient = tileOwner as PlayerView;
-
-    myPlayer
-      .actions(tile)
-      .then((actions) => {
-        if (actions.interaction?.canBreakAlliance) {
-          this.eventBus.emit(
-            new SendBreakAllianceIntentEvent(myPlayer, recipient),
-          );
-        }
-      })
-      .catch((error) => {
-        console.warn("Failed to check alliance actions:", error);
-      });
   }
 
   private doTargetPlayerUnderCursor(e: DoTargetPlayerEvent): void {

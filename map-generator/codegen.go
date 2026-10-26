@@ -208,7 +208,7 @@ func loadMapInfos() ([]mapInfo, error) {
 		validModifiers := map[string]bool{
 			"isRandomSpawn": true, "isCompact": true, "isCrowded": true,
 			"isHardNations": true, "startingGold1M": true, "startingGold5M": true,
-			"startingGold25M": true, "goldMultiplier": true, "isAlliancesDisabled": true,
+			"startingGold25M": true, "goldMultiplier": true,
 			"isNukesDisabled": true, "isSAMsDisabled": true, "isPeaceTime": true,
 			"isWaterNukes": true, "isDoomsdayClock": true,
 		}
@@ -351,7 +351,7 @@ func generateMapsTS(infos []mapInfo) (string, error) {
 	modifierKeys := []string{
 		"isRandomSpawn", "isCompact", "isCrowded", "isHardNations",
 		"startingGold1M", "startingGold5M", "startingGold25M",
-		"goldMultiplier", "isAlliancesDisabled", "isNukesDisabled",
+		"goldMultiplier", "isNukesDisabled",
 		"isSAMsDisabled", "isPeaceTime", "isWaterNukes", "isDoomsdayClock",
 	}
 	for i, mk := range modifierKeys {

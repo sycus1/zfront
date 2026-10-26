@@ -103,21 +103,6 @@ export function notableLobbySettings(
       label: translateText("game_settings.gold_multiplier"),
       value: `x${c.goldMultiplier}`,
     });
-  if (c.customAllianceDuration === 0 || c.disableAlliances)
-    items.push({
-      label: translateText("public_game_modifier.disable_alliances_label"),
-      value: disabled,
-    });
-  else if (
-    typeof c.customAllianceDuration === "number" &&
-    // 5 minutes is the sim fallback (Config.allianceDuration), so an
-    // explicit 5 changes nothing worth surfacing.
-    c.customAllianceDuration !== 5
-  )
-    items.push({
-      label: translateText("public_game_modifier.disable_alliances_label"),
-      value: renderDuration(c.customAllianceDuration * 60),
-    });
   if (c.waterNukes)
     items.push({
       label: translateText("game_settings.water_nukes"),

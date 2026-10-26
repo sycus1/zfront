@@ -76,7 +76,7 @@ export function scriptedGameStart(
     gameID: "SNAPTEST1",
     lobbyCreatedAt: 0,
     config: {
-      gameMap: GameMapType.World,
+      gameMap: GameMapType.Britannia,
       gameMapSize: GameMapSize.Compact,
       gameMode: GameMode.FFA,
       gameType: GameType.Private,
@@ -95,7 +95,7 @@ export function scriptedGameStart(
     players: SCRIPTED_HUMANS.map((clientID, i) => ({
       clientID,
       username: `scripted${i}`,
-      clanTag: null,
+
       isLobbyCreator: i === 0,
     })),
   };
@@ -206,16 +206,10 @@ function queuedIntent(game: Game, p: Player, tick: number): Intent | null {
     { type: "cancel_attack", attackID: "nonexistent" },
     { type: "boat", troops: 10, dst: other.spawnTile() ?? 0 },
     { type: "cancel_boat", unitID: 1 },
-    { type: "allianceRequest", recipient: other.id() },
-    { type: "allianceReject", requestor: other.id() },
-    { type: "breakAlliance", recipient: other.id() },
-    { type: "allianceExtension", recipient: other.id() },
     { type: "targetPlayer", target: other.id() },
     { type: "emoji", recipient: AllPlayers, emoji: 0 },
     { type: "donate_gold", recipient: other.id(), gold: 1 },
     { type: "donate_troops", recipient: other.id(), troops: 1 },
-    { type: "embargo", targetID: other.id(), action: "start" },
-    { type: "embargo_all", action: "stop" },
     {
       type: "build_unit",
       unit: UnitType.City,
@@ -280,17 +274,6 @@ function playIntent(game: Game, p: Player, rand: PseudoRandom): Intent | null {
   if (!p.isAlive()) return null;
   // Most ticks a human does nothing; keep the game moving.
   if (!rand.chance(3)) return null;
-  // Nations build no ports this early, so the scripted humans' ports are the ones that trade
-  const embargoedHuman = game
-    .players()
-    .find(
-      (o) =>
-        SCRIPTED_HUMANS.includes(o.clientID() as never) &&
-        p.hasEmbargoAgainst(o),
-    );
-  if (embargoedHuman !== undefined && rand.chance(2)) {
-    return { type: "embargo", targetID: embargoedHuman.id(), action: "stop" };
-  }
   const others = game.players().filter((o) => o !== p && o.isPlayer());
   const other = pick(rand, others);
   const own = (types: UnitType[]) => p.units(types);
@@ -371,36 +354,18 @@ function playIntent(game: Game, p: Player, rand: PseudoRandom): Intent | null {
       if (s === null) return null;
       return { type: "upgrade_structure", unit: s.type(), unitId: s.id() };
     }
-    case 10: {
-      if (other === null) return null;
-      if (p.isAlliedWith(other)) {
-        return rand.chance(4)
-          ? { type: "breakAlliance", recipient: other.id() }
-          : { type: "allianceExtension", recipient: other.id() };
-      }
-      return { type: "allianceRequest", recipient: other.id() };
-    }
-    case 11: {
-      const req = pick(rand, p.incomingAllianceRequests());
-      if (req === null) return null;
-      return { type: "allianceReject", requestor: req.requestor().id() };
-    }
-    case 12: {
-      const ally = pick(rand, p.allies());
-      if (ally === null) return null;
-      return rand.chance(2)
-        ? { type: "donate_gold", recipient: ally.id(), gold: 1000 }
-        : { type: "donate_troops", recipient: ally.id(), troops: null };
-    }
+    case 10:
+    case 11:
     case 13:
-      if (other === null) return null;
-      return {
-        type: "embargo",
-        targetID: other.id(),
-        action: rand.chance(2) ? "start" : "stop",
-      };
     case 14:
-      return { type: "embargo_all", action: rand.chance(2) ? "start" : "stop" };
+      // Were alliance and embargo intents; kept as no-ops so the rest of the
+      // script draws the same numbers.
+      return null;
+    case 12:
+      if (other === null) return null;
+      return rand.chance(2)
+        ? { type: "donate_gold", recipient: other.id(), gold: 1000 }
+        : { type: "donate_troops", recipient: other.id(), troops: null };
     case 15:
       return {
         type: "emoji",

@@ -20,7 +20,7 @@ test("an update's name placements don't change as later ticks run", async () => 
   const start = toWireGameStartInfo({
     gameID: "nameView1",
     lobbyCreatedAt: 1_700_000_000_000,
-    config: config({ gameMap: GameMapType.Onion, bots: 5 }),
+    config: config({ gameMap: GameMapType.Britannia, bots: 5 }),
     players: [human(1)],
   });
   const held: {

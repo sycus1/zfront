@@ -8,6 +8,7 @@ import {
   GameRenderer,
 } from "../../../src/client/hud/GameRenderer";
 import type { EmojiTable } from "../../../src/client/hud/layers/EmojiTable";
+import type { HordeHud } from "../../../src/client/hud/layers/HordeHud";
 import type { WinModal } from "../../../src/client/hud/layers/WinModal";
 import { ShowEmojiMenuEvent } from "../../../src/client/InputHandler";
 import type { MapRenderer } from "../../../src/client/render/gl";
@@ -40,6 +41,7 @@ const HUD_TAGS = [
   "alert-frame",
   "spawn-timer",
   "immunity-timer",
+  "horde-hud",
   "in-game-promo",
   "tutorial-panel",
 ] as const;
@@ -95,6 +97,7 @@ describe("createRenderer", () => {
     const winModal = elements.get("win-modal") as WinModal;
     expect(winModal.eventBus).toBe(eventBus);
     expect(winModal.game).toBe(game);
+    expect((elements.get("horde-hud") as HordeHud).game).toBe(game);
 
     // Emoji table got its own initEventBus: opening the menu reaches it.
     const emojiTable = elements.get("emoji-table") as EmojiTable;

@@ -32,7 +32,6 @@ export class Client {
     public readonly flares: string[] | undefined,
     public readonly ip: string,
     public username: string,
-    public clanTag: string | null,
     public ws: WebSocket,
     public readonly cosmetics: PlayerCosmetics | undefined,
     public readonly publicId: string | undefined,

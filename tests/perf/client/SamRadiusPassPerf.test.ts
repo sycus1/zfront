@@ -174,12 +174,6 @@ describe("SAMRadiusPass WebGL Performance", () => {
     pass.setColorMode("owner");
     pass.setVisible(true);
 
-    const allianceClusters = new Map<number, number>([
-      [1, 1], // Friendly cluster
-      [2, 2], // Enemy cluster
-    ]);
-    pass.setAllianceClusters(allianceClusters);
-
     const structures = createMockSAMStructures(SAM_COUNT, MAP_WIDTH);
     pass.updateStructures(structures);
 

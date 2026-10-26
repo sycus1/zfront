@@ -165,18 +165,6 @@ exports[`train golden values > trainGold: gold multipliers 1`] = `
 
 exports[`train golden values > trainGold: relationship × trade stops grid 1`] = `
 {
-  "rel=ally stops=0": 35000n,
-  "rel=ally stops=1": 35000n,
-  "rel=ally stops=10": 30000n,
-  "rel=ally stops=11": 25000n,
-  "rel=ally stops=12": 20000n,
-  "rel=ally stops=13": 15000n,
-  "rel=ally stops=14": 10000n,
-  "rel=ally stops=15": 5000n,
-  "rel=ally stops=20": 5000n,
-  "rel=ally stops=5": 35000n,
-  "rel=ally stops=50": 5000n,
-  "rel=ally stops=9": 35000n,
   "rel=other stops=0": 25000n,
   "rel=other stops=1": 25000n,
   "rel=other stops=10": 20000n,

@@ -103,7 +103,6 @@ export function makeGameView(opts: GameViewStubOptions = {}): GameView {
     stubTerrainMap(opts.width ?? 10, opts.height ?? 10),
     opts.myClientID,
     opts.myUsername ?? "tester",
-    opts.myClanTag ?? null,
     "test-game",
     opts.humans ?? [],
   );
@@ -119,7 +118,6 @@ export function makePlayerUpdate(
     clientID: "client-a",
     name: "Alice",
     displayName: "Alice",
-    clanTag: null,
     nationFlag: null,
     id: "player-a",
     smallID: 1,
@@ -133,9 +131,6 @@ export function makePlayerUpdate(
     piracyGold: 0n,
     goldEarned: 0n,
     troops: 100,
-    allies: [],
-    embargoes: new Set(),
-    isTraitor: false,
     // Doomsday-clock state. Present here so the diffPlayerUpdate field-coverage
     // walk in GameUpdateUtils.test.ts reaches these: a field missing from this
     // stub is a field that walk cannot check.
@@ -146,10 +141,7 @@ export function makePlayerUpdate(
     outgoingEmojis: [],
     outgoingAttacks: [],
     incomingAttacks: [],
-    outgoingAllianceRequests: [],
-    alliances: [],
     hasSpawned: true,
-    betrayals: 0,
     lastDeleteUnitTick: 0,
     isLobbyCreator: false,
     ...overrides,

@@ -8,7 +8,7 @@ import {
 } from "@openfront/engine-api/game/GameTypes";
 import { NukeType } from "@openfront/engine-api/StatsSchemas";
 import { atan2 } from "@openfront/engine-lib/DetMath";
-import { listNukeBreakAlliance } from "@openfront/engine-lib/execution/NukeAlliance";
+import { listNukeAngeredPlayers } from "@openfront/engine-lib/execution/NukeBlast";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import {
   zInt,
@@ -144,53 +144,28 @@ export class NukeExecution implements Execution {
   }
 
   /**
-   * Break alliances with players significantly affected by the nuke strike.
-   * Uses weighted tile counting (inner=1, outer=0.5) OR if any allied structure would be destroyed.
+   * Sour relations with players significantly affected by the nuke strike.
+   * Uses weighted tile counting (inner=1, outer=0.5) OR any structure in the
+   * blast radius.
    */
-  private maybeBreakAlliances() {
+  private angerTargets() {
     if (this.nuke === null) {
       throw new Error("Not initialized");
-    }
-    if (this.nuke.type() === UnitType.MIRVWarhead) {
-      // MIRV warheads shouldn't break alliances
-      return;
     }
 
     const magnitude = this.mg.config().nukeMagnitudes(this.nuke.type());
 
-    const playersToBreakAllianceWith = listNukeBreakAlliance({
+    const angered = listNukeAngeredPlayers({
       game: this.mg,
       targetTile: this.dst,
       magnitude,
-      threshold: this.mg.config().nukeAllianceBreakThreshold(),
+      threshold: this.mg.config().nukeAngerThreshold(),
     });
 
-    // Automatically reject incoming alliance requests.
-    for (const incoming of this.player.incomingAllianceRequests()) {
-      if (playersToBreakAllianceWith.has(incoming.requestor().smallID())) {
-        incoming.reject();
-      }
-    }
-
-    for (const playerSmallId of playersToBreakAllianceWith) {
+    for (const playerSmallId of angered) {
       const attackedPlayer = this.mg.playerBySmallID(playerSmallId);
       if (!attackedPlayer.isPlayer()) {
         continue;
-      }
-
-      // Resolves exploit of alliance breaking in which a pending alliance request
-      // was accepted in the middle of a missile attack.
-      const outgoingAllianceRequest = attackedPlayer
-        .incomingAllianceRequests()
-        .find((ar) => ar.requestor() === this.player);
-      if (outgoingAllianceRequest) {
-        outgoingAllianceRequest.reject();
-        continue;
-      }
-
-      const alliance = this.player.allianceWith(attackedPlayer);
-      if (alliance !== null) {
-        this.player.breakAlliance(alliance);
       }
       if (attackedPlayer !== this.player) {
         attackedPlayer.updateRelation(this.player, -100);
@@ -232,7 +207,7 @@ export class NukeExecution implements Execution {
       this.nuke.updateNukeState({ waitTicks: this.waitTicks });
       this.recordMotionPlan(ticks);
       if (this.nuke.type() !== UnitType.MIRVWarhead) {
-        this.maybeBreakAlliances();
+        this.angerTargets();
       }
       if (this.mg.hasOwner(this.dst)) {
         const target = this.mg.owner(this.dst);

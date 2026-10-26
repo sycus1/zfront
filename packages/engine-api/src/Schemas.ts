@@ -12,7 +12,6 @@ import {
   HumansVsNations,
   MAX_UPGRADE_AMOUNT,
   Quads,
-  RankedType,
   Trios,
   UnitType,
 } from "./game/GameTypes";
@@ -27,20 +26,14 @@ export type Intent =
   | CancelAttackIntent
   | BoatAttackIntent
   | CancelBoatIntent
-  | AllianceRequestIntent
-  | AllianceRejectIntent
-  | AllianceExtensionIntent
-  | BreakAllianceIntent
   | TargetPlayerIntent
   | EmojiIntent
   | DonateGoldIntent
   | DonateTroopsIntent
   | BuildUnitIntent
-  | EmbargoIntent
   | QuickChatIntent
   | MoveWarshipIntent
   | MarkDisconnectedIntent
-  | EmbargoAllIntent
   | UpgradeStructureIntent
   | DeleteUnitIntent
   | KickPlayerIntent
@@ -52,16 +45,11 @@ export type AttackIntent = z.infer<typeof AttackIntentSchema>;
 export type CancelAttackIntent = z.infer<typeof CancelAttackIntentSchema>;
 export type SpawnIntent = z.infer<typeof SpawnIntentSchema>;
 export type BoatAttackIntent = z.infer<typeof BoatAttackIntentSchema>;
-export type EmbargoAllIntent = z.infer<typeof EmbargoAllIntentSchema>;
 export type CancelBoatIntent = z.infer<typeof CancelBoatIntentSchema>;
-export type AllianceRequestIntent = z.infer<typeof AllianceRequestIntentSchema>;
-export type AllianceRejectIntent = z.infer<typeof AllianceRejectIntentSchema>;
-export type BreakAllianceIntent = z.infer<typeof BreakAllianceIntentSchema>;
 export type TargetPlayerIntent = z.infer<typeof TargetPlayerIntentSchema>;
 export type EmojiIntent = z.infer<typeof EmojiIntentSchema>;
 export type DonateGoldIntent = z.infer<typeof DonateGoldIntentSchema>;
 export type DonateTroopsIntent = z.infer<typeof DonateTroopIntentSchema>;
-export type EmbargoIntent = z.infer<typeof EmbargoIntentSchema>;
 export type BuildUnitIntent = z.infer<typeof BuildUnitIntentSchema>;
 export type UpgradeStructureIntent = z.infer<
   typeof UpgradeStructureIntentSchema
@@ -70,9 +58,6 @@ export type MoveWarshipIntent = z.infer<typeof MoveWarshipIntentSchema>;
 export type QuickChatIntent = z.infer<typeof QuickChatIntentSchema>;
 export type MarkDisconnectedIntent = z.infer<
   typeof MarkDisconnectedIntentSchema
->;
-export type AllianceExtensionIntent = z.infer<
-  typeof AllianceExtensionIntentSchema
 >;
 export type DeleteUnitIntent = z.infer<typeof DeleteUnitIntentSchema>;
 export type KickPlayerIntent = z.infer<typeof KickPlayerIntentSchema>;
@@ -175,11 +160,6 @@ export const JoinUsernameSchema = z
   .min(MIN_USERNAME_LENGTH)
   .max(MAX_USERNAME_LENGTH);
 
-export const ClanTagSchema = z
-  .string()
-  .regex(/^[a-zA-Z0-9]{2,5}$/)
-  .nullable();
-
 //
 // Utility types
 //
@@ -262,7 +242,6 @@ export const GameConfigSchema = z.object({
   donateTroops: z.boolean(), // Configures donations to humans only
   gameType: z.enum(GameType),
   gameMode: z.enum(GameMode),
-  rankedType: z.enum(RankedType).optional(), // Only set for ranked games.
   gameMapSize: z.enum(GameMapSize),
   doomsdayClock: DoomsdayClockConfigSchema.optional(),
   overtime: OvertimeConfigSchema.optional(),
@@ -274,7 +253,6 @@ export const GameConfigSchema = z.object({
       isHardNations: z.boolean().optional(),
       startingGold: zb.uint().optional(),
       goldMultiplier: zb.float({ min: 0.1, max: 1000 }).optional(),
-      isAlliancesDisabled: z.boolean().optional(),
       isPortsDisabled: z.boolean().optional(),
       isNukesDisabled: z.boolean().optional(),
       isSAMsDisabled: z.boolean().optional(),
@@ -294,8 +272,6 @@ export const GameConfigSchema = z.object({
   infiniteTroops: z.boolean(),
   instantBuild: z.boolean(),
   disableNavMesh: z.boolean().optional(),
-  disableAlliances: z.boolean().nullable().optional(),
-  disableClanTags: z.boolean().optional(),
   // Opt-in live game stats reporting for the admin bot. Off by default and has
   // no UI — the admin bot sets it when creating tournament games, since it adds
   // per-client traffic. See LiveStatsController / GameServer.handleLiveStats.
@@ -320,7 +296,6 @@ export const GameConfigSchema = z.object({
   // create_game / update_game_config.
   trusted: z.boolean().optional(),
   maxTimerValue: zb.uint({ min: 1, max: 120 }).nullable().optional(), // In minutes
-  customAllianceDuration: zb.uint({ max: 15 }).nullable().optional(), // In minutes; 0 disables alliances
   startDelay: zb.uint({ max: 600 }).nullable().optional(), // In seconds
   spawnImmunityDuration: zb.uint().nullable().optional(), // In ticks
   disabledUnits: z.enum(UnitType).array().optional(),
@@ -409,11 +384,6 @@ export const QuickChatKeySchema = z.enum(
 // Intents
 //
 
-export const AllianceExtensionIntentSchema = z.object({
-  type: z.literal("allianceExtension"),
-  recipient: MappedID,
-});
-
 export const AttackIntentSchema = z.object({
   type: z.literal("attack"),
   targetID: MappedID.nullable(),
@@ -435,21 +405,6 @@ export const BoatAttackIntentSchema = z.object({
   dst: zb.uint(),
 });
 
-export const AllianceRequestIntentSchema = z.object({
-  type: z.literal("allianceRequest"),
-  recipient: MappedID,
-});
-
-export const AllianceRejectIntentSchema = z.object({
-  type: z.literal("allianceReject"),
-  requestor: MappedID,
-});
-
-export const BreakAllianceIntentSchema = z.object({
-  type: z.literal("breakAlliance"),
-  recipient: MappedID,
-});
-
 export const TargetPlayerIntentSchema = z.object({
   type: z.literal("targetPlayer"),
   target: MappedID,
@@ -461,17 +416,6 @@ export const EmojiIntentSchema = z.object({
     select: (v) => (v === AllPlayers ? 1 : 0),
   }),
   emoji: EmojiSchema,
-});
-
-export const EmbargoIntentSchema = z.object({
-  type: z.literal("embargo"),
-  targetID: MappedID,
-  action: z.union([z.literal("start"), z.literal("stop")]),
-});
-
-export const EmbargoAllIntentSchema = z.object({
-  type: z.literal("embargo_all"),
-  action: z.union([z.literal("start"), z.literal("stop")]),
 });
 
 export const DonateGoldIntentSchema = z.object({
@@ -570,20 +514,14 @@ export const IntentSchema = z.discriminatedUnion("type", [
   MarkDisconnectedIntentSchema,
   BoatAttackIntentSchema,
   CancelBoatIntentSchema,
-  AllianceRequestIntentSchema,
-  AllianceRejectIntentSchema,
-  BreakAllianceIntentSchema,
   TargetPlayerIntentSchema,
   EmojiIntentSchema,
   DonateGoldIntentSchema,
   DonateTroopIntentSchema,
   BuildUnitIntentSchema,
   UpgradeStructureIntentSchema,
-  EmbargoIntentSchema,
-  EmbargoAllIntentSchema,
   MoveWarshipIntentSchema,
   QuickChatIntentSchema,
-  AllianceExtensionIntentSchema,
   DeleteUnitIntentSchema,
   KickPlayerIntentSchema,
   TogglePauseIntentSchema,
@@ -617,25 +555,13 @@ export const TurnSchema = z.object({
 export const PlayerSchema = z.object({
   clientID: ID,
   username: UsernameSchema,
-  clanTag: ClanTagSchema,
   isLobbyCreator: z.boolean().optional(),
   friends: z.array(ID).optional(),
   // Server-stamped team slot for matchmade team games (index into the
   // game's team list). Feeds deterministic team assignment, so it must be
-  // identical for every client (like clanTag/friends).
+  // identical for every client (like friends).
   teamIndex: zb.uint().optional(),
 });
-
-// A purchased bot tribe name in use this game (active names are globally
-// unique, so the name alone identifies the tribe). Loose to mirror infra's
-// analytics-ingest schema — a field the API adds later flows through to the
-// record without a game-side change, instead of being silently stripped.
-export const TribeSchema = z
-  .object({
-    name: SafeString.min(1).max(64),
-  })
-  .loose();
-export type Tribe = z.infer<typeof TribeSchema>;
 
 export const GameStartInfoSchema = z.object({
   gameID: ID,
@@ -644,11 +570,6 @@ export const GameStartInfoSchema = z.object({
   listed: z.boolean().optional(),
   config: GameConfigSchema,
   players: PlayerSchema.array(),
-  // Purchased bot tribe names in use this game (public games only). Rides
-  // the analytics record to infra at game end for owner appearance stats.
-  // zb.json: TribeSchema is `.loose()`, and a positional binary layout would
-  // silently drop the passthrough keys that looseness exists to preserve.
-  tribes: z.array(zb.json(TribeSchema)).max(100).optional(),
 });
 
 export const WinnerSchema = z

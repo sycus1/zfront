@@ -26,11 +26,7 @@ declare global {
       numWorkers?: number;
       turnstileSiteKey?: string;
       jwtAudience?: string;
-      // Environment-scoped like turnstileSiteKey, but optional: a deployment
-      // without one (dev, desktop shells) just keeps the inline Stripe flow
-      // off.
-      stripePublishableKey?: string;
-      // Environment-scoped and optional like stripePublishableKey: the
+      // Environment-scoped like turnstileSiteKey, but optional: the
       // Grafana Faro collector URL. Absent keeps client telemetry off.
       faroCollectorUrl?: string;
       // The rendering server's own id. Absent on a static page, which no

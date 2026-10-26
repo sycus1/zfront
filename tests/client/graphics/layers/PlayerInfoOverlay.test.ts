@@ -54,7 +54,6 @@ import {
 import { PlayerInfoOverlay } from "../../../../src/client/hud/layers/PlayerInfoOverlay";
 import {
   DoBoatAttackEvent,
-  DoRequestAllianceEvent,
   DoTargetPlayerEvent,
 } from "../../../../src/client/InputHandler";
 
@@ -79,7 +78,6 @@ describe("PlayerInfoOverlay", () => {
   const hovered = {
     isPlayer: () => true,
     profile: () => Promise.resolve(null),
-    getTraitorRemainingTicks: () => 0,
     outgoingAttacks: () => [],
     troops: () => 100,
     gold: () => 0n,
@@ -117,7 +115,6 @@ describe("PlayerInfoOverlay", () => {
   it("shows the hovered player's card with a green name for a friend", () => {
     overlay.game = makeGame({
       isFriendly: () => true,
-      isAlliedWith: () => false,
       smallID: () => 1,
     }) as never;
 
@@ -143,7 +140,6 @@ describe("PlayerInfoOverlay", () => {
   it("keeps its target while the pointer is on the panel", () => {
     const game = makeGame({
       isFriendly: () => false,
-      isAlliedWith: () => false,
       smallID: () => 1,
     });
     overlay.game = game as never;
@@ -181,7 +177,6 @@ describe("PlayerInfoOverlay", () => {
       const game = makeGame(
         me ?? {
           isFriendly: () => false,
-          isAlliedWith: () => false,
           smallID: () => 1,
           actions: async () => ({ buildableUnits: [] }),
         },
@@ -212,7 +207,6 @@ describe("PlayerInfoOverlay", () => {
       const out = showWith(1200, false, {
         ...hovered,
         isFriendly: () => true,
-        isAlliedWith: () => false,
       });
       expect(out).not.toContain("player_panel.chat");
       expect(out).toContain("player_panel.emotes");
@@ -235,7 +229,6 @@ describe("PlayerInfoOverlay", () => {
       overlay.game = makeGame(
         {
           isFriendly: () => false,
-          isAlliedWith: () => false,
           smallID: () => 1,
         },
         true,
@@ -299,7 +292,6 @@ describe("PlayerInfoOverlay", () => {
       }));
       overlay.game = makeGame({
         isFriendly: () => false,
-        isAlliedWith: () => false,
         smallID: () => 1,
         actions,
       }) as never;
@@ -331,68 +323,47 @@ describe("PlayerInfoOverlay", () => {
     }
 
     it("show only what I can do to the hovered player", async () => {
-      const { actions, out } = await hoverBob(
-        { canSendAllianceRequest: true, canTarget: true },
-        true,
-      );
+      const { actions, out } = await hoverBob({ canTarget: true }, true);
       expect(actions).toHaveBeenCalledWith(42, [UnitType.TransportShip]);
-      expect(out).toContain("player_panel.send_alliance");
       expect(out).toContain("player_panel.target");
       expect(out).toContain("user_setting.boat_attack");
-      expect(out).not.toContain("player_panel.break_alliance");
     });
 
-    it("swap request alliance for break alliance once allied, and hide boat out of reach", async () => {
-      const { out } = await hoverBob({ canBreakAlliance: true }, false);
-      expect(out).toContain("player_panel.break_alliance");
-      expect(out).not.toContain("player_panel.send_alliance");
+    it("hide target and boat when I can't use them", async () => {
+      const { out } = await hoverBob({}, false);
       expect(out).not.toContain("player_panel.target");
       expect(out).not.toContain("user_setting.boat_attack");
     });
 
     it("act on the tile the panel shows", async () => {
-      await hoverBob({ canSendAllianceRequest: true, canTarget: true }, true);
+      await hoverBob({ canTarget: true }, true);
       const tree = overlay.render();
-      clickHandler(tree, "player_panel.send_alliance")!();
       clickHandler(tree, "player_panel.target")!();
       clickHandler(tree, "user_setting.boat_attack")!();
 
       const sent = emit.mock.calls.map(([e]) => e);
-      expect(sent[0]).toBeInstanceOf(DoRequestAllianceEvent);
-      expect(sent[1]).toBeInstanceOf(DoTargetPlayerEvent);
-      expect(sent[2]).toBeInstanceOf(DoBoatAttackEvent);
-      expect(sent.map((e) => e.tile)).toEqual([42, 42, 42]);
-      // Alliance and target also name the shown player, so a tile that
-      // changes hands meanwhile doesn't redirect them.
+      expect(sent[0]).toBeInstanceOf(DoTargetPlayerEvent);
+      expect(sent[1]).toBeInstanceOf(DoBoatAttackEvent);
+      expect(sent.map((e) => e.tile)).toEqual([42, 42]);
+      // Target also names the shown player, so a tile that changes hands
+      // meanwhile doesn't redirect it.
       expect(sent[0].playerID).toBe("bob");
-      expect(sent[1].playerID).toBe("bob");
     });
 
-    it("drop Send Alliance as soon as I click it", async () => {
-      const { actions } = await hoverBob(
-        { canSendAllianceRequest: true, canTarget: true },
-        false,
-      );
-      clickHandler(overlay.render(), "player_panel.send_alliance")!();
+    it("drop Target as soon as I click it", async () => {
+      const { actions } = await hoverBob({ canTarget: true }, true);
+      clickHandler(overlay.render(), "player_panel.target")!();
       overlay.maybeShow(10, 10); // the mouse moves on
 
       const out = flatten(overlay.render());
-      expect(out).not.toContain("player_panel.send_alliance");
-      expect(out).toContain("player_panel.target");
-      // No new question yet: the game hasn't seen the request.
+      expect(out).not.toContain("player_panel.target");
+      expect(out).toContain("user_setting.boat_attack");
+      // No new question yet: the game hasn't seen the intent.
       expect(actions).toHaveBeenCalledTimes(1);
     });
 
-    it("drop Send Alliance when I press K over the player", async () => {
-      await hoverBob({ canSendAllianceRequest: true }, false);
-      bus.emit(new DoRequestAllianceEvent());
-      expect(flatten(overlay.render())).not.toContain(
-        "player_panel.send_alliance",
-      );
-    });
-
     it("ignore an answer that was on its way before I acted", async () => {
-      await hoverBob({ canSendAllianceRequest: true }, false);
+      await hoverBob({ canTarget: true }, false);
       let answer!: (a: unknown) => void;
       const me = overlay.game.myPlayer() as unknown as {
         actions: ReturnType<typeof vi.fn>;
@@ -403,24 +374,21 @@ describe("PlayerInfoOverlay", () => {
       overlay["playerActionsFetchedAt"] = 0;
       overlay.tick(); // asks again while the mouse rests
 
-      bus.emit(new DoRequestAllianceEvent());
+      bus.emit(new DoTargetPlayerEvent());
       answer({
-        interaction: { canSendAllianceRequest: true },
+        interaction: { canTarget: true },
         buildableUnits: [],
       });
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(flatten(overlay.render())).not.toContain(
-        "player_panel.send_alliance",
-      );
+      expect(flatten(overlay.render())).not.toContain("player_panel.target");
     });
 
     it("show none while players are still spawning", async () => {
       const actions = vi.fn();
       const game = makeGame({
         isFriendly: () => false,
-        isAlliedWith: () => false,
         smallID: () => 1,
         actions,
       });
@@ -448,7 +416,6 @@ describe("PlayerInfoOverlay", () => {
       const me = {
         ...hovered,
         isFriendly: () => true,
-        isAlliedWith: () => false,
         actions: vi.fn(),
       };
       const game = makeGame(me);

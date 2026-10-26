@@ -23,7 +23,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SNAPSHOT = new Uint8Array(
   gunzipSync(
     fs.readFileSync(
-      path.join(__dirname, "../../testdata/snapshots/format-1.snapshot.gz"),
+      path.join(__dirname, "../../testdata/snapshots/format-2.snapshot.gz"),
     ),
   ),
 );

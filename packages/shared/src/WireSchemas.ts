@@ -16,7 +16,6 @@ import type { GameEvent } from "./EventBus";
 
 import {
   AllPlayersStatsSchema,
-  ClanTagSchema,
   ClientID,
   GameConfigSchema,
   GameStartInfoSchema,
@@ -175,10 +174,6 @@ export const MIN_HOSTED_LOBBY_PLAYERS = 10;
 
 export const MAX_HOSTED_LOBBY_PLAYERS = 100;
 
-// A listed lobby this close to its auto-start can no longer be queued, so a
-// host can't pay for a queue spot the lobby starts before it reaches.
-export const LOBBY_QUEUE_CUTOFF_MS = 30 * 1000;
-
 // Featured lobbies get a longer window. A scheduled event announced ahead of
 // time needs the listing to still be up when its audience arrives, and unlike a
 // subscriber sitting on a listing the host is an authenticated admin bot. Only
@@ -207,7 +202,6 @@ export type { LevelBadge } from "./LevelBadgeWire";
 export const ClientInfoSchema = z.object({
   clientID: z.string(),
   username: UsernameSchema,
-  clanTag: ClanTagSchema,
   friends: z.array(z.string()).optional(),
   // Plays under their server-validated account name (blue check in the
   // lobby list). Never set on anonymized entries — the badge vouches for
@@ -258,9 +252,6 @@ export const GameInfoSchema = z.object({
   label: LobbyLabelSchema.optional(),
   accent: LobbyAccentSchema.optional(),
   featured: z.boolean().optional(),
-  // Listed lobbies only: the host paid to put it in the public Special
-  // queue, so the queue's countdown starts it.
-  queued: z.boolean().optional(),
 });
 
 // Browser-facing lobby info. Master/worker-internal fields (the creator hash
@@ -348,7 +339,6 @@ export class GroupTokenEvent implements GameEvent {
 export interface ClientInfo {
   clientID: ClientID;
   username: string;
-  clanTag: string | null;
   friends?: ClientID[];
   // Plays under their server-validated account name (blue check). Never set
   // on anonymized entries.
@@ -465,12 +455,11 @@ export const PlayerCosmeticsSchema = z.object({
 
 // A player as the server sends and records it: what the engine reads
 // (PlayerSchema) plus the cosmetics only the client renders. zbin encodes
-// fields in shape order, so cosmetics keeps its place after clanTag.
-const { clientID, username, clanTag, ...playerRest } = PlayerSchema.shape;
+// fields in shape order, so cosmetics keeps its place after username.
+const { clientID, username, ...playerRest } = PlayerSchema.shape;
 export const WirePlayerSchema = z.object({
   clientID,
   username,
-  clanTag,
   cosmetics: PlayerCosmeticsSchema.optional(),
   ...playerRest,
 });
@@ -716,7 +705,6 @@ export const ClientJoinMessageSchema = z.object({
   token: TokenSchema, // WARNING: PII - server extracts persistentID from this
   gameID: ID,
   username: JoinUsernameSchema,
-  clanTag: ClanTagSchema,
   // Server replaces the refs with the actual cosmetic data.
   cosmetics: PlayerCosmeticRefsSchema.optional(),
   turnstileToken: z.string().nullable(),
@@ -834,8 +822,8 @@ export const AnalyticsRecordSchema = PartialAnalyticsRecordSchema.extend({
 export type AnalyticsRecord = z.infer<typeof AnalyticsRecordSchema>;
 
 // Lenient variant for *reading* archived records. Older builds wrote records
-// under earlier schemas (username rules tightened since, clanTag and nations
-// added later, conquests became an array) while the `version` literal never
+// under earlier schemas (username rules tightened since, nations added
+// later, conquests became an array) while the `version` literal never
 // changed, so strict parsing rejects them wholesale. Records are trusted
 // server output, not untrusted input — tolerate the historical shapes.
 // Inferred types are identical to the strict schemas', so parsed results are
@@ -845,7 +833,6 @@ const ArchivedPlayerRecordSchema = PlayerRecordSchema.extend({
   // Validated at join time under the rules of its era; the loosest era was
   // SafeString (max 1000, emoji allowed, no min), so only cap length.
   username: z.string().max(1000),
-  clanTag: ClanTagSchema.catch(null).default(null), // predates clan tags
   stats: ArchivedPlayerStatsSchema, // scalar conquests
 });
 

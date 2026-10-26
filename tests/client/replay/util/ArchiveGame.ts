@@ -22,12 +22,7 @@ import {
   GameUpdateType,
   HashUpdate,
 } from "@openfront/engine-api/game/GameUpdates";
-import {
-  GameConfig,
-  GameStartInfo,
-  StampedIntent,
-  Turn,
-} from "@openfront/engine-api/Schemas";
+import { GameConfig, StampedIntent, Turn } from "@openfront/engine-api/Schemas";
 import { Game } from "@openfront/engine/game/Game";
 import { createGameRunner } from "@openfront/engine/GameRunner";
 import { loadMapFiles } from "@openfront/shared/GameMapLoader";
@@ -60,7 +55,6 @@ export interface ArchiveOptions {
   config: GameConfig;
   players: WirePlayer[];
   ticks: number;
-  tribes?: GameStartInfo["tribes"];
   /** Intents the clients send for turn `tick`, given the live game. */
   intents?: (game: Game, tick: number) => StampedIntent[];
 }
@@ -79,7 +73,6 @@ export async function playAndArchive(
     lobbyCreatedAt: 1_700_000_000_000,
     config: opts.config,
     players: opts.players,
-    ...(opts.tribes !== undefined ? { tribes: opts.tribes } : {}),
   };
   const wireStart = toWireGameStartInfo(start);
 
@@ -132,8 +125,6 @@ export async function playAndArchive(
     start.lobbyCreatedAt + opts.ticks * 100,
     undefined,
     start.lobbyCreatedAt,
-    undefined,
-    start.tribes,
   );
   const record = GameRecordSchema.parse(
     JSON.parse(JSON.stringify({ ...partial, gitCommit: "DEV" })),
@@ -159,7 +150,7 @@ export function spawnOnLand(
 /** A public-game config; Pangaea FFA with 20 bots unless overridden. */
 export function config(overrides: Partial<GameConfig> = {}): GameConfig {
   return {
-    gameMap: GameMapType.Pangaea,
+    gameMap: GameMapType.Britannia,
     difficulty: Difficulty.Medium,
     donateGold: false,
     donateTroops: false,
@@ -184,7 +175,6 @@ export function human(
   return {
     clientID: `client00${n}`,
     username: `Human ${n}`,
-    clanTag: null,
     ...overrides,
   };
 }

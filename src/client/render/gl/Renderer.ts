@@ -933,10 +933,9 @@ export class GPURenderer {
   ): void {
     this.namePass.updateNames(names, players, snap, statusData);
 
-    // Extract local player's allies + teammates for SAM radius coloring
+    // Extract local player's teammates for SAM radius coloring
     if (this.localPlayerID > 0) {
-      const localPS = players.get(this.localPlayerID);
-      const friendly = new Set(localPS?.allies ?? []);
+      const friendly = new Set<number>();
       const myTeam = this.playerTeams.get(this.localPlayerID);
       if (myTeam !== undefined) {
         for (const [sid, team] of this.playerTeams) {
@@ -1157,10 +1156,6 @@ export class GPURenderer {
 
   setLocalRailColor(r: number, g: number, b: number): void {
     this.railroadPass.setLocalRailColor(r, g, b);
-  }
-
-  setSAMAllianceClusters(clusters: Map<number, number>): void {
-    this.samRadiusPass.setAllianceClusters(clusters);
   }
 
   setAltView(active: boolean): void {

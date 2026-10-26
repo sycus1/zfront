@@ -132,22 +132,6 @@ export class PlayerExecution implements Execution {
     // Record stats
     this.mg.stats().goldWork(this.player, goldFromWorkers);
 
-    for (const alliance of this.player.alliances()) {
-      if (alliance.expiresAt() <= this.mg.ticks()) {
-        alliance.expire();
-      }
-    }
-
-    for (const embargo of this.player.getEmbargoes()) {
-      if (
-        embargo.isTemporary &&
-        this.mg.ticks() - embargo.createdAt >
-          this.mg.config().temporaryEmbargoDuration()
-      ) {
-        this.player.stopEmbargo(embargo.target);
-      }
-    }
-
     if (
       ticks - this.lastCalc > this.ticksPerClusterCalc ||
       this.player.numTilesOwned() < 100
@@ -1443,7 +1427,7 @@ export class PlayerExecution implements Execution {
 
   private removeOnDeath(): void {
     // Player (bot, human, nation) has no tiles
-    // Delete any remaining gold, non-nuke units and alliances
+    // Delete any remaining gold and non-nuke units
     const gold = this.player.gold();
     this.player.removeGold(gold);
 
@@ -1457,8 +1441,6 @@ export class PlayerExecution implements Execution {
         u.delete();
       }
     });
-
-    this.player.removeAllAlliances();
   }
 
   snapshot(w: SnapshotWriter): ExecRecord {

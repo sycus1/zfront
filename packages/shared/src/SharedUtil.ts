@@ -2,7 +2,6 @@ import { GameType, PlayerType } from "@openfront/engine-api/game/GameTypes";
 import {
   GameConfig,
   GameID,
-  Tribe,
   Turn,
   Winner,
 } from "@openfront/engine-api/Schemas";
@@ -25,13 +24,12 @@ export function sanitize(name: string): string {
 }
 
 // Replays rebuild GameStartInfo from the archived record, which keeps
-// players' real clanTag and friends (analytics reads them). Live clients
-// never simulated with those: the server blanks clanTag when clan tags are
-// disabled, and clanTag + friends when names are anonymized — identically
-// for every client, because both feed deterministic team assignment
-// (TeamAssignment.ts). Mirrors GameServer.start() (wireGameStartInfo) and
-// startInfoFor(); replays must apply the same blanking before simulating,
-// or team games with either setting diverge from the recorded hashes.
+// players' real friends (analytics reads them). Live clients never simulated
+// with those when names are anonymized: the server blanks friends then,
+// identically for every client, because they feed deterministic team
+// assignment (TeamAssignment.ts). Mirrors GameServer.start()
+// (wireGameStartInfo) and startInfoFor(); replays must apply the same
+// blanking before simulating, or team games diverge from the recorded hashes.
 // Singleplayer records were simulated (and archived) with the real values —
 // no server, no blanking — so they replay as-is.
 export function toWireGameStartInfo(
@@ -41,18 +39,14 @@ export function toWireGameStartInfo(
   if (config.gameType === GameType.Singleplayer) {
     return info;
   }
-  const blankClanTags =
-    (config.disableClanTags ?? false) || (config.anonymizeNames ?? false);
-  const blankFriends = config.anonymizeNames ?? false;
-  if (!blankClanTags && !blankFriends) {
+  if (!(config.anonymizeNames ?? false)) {
     return info;
   }
   return {
     ...info,
     players: info.players.map((p) => ({
       ...p,
-      clanTag: blankClanTags ? null : p.clanTag,
-      friends: blankFriends ? undefined : p.friends,
+      friends: undefined,
     })),
   };
 }
@@ -70,10 +64,6 @@ export function createPartialGameRecord(
   lobbyCreatedAt?: number,
   // Time the lobby became visible to players (ms).
   visibleAt?: number,
-  // Purchased bot tribe names in use this game (public games only). Infra
-  // ingest reads them from the record for owner appearance stats, and
-  // replays rebuild GameStartInfo from the record so the same names spawn.
-  tribes?: Tribe[],
   // Player reports filed during the game (multiplayer only; see
   // GameServer.handleReport). The API ingests them for moderation.
   reports?: PlayerReport[],
@@ -108,7 +98,6 @@ export function createPartialGameRecord(
       duration,
       num_turns,
       winner,
-      tribes,
       reports,
       publicGameType,
       statsAgreed,
@@ -188,14 +177,6 @@ export function createRandomName(
  */
 export function replacer(_key: string, value: any): any {
   return typeof value === "bigint" ? value.toString() : value;
-}
-
-const CLAN_TAG_CHARS = "a-zA-Z0-9";
-
-const CLAN_TAG_INVALID_CHARS = new RegExp(`[^${CLAN_TAG_CHARS}]`, "g");
-
-export function sanitizeClanTag(tag: string): string {
-  return tag.replace(CLAN_TAG_INVALID_CHARS, "").substring(0, 5).toUpperCase();
 }
 
 // A featured lobby's label is host-supplied text shown in the lobby browser, so

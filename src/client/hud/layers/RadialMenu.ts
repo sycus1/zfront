@@ -597,27 +597,7 @@ export class RadialMenu implements Controller {
         const content = d3.select(`g[data-id="${contentId}"]`);
         const disabled = this.isItemDisabled(d.data);
 
-        if (d.data.renderType && this.params) {
-          const stateKey = this.getStateKeyByType(
-            d.data.renderType,
-            disabled,
-            this.params,
-          );
-          if (stateKey) {
-            content.attr("data-prev-state", stateKey);
-          }
-          if (d.data.renderType === "allyExtend") {
-            this.renderAllyExtendIcon(
-              content.node()! as SVGGElement,
-              arc.centroid(d)[0],
-              arc.centroid(d)[1],
-              this.config.iconSize,
-              disabled,
-              this.params,
-              d.data.icon,
-            );
-          }
-        } else if (d.data.text) {
+        if (d.data.text) {
           content
             .append("text")
             .attr("text-anchor", "middle")
@@ -1138,30 +1118,26 @@ export class RadialMenu implements Controller {
         // Update icon/text appearance using the same logic as renderIconsAndText
         const icon = this.menuIcons.get(itemId);
         if (icon) {
-          if (item.renderType === "allyExtend" && this.params) {
-            this.refreshAllyExtendIcon(item, disabled, icon);
-          } else {
-            // Update text opacity
-            const textElement = icon.select("text");
-            if (!textElement.empty()) {
-              textElement.style("opacity", disabled ? 0.5 : 1);
-            }
+          // Update text opacity
+          const textElement = icon.select("text");
+          if (!textElement.empty()) {
+            textElement.style("opacity", disabled ? 0.5 : 1);
+          }
 
-            // Update image opacity
-            const imageElement = icon.select("image");
-            if (!imageElement.empty()) {
-              imageElement.attr("opacity", disabled ? 0.5 : 1);
-            }
+          // Update image opacity
+          const imageElement = icon.select("image");
+          if (!imageElement.empty()) {
+            imageElement.attr("opacity", disabled ? 0.5 : 1);
+          }
 
-            // Update cooldown text if applicable
-            const cooldownElement = icon.select(".cooldown-text");
-            if (this.params && !cooldownElement.empty() && item.cooldown) {
-              const cooldown = Math.ceil(item.cooldown(this.params));
-              if (cooldown <= 0) {
-                cooldownElement.remove();
-              } else {
-                cooldownElement.text(cooldown + "s");
-              }
+          // Update cooldown text if applicable
+          const cooldownElement = icon.select(".cooldown-text");
+          if (this.params && !cooldownElement.empty() && item.cooldown) {
+            const cooldown = Math.ceil(item.cooldown(this.params));
+            if (cooldown <= 0) {
+              cooldownElement.remove();
+            } else {
+              cooldownElement.text(cooldown + "s");
             }
           }
 
@@ -1173,47 +1149,6 @@ export class RadialMenu implements Controller {
 
     // Refresh center button state
     this.updateCenterButtonState(this.centerButtonState);
-  }
-
-  private refreshAllyExtendIcon(
-    item: MenuElement,
-    disabled: boolean,
-    icon: d3.Selection<SVGImageElement, unknown, null, undefined>,
-  ): void {
-    if (item.renderType !== "allyExtend" || !this.params) {
-      return;
-    }
-
-    const stateKey = this.getStateKeyByType(
-      item.renderType,
-      disabled,
-      this.params,
-    );
-    const prevState = icon.attr("data-prev-state");
-
-    if (stateKey && stateKey === prevState) {
-      // State unchanged, skip re-render to preserve animations
-    } else {
-      const cx = parseFloat(icon.attr("data-cx") || "0");
-      const cy = parseFloat(icon.attr("data-cy") || "0");
-
-      if (stateKey) {
-        icon.attr("data-prev-state", stateKey);
-      } else {
-        icon.selectAll("*").remove();
-      }
-
-      this.renderAllyExtendIcon(
-        icon.node()! as SVGGElement,
-        cx,
-        cy,
-        this.config.iconSize,
-        disabled,
-        this.params,
-        item.icon,
-        true,
-      );
-    }
   }
 
   private maybeUpdateTimerGradient(
@@ -1244,101 +1179,6 @@ export class RadialMenu implements Controller {
         .attr("offset", offset)
         .attr("stop-color", normalColor);
     }
-  }
-
-  private getStateKeyByType(
-    type: string,
-    disabled: boolean,
-    params: MenuElementParams,
-  ): string | null {
-    switch (type) {
-      case "allyExtend":
-        return this.getAllyExtendStateKey(disabled, params);
-      default:
-        return null;
-    }
-  }
-
-  private getAllyExtendStateKey(
-    disabled: boolean,
-    params: MenuElementParams,
-  ): string {
-    const interaction = params.playerActions?.interaction;
-    const myAgreed = interaction?.allianceInfo?.myPlayerAgreedToExtend ?? false;
-    const otherAgreed = interaction?.allianceInfo?.otherAgreedToExtend ?? false;
-    return `${disabled}:${myAgreed}:${otherAgreed}`;
-  }
-
-  private renderAllyExtendIcon(
-    content: SVGGElement,
-    cx: number,
-    cy: number,
-    iconSize: number,
-    disabled: boolean,
-    params: MenuElementParams,
-    icon?: string,
-    update?: boolean,
-  ): void {
-    if (update) {
-      while (content.firstChild) content.removeChild(content.firstChild);
-    }
-
-    const interaction = params.playerActions?.interaction;
-    const myAgreed = interaction?.allianceInfo?.myPlayerAgreedToExtend ?? false;
-    const otherAgreed = interaction?.allianceInfo?.otherAgreedToExtend ?? false;
-
-    const ns = "http://www.w3.org/2000/svg";
-    const smallSize = iconSize * 0.8;
-    const iconUrl = icon ?? "";
-
-    getSvgAspectRatio(iconUrl).then((ratio) => {
-      const width = smallSize * (ratio ?? 1);
-      const gap = 2;
-      const totalWidth = width * 2 + gap;
-
-      // Left handshake = me
-      const leftImg = document.createElementNS(ns, "image");
-      leftImg.setAttribute("href", iconUrl);
-      leftImg.setAttribute("width", width.toString());
-      leftImg.setAttribute("height", smallSize.toString());
-      leftImg.setAttribute("x", (cx - totalWidth / 2).toString());
-      leftImg.setAttribute("y", (cy - smallSize / 2).toString());
-      leftImg.setAttribute("opacity", disabled ? "0.5" : "1");
-
-      if (!myAgreed) {
-        const animLeft = document.createElementNS(ns, "animate");
-        animLeft.setAttribute("attributeName", "opacity");
-        animLeft.setAttribute("values", disabled ? "0.5;0.1;0.5" : "1;0.2;1");
-        animLeft.setAttribute("dur", "1.5s");
-        animLeft.setAttribute("repeatCount", "indefinite");
-        leftImg.appendChild(animLeft);
-      }
-
-      content.appendChild(leftImg);
-
-      // Right handshake = them
-      const rightImg = document.createElementNS(ns, "image");
-      rightImg.setAttribute("href", iconUrl);
-      rightImg.setAttribute("width", width.toString());
-      rightImg.setAttribute("height", smallSize.toString());
-      rightImg.setAttribute(
-        "x",
-        (cx - totalWidth / 2 + width + gap).toString(),
-      );
-      rightImg.setAttribute("y", (cy - smallSize / 2).toString());
-      rightImg.setAttribute("opacity", disabled ? "0.5" : "1");
-
-      if (!otherAgreed) {
-        const animRight = document.createElementNS(ns, "animate");
-        animRight.setAttribute("attributeName", "opacity");
-        animRight.setAttribute("values", disabled ? "0.5;0.1;0.5" : "1;0.2;1");
-        animRight.setAttribute("dur", "1.5s");
-        animRight.setAttribute("repeatCount", "indefinite");
-        rightImg.appendChild(animRight);
-      }
-
-      content.appendChild(rightImg);
-    });
   }
 
   private isReopeningAllowed(): boolean {
