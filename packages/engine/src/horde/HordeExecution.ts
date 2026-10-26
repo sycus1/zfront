@@ -16,14 +16,18 @@ import { Execution, Game, Player, Unit } from "../game/Game";
 import { execSnapshotType } from "../snapshot/ExecutionSnapshot";
 import type { ExecRecord, SnapshotReader } from "../snapshot/SnapshotContext";
 import { Elites } from "./Elites";
-import { FlowField } from "./FlowField";
+import { FlowField, WALL_COST } from "./FlowField";
 import { buildCostField, HordeField } from "./HordeField";
+import { WaveDirector, WavePlan } from "./WaveDirector";
 
 /**
  * Zombie waves (zfront spike). The mass horde is a density field on the
  * coarse map that flows toward player structures; elites are discrete
  * agents on the same flow field. Structures are obstacles: blocked zombies
- * press on them until they fall. Defense Posts stand in for turrets.
+ * press on them until they fall. Walls are obstacles too, but not targets:
+ * the horde goes round them where it can and breaks through where it must.
+ * Defense Posts stand in for turrets. The WaveDirector plans each wave's
+ * size and directions.
  *
  * The player wins by keeping their HQ standing until the wave after
  * `wavesToWin` would arrive, and loses when every human HQ has fallen.
@@ -38,13 +42,20 @@ export interface HordeOptions {
   /** Ticks from the end of the spawn phase to the first wave. */
   firstWaveDelay: number;
   waveInterval: number;
+  /** Points for the first wave: one per shambler, `elitePoints` per elite. */
   firstWaveSize: number;
-  /** Each wave is this many percent bigger than the last. */
+  /** Each wave's budget is this many percent bigger than the last. */
   waveGrowthPercent: number;
   emittersPerWave: number;
   /** Zombies each emitter releases per tick until its share is out. */
   emitRate: number;
+  /** Elites in the first wave; later waves scale with the budget. */
   elitesPerWave: number;
+  elitePoints: number;
+  /** Waves come from one more direction every this many waves. */
+  wavesPerDirection: number;
+  /** Waves don't come ashore closer than this to the HQ (coarse cells). */
+  minSpawnDistance: number;
   maxElites: number;
   eliteHp: number;
   /** Ticks between elite steps (lower is faster). */
@@ -60,6 +71,7 @@ export interface HordeOptions {
   /** Structure damage per tick is pressure >> pressureShift. */
   pressureShift: number;
   structureHp: number;
+  wallHp: number;
   /** HQ health. When it falls, the player loses. */
   hqHp: number;
   /** Waves to survive to win; 0 means endless. */
@@ -74,7 +86,7 @@ export interface HordeOptions {
 }
 
 // Spike defaults, sized to show a big horde in a solo game within minutes:
-// waves of 20k, 30k, 45k, 67k, 100k... every 30 seconds.
+// waves of 20k, 30k, 45k, 67k, 100k... points every 30 seconds.
 export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   firstWaveDelay: 100,
   waveInterval: 300,
@@ -83,6 +95,9 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   emittersPerWave: 8,
   emitRate: 200,
   elitesPerWave: 50,
+  elitePoints: 20,
+  wavesPerDirection: 3,
+  minSpawnDistance: 40,
   maxElites: 500,
   eliteHp: 300,
   eliteSpeed: 1,
@@ -94,6 +109,7 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   turretEliteDamage: 20,
   pressureShift: 6,
   structureHp: 3_000,
+  wallHp: 10_000,
   hqHp: 50_000,
   wavesToWin: 10,
   flowDebounce: 10,
@@ -138,10 +154,14 @@ export class HordeExecution implements Execution {
   private turretOffsets!: Int32Array;
   /** Terrain movement cost; the live cost adds structure cells on top. */
   private terrainCost!: Uint8Array;
+  private director!: WaveDirector;
 
   private wave = 0;
-  private waveSize = 0;
+  /** The wave under way (or last started), and the one announced next. */
+  private currentPlan: WavePlan | null = null;
+  private nextPlan: WavePlan | null = null;
   private nextWaveTick = -1;
+  private ticks = 0;
   private emitterCells: number[] = [];
   private emitterRemaining: number[] = [];
 
@@ -157,8 +177,11 @@ export class HordeExecution implements Execution {
 
   /** Target cells (structures and HQs) from the latest scan. */
   private hordeTargetCells: number[] = [];
+  /** Wall cells from the latest scan: obstacles, but not targets. */
+  private hordeWallCells: number[] = [];
   /** Target cells the flow field was last computed from; null before the first. */
   private flowCells: number[] | null = null;
+  private flowWalls: number[] = [];
   /** Ticks of the latest and the first structure change since the last recompute. */
   private lastChangeTick = -1;
   private firstPendingTick = -1;
@@ -204,6 +227,7 @@ export class HordeExecution implements Execution {
       this.height,
     );
     this.turretOffsets = discOffsets(opts.turretRange, this.width);
+    this.director = new WaveDirector(opts, this.width);
     this.hordeStructureAt = new Map();
     this.hordeTurrets = [];
     this.hordeHqAt = new Map();
@@ -223,17 +247,20 @@ export class HordeExecution implements Execution {
 
   tick(ticks: number): void {
     if (this.mg === null || this.outcome !== "playing") return;
+    this.ticks = ticks;
     if (this.nextWaveTick < 0) {
       this.nextWaveTick = ticks + this.opts.firstWaveDelay;
     }
     this.scanStructures(ticks);
+    this.planNextWave();
     if (ticks >= this.nextWaveTick) {
-      if (this.opts.wavesToWin > 0 && this.wave >= this.opts.wavesToWin) {
+      if (this.allWavesStarted()) {
         this.win();
         return;
       }
       this.startWave();
       this.nextWaveTick = ticks + this.opts.waveInterval;
+      this.planNextWave();
     }
     this.emit();
     this.field.step(this.hordeFlow.dist);
@@ -256,6 +283,11 @@ export class HordeExecution implements Execution {
     };
   }
 
+  /** The wave announced next, or null when none is left. */
+  upcomingWave(): WavePlan | null {
+    return this.nextPlan;
+  }
+
   /** Density per coarse cell, for rendering and tests. Do not mutate. */
   density(): Uint16Array {
     return this.field.density;
@@ -272,11 +304,13 @@ export class HordeExecution implements Execution {
     const cells = new Uint8Array(d.length);
     for (let i = 0; i < d.length; i++) {
       const v = d[i];
-      if (v !== 0) cells[i] = v >= 254 * 8 ? 254 : (v + 7) >> 3;
+      if (v !== 0) cells[i] = v >= 253 * 8 ? 253 : (v + 7) >> 3;
     }
+    for (const c of this.hordeWallCells) cells[c] = 254;
     for (let k = 0; k < this.elites.count; k++) {
       cells[this.elites.cell[k]] = 255;
     }
+    const next = this.nextPlan;
     return {
       width: this.width,
       height: this.height,
@@ -290,6 +324,15 @@ export class HordeExecution implements Execution {
       outcome: this.outcome,
       hqHp: this.firstHqHp(),
       hqMaxHp: this.opts.hqHp,
+      nextWaveIn:
+        this.outcome === "playing" && this.nextWaveTick >= 0
+          ? Math.max(0, this.nextWaveTick - this.ticks)
+          : -1,
+      nextWave: next?.wave ?? 0,
+      nextWaveShamblers: next?.shamblers ?? 0,
+      nextWaveElites: next?.elites ?? 0,
+      nextWaveSectors: next?.sectors ?? 0,
+      nextWaveFinal: next?.final ?? false,
       encodeMs: 0,
       sentAt: 0,
     };
@@ -313,6 +356,12 @@ export class HordeExecution implements Execution {
       mix(this.elites.hp[k]);
     }
     mix(this.wave);
+    for (const plan of [this.currentPlan, this.nextPlan]) {
+      if (plan === null) continue;
+      mix(plan.wave);
+      mix(plan.budget);
+      mix(plan.sectors);
+    }
     mix(this.killed);
     mix(this.structuresDestroyed);
     mix(OUTCOMES.indexOf(this.outcome));
@@ -350,6 +399,7 @@ export class HordeExecution implements Execution {
    */
   private scanStructures(ticks: number): void {
     const units = this.mg!.units(TARGET_TYPES);
+    const walls = this.mg!.units(UnitType.Wall);
     // Each human player's spawn tile is their HQ: always a target, and an
     // obstacle the horde presses on. When it falls the player loses.
     const hqs: TileRef[] = [];
@@ -368,10 +418,14 @@ export class HordeExecution implements Execution {
     for (const t of hqs) {
       sig = Math.imul(sig ^ t, 16777619);
     }
-    sig = Math.imul(sig ^ (units.length + hqs.length), 16777619) >>> 0;
+    sig = Math.imul(sig ^ (units.length + hqs.length), 16777619);
+    for (const u of walls) {
+      sig = Math.imul(sig ^ u.tile(), 16777619);
+    }
+    sig = Math.imul(sig ^ walls.length, 16777619) >>> 0;
     const changed = sig !== this.hordeStructureSig;
     if (changed || this.hordeObstaclesStale) {
-      this.rebuildObstacles(units, hqs, hqOwners);
+      this.rebuildObstacles(units, walls, hqs, hqOwners);
       this.hordeObstaclesStale = false;
     }
     if (changed) {
@@ -385,13 +439,14 @@ export class HordeExecution implements Execution {
       ticks - this.lastChangeTick >= this.opts.flowDebounce ||
       ticks - this.firstPendingTick >= this.opts.flowMaxDelay
     ) {
-      this.computeFlow(this.hordeTargetCells);
+      this.computeFlow(this.hordeTargetCells, this.hordeWallCells);
       this.firstPendingTick = -1;
     }
   }
 
   private rebuildObstacles(
     units: readonly Unit[],
+    walls: readonly Unit[],
     hqs: readonly TileRef[],
     hqOwners: readonly Player[],
   ): void {
@@ -419,18 +474,39 @@ export class HordeExecution implements Execution {
       if (!this.hordeHqAt.has(cell)) this.hordeHqAt.set(cell, hqOwners[k]);
     });
     this.hordeTargetCells = cells;
+    // Walls last: a cell already holding a target stays a target.
+    const wallCells: number[] = [];
+    for (const u of walls) {
+      const cell = this.cellOf(u.tile());
+      if (obstacle[cell] !== 0) continue;
+      obstacle[cell] = 1;
+      wallCells.push(cell);
+      this.hordeStructureAt.set(cell, u);
+    }
+    this.hordeWallCells = wallCells;
   }
 
-  /** Recomputes the flow field toward `cells`, which become enterable. */
-  private computeFlow(cells: readonly number[]): void {
+  /**
+   * Recomputes the flow field toward `cells`, which become enterable. Wall
+   * cells (on walkable terrain) get WALL_COST, so the flow goes round them
+   * unless there is no other way in.
+   */
+  private computeFlow(
+    cells: readonly number[],
+    walls: readonly number[],
+  ): void {
     const cost = this.hordeFlow.cost;
     cost.set(this.terrainCost);
+    for (const c of walls) {
+      if (cost[c] !== 0) cost[c] = WALL_COST;
+    }
     for (const c of cells) {
       if (cost[c] === 0) cost[c] = 1;
     }
     const start = performance.now();
     this.hordeFlow.compute(cells);
     this.flowCells = [...cells];
+    this.flowWalls = [...walls];
     const ms = performance.now() - start;
     const prof = this.hordeProfile;
     prof.recomputes++;
@@ -439,29 +515,55 @@ export class HordeExecution implements Execution {
     if (ms > prof.maxRecomputeMs) prof.maxRecomputeMs = ms;
   }
 
+  private allWavesStarted(): boolean {
+    return this.opts.wavesToWin > 0 && this.wave >= this.opts.wavesToWin;
+  }
+
+  /** Plans (and so announces) the next wave once the last one has started. */
+  private planNextWave(): void {
+    if (this.nextPlan !== null || this.allWavesStarted()) return;
+    this.surveySpawns();
+    this.nextPlan = this.director.plan(this.currentPlan, this.random);
+  }
+
+  /** Sorts spawn cells by direction around the first HQ (or the map centre). */
+  private surveySpawns(): void {
+    let centre = (this.height >> 1) * this.width + (this.width >> 1);
+    for (const cell of this.hordeHqAt.keys()) {
+      centre = cell;
+      break;
+    }
+    this.director.survey(this.spawnCells, centre, this.hordeFlow.dist);
+  }
+
   private startWave(): void {
-    if (this.spawnCells.length === 0) return;
-    this.waveSize =
-      this.wave === 0
-        ? this.opts.firstWaveSize
-        : Math.floor(
-            (this.waveSize * (100 + this.opts.waveGrowthPercent)) / 100,
-          );
-    this.wave++;
-    const n = this.opts.emittersPerWave;
-    const share = Math.floor(this.waveSize / n);
-    for (let j = 0; j < n; j++) {
-      const cell =
-        this.spawnCells[this.random.nextInt(0, this.spawnCells.length)];
+    const plan = this.nextPlan;
+    if (plan === null) return;
+    this.nextPlan = null;
+    this.currentPlan = plan;
+    this.wave = plan.wave;
+    this.surveySpawns();
+    const cells = this.director.emitterCells(
+      plan,
+      this.opts.emittersPerWave,
+      this.random,
+    );
+    if (cells.length === 0) return;
+    const n = cells.length;
+    const share = Math.floor(plan.shamblers / n);
+    cells.forEach((cell, j) => {
       this.emitterCells.push(cell);
       this.emitterRemaining.push(
-        j === 0 ? share + (this.waveSize - share * n) : share,
+        j === 0 ? share + (plan.shamblers - share * n) : share,
       );
-    }
-    for (let j = 0; j < this.opts.elitesPerWave; j++) {
-      const cell =
-        this.spawnCells[this.random.nextInt(0, this.spawnCells.length)];
-      this.elites.spawn(cell, this.opts.eliteHp);
+    });
+    const eliteCells = this.director.emitterCells(
+      plan,
+      plan.elites,
+      this.random,
+    );
+    for (let j = 0; j < plan.elites; j++) {
+      this.elites.spawn(eliteCells[j], this.opts.eliteHp);
     }
   }
 
@@ -528,8 +630,10 @@ export class HordeExecution implements Execution {
         return;
       }
       const key = u.tile();
+      const maxHp =
+        u.type() === UnitType.Wall ? this.opts.wallHp : this.opts.structureHp;
       const hp =
-        (this.structureHp.get(key) ?? this.opts.structureHp) -
+        (this.structureHp.get(key) ?? maxHp) -
         (pressure >> this.opts.pressureShift);
       if (hp > 0) {
         this.structureHp.set(key, hp);
@@ -579,8 +683,10 @@ export class HordeExecution implements Execution {
       options: this.opts,
       random: this.random.getState(),
       wave: this.wave,
-      waveSize: this.waveSize,
+      currentPlan: this.currentPlan,
+      nextPlan: this.nextPlan,
       nextWaveTick: this.nextWaveTick,
+      ticks: this.ticks,
       density:
         this.mg !== null ? this.field.density.slice() : new Uint16Array(),
       emitterCells: [...this.emitterCells],
@@ -596,6 +702,7 @@ export class HordeExecution implements Execution {
       outcome: OUTCOMES.indexOf(this.outcome),
       structureSig: this.hordeStructureSig,
       flowCells: this.flowCells === null ? null : [...this.flowCells],
+      flowWalls: [...this.flowWalls],
       lastChangeTick: this.lastChangeTick,
       firstPendingTick: this.firstPendingTick,
       killed: this.killed,
@@ -608,8 +715,10 @@ export class HordeExecution implements Execution {
     this.opts = opts;
     this.mg = null;
     this.wave = s.wave;
-    this.waveSize = s.waveSize;
+    this.currentPlan = s.currentPlan;
+    this.nextPlan = s.nextPlan;
     this.nextWaveTick = s.nextWaveTick;
+    this.ticks = s.ticks;
     this.killed = s.killed;
     this.structuresDestroyed = s.structuresDestroyed;
     this.hqsFallen = s.hqsFallen;
@@ -617,7 +726,9 @@ export class HordeExecution implements Execution {
     this.hordeProfile = newProfile();
     this.hordeStructureSig = s.structureSig;
     this.hordeTargetCells = [];
+    this.hordeWallCells = [];
     this.flowCells = null;
+    this.flowWalls = [];
     this.lastChangeTick = s.lastChangeTick;
     this.firstPendingTick = s.firstPendingTick;
     // Rebuilt on the next scan from the same units the original game has.
@@ -638,7 +749,7 @@ export class HordeExecution implements Execution {
       s.hpTiles.map((t, i) => [t as TileRef, s.hpValues[i]]),
     );
     this.hqHp = new Map(s.hqIds.map((id, i) => [id, s.hqValues[i]]));
-    if (s.flowCells !== null) this.computeFlow(s.flowCells);
+    if (s.flowCells !== null) this.computeFlow(s.flowCells, s.flowWalls);
   }
 }
 
@@ -707,6 +818,9 @@ const HordeOptionsSchema = z.object({
   emittersPerWave: zInt(),
   emitRate: zInt(),
   elitesPerWave: zInt(),
+  elitePoints: zInt(),
+  wavesPerDirection: zInt(),
+  minSpawnDistance: zInt(),
   maxElites: zInt(),
   eliteHp: zInt(),
   eliteSpeed: zInt(),
@@ -718,10 +832,20 @@ const HordeOptionsSchema = z.object({
   turretEliteDamage: zInt(),
   pressureShift: zInt(),
   structureHp: zInt(),
+  wallHp: zInt(),
   hqHp: zInt(),
   wavesToWin: zInt(),
   flowDebounce: zInt(),
   flowMaxDelay: zInt(),
+});
+
+const WavePlanSchema = z.object({
+  wave: zInt(),
+  budget: zInt(),
+  shamblers: zInt(),
+  elites: zInt(),
+  sectors: zInt(),
+  final: z.boolean(),
 });
 
 const HordeStateSchema = z.object({
@@ -729,8 +853,10 @@ const HordeStateSchema = z.object({
   options: HordeOptionsSchema,
   random: zRandom(),
   wave: zInt(),
-  waveSize: zInt(),
+  currentPlan: WavePlanSchema.nullable(),
+  nextPlan: WavePlanSchema.nullable(),
   nextWaveTick: zInt(),
+  ticks: zInt(),
   density: zU16Array(),
   emitterCells: z.array(zInt()),
   emitterRemaining: z.array(zInt()),
@@ -746,6 +872,7 @@ const HordeStateSchema = z.object({
   outcome: zInt(),
   structureSig: zInt(),
   flowCells: z.array(zInt()).nullable(),
+  flowWalls: z.array(zInt()),
   lastChangeTick: zInt(),
   firstPendingTick: zInt(),
   killed: zInt(),
@@ -757,7 +884,7 @@ const OUTCOMES: readonly HordeOutcome[] = ["playing", "won", "lost"];
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 2,
+  version: 3,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -777,6 +904,33 @@ export const HordeExecutionSnapshot = execSnapshotType({
       flowCells: null,
       lastChangeTick: -1,
       firstPendingTick: -1,
+    }),
+    // 2 -> 3: walls and the wave director. The wave under way keeps its
+    // size; the next one is planned on the first tick after the restore.
+    // Elites cost no points, as before.
+    2: (d) => ({
+      ...d,
+      options: {
+        ...d.options,
+        elitePoints: 0,
+        wavesPerDirection: 3,
+        minSpawnDistance: 0,
+        wallHp: 10_000,
+      },
+      currentPlan:
+        d.wave > 0
+          ? {
+              wave: d.wave,
+              budget: d.waveSize,
+              shamblers: d.waveSize,
+              elites: d.options.elitesPerWave,
+              sectors: 0,
+              final: false,
+            }
+          : null,
+      nextPlan: null,
+      ticks: 0,
+      flowWalls: [],
     }),
   },
   cls: () => HordeExecution,

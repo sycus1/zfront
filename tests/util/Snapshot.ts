@@ -174,6 +174,8 @@ export const DERIVED_FIELDS = new Set<string>([
   "hordeTurrets",
   "hordeHqAt",
   "hordeTargetCells",
+  "hordeWallCells",
+  "director", // WaveDirector: re-surveys the spawn cells before every use
   "hordeObstaclesStale",
   "moveCost", // the live cost: terrain plus structure cells, rebuilt on scan
   "hordeProfile",

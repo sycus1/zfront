@@ -10,6 +10,7 @@
       "missile_silo": "Used to launch nukes",
       "port": "Sends trade ships to generate gold",
       "sam_launcher": "Defends against incoming nukes",
+      "wall": "Blocks the horde. Zombies go round walls, or break through when there's no other way",
       "warship": "Captures trade ships, destroys ships and boats"
     },
     "not_enough_money": "Not enough money",
@@ -564,9 +565,25 @@
     "video_tutorial": "Video Tutorial",
     "video_tutorial_title": "zFront Tutorial"
   },
+  "horde_direction": {
+    "e": "E",
+    "n": "N",
+    "ne": "NE",
+    "nw": "NW",
+    "s": "S",
+    "se": "SE",
+    "sw": "SW",
+    "w": "W"
+  },
   "horde_hud": {
     "alive": "{count} zombies",
+    "final_wave": "Final wave in {time}",
+    "from": "From {directions}",
+    "from_everywhere": "From every side",
     "hq": "HQ",
+    "next_size": "{count} zombies, {elites} elites",
+    "next_wave": "Wave {wave} in {time}",
+    "victory_in": "Hold on: victory in {time}",
     "wave": "Wave {wave}",
     "wave_of": "Wave {wave} / {total}"
   },
@@ -956,6 +973,7 @@
     "missile_silo": "Missile Silo",
     "port": "Port",
     "sam_launcher": "SAM Launcher",
+    "wall": "Wall",
     "warship": "Warship"
   },
   "user_setting": {
@@ -1021,6 +1039,8 @@
     "build_port_desc": "Build a Port under your cursor.",
     "build_sam_launcher": "Build SAM Launcher",
     "build_sam_launcher_desc": "Build a SAM Launcher under your cursor.",
+    "build_wall": "Build Wall",
+    "build_wall_desc": "Build a Wall under your cursor. Stays selected so you can place a line.",
     "build_warship": "Build Warship",
     "build_warship_desc": "Build a Warship under your cursor.",
     "camera_movement": "Camera Movement",

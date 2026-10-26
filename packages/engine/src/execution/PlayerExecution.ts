@@ -86,7 +86,7 @@ export class PlayerExecution implements Execution {
   tick(ticks: number) {
     this.player.decayRelations();
     for (const u of this.player.units()) {
-      if (!Structures.has(u.type())) {
+      if (!Structures.has(u.type()) && u.type() !== UnitType.Wall) {
         continue;
       }
 
@@ -100,7 +100,7 @@ export class PlayerExecution implements Execution {
       }
 
       const captor = this.mg!.player(owner.id());
-      if (u.type() === UnitType.DefensePost) {
+      if (u.type() === UnitType.DefensePost || u.type() === UnitType.Wall) {
         u.delete(true, captor);
       } else {
         captor.captureUnit(u);

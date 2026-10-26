@@ -2,19 +2,27 @@
  * Integer flow field for the zombie horde (zfront).
  *
  * Dial's algorithm (bucket-queue Dijkstra) over an 8-connected grid. `cost[i]`
- * is the terrain cost of cell i (1..MAX_CELL_COST); 0 means blocked. A step
- * costs ORTHO_STEP or DIAG_STEP (about 1 : sqrt 2) times the cost of the cell
- * it leaves, and a diagonal step may not cut the corner between two cells
- * when either of them is blocked. Sources start at distance 0 whatever their
- * own cost, so a structure cell can be both an obstacle and a target. Every
- * value is an integer, so the field is identical on every client.
+ * is the terrain cost of cell i (1..MAX_CELL_COST), WALL_COST for a wall;
+ * 0 means blocked. A step costs ORTHO_STEP or DIAG_STEP (about 1 : sqrt 2)
+ * times the cost of the cell it leaves, and a diagonal step may not cut the
+ * corner between two cells when either of them is blocked or a wall. Sources
+ * start at distance 0 whatever their own cost, so a structure cell can be
+ * both an obstacle and a target. Every value is an integer, so the field is
+ * identical on every client.
+ *
+ * Walls are expensive rather than blocked: the flow goes around a wall when
+ * there is a way round, and through it (so the horde presses on it) when the
+ * base is sealed.
  */
 
 export const UNREACHABLE = 0xffffffff;
+/** Highest terrain cost. */
 export const MAX_CELL_COST = 15;
+/** Cost of a wall cell: one wall is worth a long detour. */
+export const WALL_COST = 255;
 export const ORTHO_STEP = 5;
 export const DIAG_STEP = 7;
-const NUM_BUCKETS = DIAG_STEP * MAX_CELL_COST + 1;
+const NUM_BUCKETS = DIAG_STEP * WALL_COST + 1;
 
 export class FlowField {
   readonly dist: Uint32Array;
@@ -31,7 +39,7 @@ export class FlowField {
     }
     this.dist = new Uint32Array(width * height).fill(UNREACHABLE);
     for (let b = 0; b < NUM_BUCKETS; b++) {
-      this.buckets.push(new Int32Array(256));
+      this.buckets.push(new Int32Array(16));
     }
   }
 
@@ -68,18 +76,22 @@ export class FlowField {
         const hasE = x < w - 1;
         const hasN = i >= w;
         const hasS = i < w * (h - 1);
-        const openW = hasW && cost[i - 1] !== 0;
-        const openE = hasE && cost[i + 1] !== 0;
-        const openN = hasN && cost[i - w] !== 0;
-        const openS = hasS && cost[i + w] !== 0;
-        if (openW) pending += this.relax(i - 1, cur, ORTHO_STEP);
-        if (openE) pending += this.relax(i + 1, cur, ORTHO_STEP);
-        if (openN) pending += this.relax(i - w, cur, ORTHO_STEP);
-        if (openS) pending += this.relax(i + w, cur, ORTHO_STEP);
-        if (openN && openW) pending += this.relax(i - w - 1, cur, DIAG_STEP);
-        if (openN && openE) pending += this.relax(i - w + 1, cur, DIAG_STEP);
-        if (openS && openW) pending += this.relax(i + w - 1, cur, DIAG_STEP);
-        if (openS && openE) pending += this.relax(i + w + 1, cur, DIAG_STEP);
+        const cW = hasW ? cost[i - 1] : 0;
+        const cE = hasE ? cost[i + 1] : 0;
+        const cN = hasN ? cost[i - w] : 0;
+        const cS = hasS ? cost[i + w] : 0;
+        if (cW !== 0) pending += this.relax(i - 1, cur, ORTHO_STEP);
+        if (cE !== 0) pending += this.relax(i + 1, cur, ORTHO_STEP);
+        if (cN !== 0) pending += this.relax(i - w, cur, ORTHO_STEP);
+        if (cS !== 0) pending += this.relax(i + w, cur, ORTHO_STEP);
+        const clearW = cW !== 0 && cW !== WALL_COST;
+        const clearE = cE !== 0 && cE !== WALL_COST;
+        const clearN = cN !== 0 && cN !== WALL_COST;
+        const clearS = cS !== 0 && cS !== WALL_COST;
+        if (clearN && clearW) pending += this.relax(i - w - 1, cur, DIAG_STEP);
+        if (clearN && clearE) pending += this.relax(i - w + 1, cur, DIAG_STEP);
+        if (clearS && clearW) pending += this.relax(i + w - 1, cur, DIAG_STEP);
+        if (clearS && clearE) pending += this.relax(i + w + 1, cur, DIAG_STEP);
       }
     }
   }
@@ -110,7 +122,7 @@ export class FlowField {
 /**
  * Writes the reachable 8-neighbours of cell `i` into `out` in a fixed order
  * (N, E, S, W, NE, SE, SW, NW) and returns how many there are. Diagonals
- * that would cut a blocked corner are left out, matching FlowField.
+ * that would cut a blocked or walled corner are left out, matching FlowField.
  */
 export function neighbours8(
   cost: Uint8Array,
@@ -120,19 +132,23 @@ export function neighbours8(
   out: Int32Array,
 ): number {
   const x = i % width;
-  const openN = i >= width && cost[i - width] !== 0;
-  const openE = x < width - 1 && cost[i + 1] !== 0;
-  const openS = i < width * (height - 1) && cost[i + width] !== 0;
-  const openW = x > 0 && cost[i - 1] !== 0;
+  const cN = i >= width ? cost[i - width] : 0;
+  const cE = x < width - 1 ? cost[i + 1] : 0;
+  const cS = i < width * (height - 1) ? cost[i + width] : 0;
+  const cW = x > 0 ? cost[i - 1] : 0;
   let n = 0;
-  if (openN) out[n++] = i - width;
-  if (openE) out[n++] = i + 1;
-  if (openS) out[n++] = i + width;
-  if (openW) out[n++] = i - 1;
-  if (openN && openE) out[n++] = i - width + 1;
-  if (openS && openE) out[n++] = i + width + 1;
-  if (openS && openW) out[n++] = i + width - 1;
-  if (openN && openW) out[n++] = i - width - 1;
+  if (cN !== 0) out[n++] = i - width;
+  if (cE !== 0) out[n++] = i + 1;
+  if (cS !== 0) out[n++] = i + width;
+  if (cW !== 0) out[n++] = i - 1;
+  const clearN = cN !== 0 && cN !== WALL_COST;
+  const clearE = cE !== 0 && cE !== WALL_COST;
+  const clearS = cS !== 0 && cS !== WALL_COST;
+  const clearW = cW !== 0 && cW !== WALL_COST;
+  if (clearN && clearE) out[n++] = i - width + 1;
+  if (clearS && clearE) out[n++] = i + width + 1;
+  if (clearS && clearW) out[n++] = i + width - 1;
+  if (clearN && clearW) out[n++] = i - width - 1;
   return n;
 }
 

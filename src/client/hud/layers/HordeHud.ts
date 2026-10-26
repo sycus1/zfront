@@ -6,9 +6,18 @@ import { Controller } from "../../Controller";
 import { translateText } from "../../Utils";
 import { GameView } from "../../view";
 
+const DIRECTIONS = ["n", "ne", "e", "se", "s", "sw", "w", "nw"] as const;
+
+/** Ticks (10 per second) as m:ss. */
+export function formatCountdown(ticks: number): string {
+  const secs = Math.ceil(Math.max(0, ticks) / 10);
+  return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+}
+
 /**
- * zfront: the wave counter and HQ health bar, top centre. Shown in horde
- * games once the first wave timer starts.
+ * zfront: the wave counter, HQ health bar and the next wave's countdown and
+ * directions, top centre. Shown in horde games once the first wave timer
+ * starts.
  */
 @customElement("horde-hud")
 export class HordeHud extends LitElement implements Controller {
@@ -80,6 +89,49 @@ export class HordeHud extends LitElement implements Controller {
           <span class="w-9 text-right tabular-nums" data-horde-hq
             >${hqPercent}%</span
           >
+        </div>
+        ${this.renderNextWave(s)}
+      </div>
+    `;
+  }
+
+  private renderNextWave(s: HordeFrame) {
+    if (s.outcome !== "playing" || s.nextWaveIn < 0) return nothing;
+    const time = formatCountdown(s.nextWaveIn);
+    if (s.nextWave === 0) {
+      return html`<div class="mt-1.5 text-xs text-white/80" data-horde-next>
+        ${translateText("horde_hud.victory_in", { time })}
+      </div>`;
+    }
+    const directions = DIRECTIONS.filter(
+      (_, k) => (s.nextWaveSectors & (1 << k)) !== 0,
+    ).map((d) => translateText(`horde_direction.${d}`));
+    const from =
+      s.nextWaveFinal || directions.length === DIRECTIONS.length
+        ? translateText("horde_hud.from_everywhere")
+        : translateText("horde_hud.from", {
+            directions: directions.join(", "),
+          });
+    return html`
+      <div class="mt-1.5 text-xs" data-horde-next>
+        <div class="flex items-baseline justify-between gap-3">
+          <span class="font-semibold ${s.nextWaveFinal ? "text-red-300" : ""}">
+            ${
+              s.nextWaveFinal
+                ? translateText("horde_hud.final_wave", { time })
+                : translateText("horde_hud.next_wave", {
+                    wave: s.nextWave,
+                    time,
+                  })
+            }
+          </span>
+          <span class="text-white/80" data-horde-from>${from}</span>
+        </div>
+        <div class="text-white/60">
+          ${translateText("horde_hud.next_size", {
+            count: renderNumber(s.nextWaveShamblers),
+            elites: renderNumber(s.nextWaveElites),
+          })}
         </div>
       </div>
     `;

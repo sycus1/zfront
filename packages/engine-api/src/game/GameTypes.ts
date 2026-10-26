@@ -193,6 +193,8 @@ export enum UnitType {
   MIRVWarhead = "MIRV Warhead",
   Train = "Train",
   Factory = "Factory",
+  /** zfront: blocks the horde and soaks its pressure. Not a horde target. */
+  Wall = "Wall",
 }
 
 export enum TrainType {
@@ -226,6 +228,7 @@ export const Structures = unitTypeGroup([
 
 export const BuildMenus = unitTypeGroup([
   ...Structures.types,
+  UnitType.Wall,
   ...BuildableAttacks.types,
 ] as const);
 

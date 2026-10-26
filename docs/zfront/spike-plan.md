@@ -187,13 +187,31 @@ Build zfront on the forked OpenFront engine.
 ## After the spike: Phase 0 (strip and rebrand) checklist
 
 - [x] **Remove** alliances, embargoes and traitors, clans, ranked play and the paid lobby queue, the Steam desktop release and Steam joins, Stripe and Apple Pay, and paid bot tribe names. Poki, CrazyGames, ads and the cosmetics store went in the first UI cleanup (PR #1). **Kept on purpose:** trade and transport ships, warships, trains and rail, which zfront may reuse.
-- [ ] **Closed-API calls** (`api.openfront.io`): still wired into auth, join verification, lobby coordination and archiving. The MVP is single-player only, so these go when the multiplayer server is dropped or replaced.
+- [ ] **Closed-API calls** (`api.openfront.io`): still wired into auth, join verification, lobby coordination and archiving. Kept for now along with the multiplayer server (see "Multiplayer server: kept for now" below).
 - [x] **Remove maps** other than Britannia, plus their entries in `Maps.gen.ts` and `en.json`. `resources/maps` went from 616 MB to 4 MB.
 - [ ] **Rebrand** the UI with the zfront name, logo, favicon and font, and add an AGPL "Source" link to the footer. Keep "© OpenFront and Contributors".
 - [ ] **Static deploy to Cloudflare Workers** (`staging.zfront.app`). Build the client with Vite, render the app shell with `src/server/RenderStaticIndex.ts --environment-only` (which OpenFront already uses for its static Worker), and serve `out/` plus `resources/` as Workers Static Assets.
 - [ ] **England map:** a heightmap script from OS Terrain 50 to PNG, then `npm run gen-maps` (needs Go).
 - [x] **Docs:** rewrite `CONTRIBUTING.md` for zfront.
 - [ ] **CI:** enable GitHub Actions on the fork, which has them off by default. Keep only `ci.yml`. (Handled with the staging deploy.)
+
+## Multiplayer server: kept for now
+
+_Decided 2026-10-26._ The MVP is single-player, but we are **keeping OpenFront's multiplayer server** (`src/server/`: lobbies, intent relay, WebSocket game loop) and the OpenFront API plumbing that goes with it (auth, join verification, lobby coordination, archiving). Don't strip them. The idea is a possible **co-op mode** later (2–4 players defending together, see "Could have" in the [requirements](requirements-draft.md)). The engine is already deterministic and lockstep, so co-op mostly needs the server and lobby flow that is already here. Whether it ends up on this Node server or a Cloudflare Durable Object relay is still open. Until then, solo games don't depend on it.
+
+## MVP: Wall unit and wave director
+
+_Started 2026-10-26._
+
+- **Wall** (`UnitType.Wall`, 10,000 gold, 1 s to build, 10,000 HP). Built on your own land, at least two tiles from any other wall or structure, which is exactly one wall per 2×2 horde cell, so walls placed two tiles apart make a solid line. The build ghost stays selected after each wall (hotkey V).
+  - Walls are horde **obstacles but not targets**. In the flow field a wall cell costs `WALL_COST` (255, against 1–4 for terrain), so the horde takes any reasonable way round and only presses on a wall when the base is sealed or the detour is very long. Zombies can't slip diagonally between two walls.
+  - Pressure damages walls like other structures. A fallen wall reopens the cell at once; the flow field catches up after the usual debounce.
+  - The renderer draws walls from the horde frame (cell value 254) as stone blocks in `HordePass`, not as structure icons.
+- **Wave director** (`packages/engine/src/horde/WaveDirector.ts`):
+  - Each wave has a points budget (`firstWaveSize`, growing by `waveGrowthPercent`). Elites cost `elitePoints` each and scale with the budget; the rest are shamblers.
+  - Waves come from compass directions around the HQ: one direction for waves 1–3, two for 4–6, three for 7–9, and every direction for the final wave. Directions are picked with the seeded PRNG from those that have reachable coast or map edge at least `minSpawnDistance` cells from the HQ.
+  - The next wave is planned as soon as the current one starts, so the HUD shows its countdown, size and directions during the calm.
+- **Still to do for the MVP:** wall tiers (barricade, stone, reinforced) and repair, a real turret and the other buildings, the cash economy, "call wave early", direction arrows on the map, and tuning the numbers after a play-test.
 
 ## Prerequisites
 

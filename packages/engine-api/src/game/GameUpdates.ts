@@ -30,8 +30,8 @@ export interface HordeFrame {
   width: number;
   height: number;
   /**
-   * One byte per cell: 0 empty, 1-254 horde density (zombies / 8, clamped),
-   * 255 an elite.
+   * One byte per cell: 0 empty, 1-253 horde density (zombies / 8, clamped),
+   * 254 a wall, 255 an elite.
    */
   cells: Uint8Array;
   alive: number;
@@ -46,6 +46,19 @@ export interface HordeFrame {
   /** The first human player's HQ health (0 once it has fallen). */
   hqHp: number;
   hqMaxHp: number;
+  /**
+   * Ticks until the next wave starts, or until the win once every wave has
+   * started; -1 once the game is over.
+   */
+  nextWaveIn: number;
+  /** The announced next wave's number, or 0 when no wave is left. */
+  nextWave: number;
+  nextWaveShamblers: number;
+  nextWaveElites: number;
+  /** Bit mask of the directions it comes from: bit 0 N, then clockwise. */
+  nextWaveSectors: number;
+  /** The last wave, which comes from every side. */
+  nextWaveFinal: boolean;
   /** Spike instrumentation: worker encode time and send time (epoch ms). */
   encodeMs: number;
   sentAt: number;

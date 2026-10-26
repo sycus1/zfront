@@ -365,6 +365,8 @@ export class EngineConfig extends Config {
           (numUnits: number) => Math.min(250_000, (numUnits + 1) * 50_000),
           UnitType.DefensePost,
         );
+      case UnitType.Wall:
+        return this.costWrapper(() => 10_000, UnitType.Wall);
       case UnitType.SAMLauncher:
         return this.costWrapper(
           (numUnits: number) => Math.min(3_000_000, (numUnits + 1) * 1_500_000),
