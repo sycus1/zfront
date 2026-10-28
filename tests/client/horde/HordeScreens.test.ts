@@ -7,7 +7,11 @@ import {
   HordeHud,
 } from "../../../src/client/hud/layers/HordeHud";
 import { WinModal } from "../../../src/client/hud/layers/WinModal";
-import { SendWinnerEvent } from "../../../src/client/Transport";
+import { waveArrows } from "../../../src/client/render/gl/passes/HordePass";
+import {
+  SendCallWaveIntentEvent,
+  SendWinnerEvent,
+} from "../../../src/client/Transport";
 import type { GameView } from "../../../src/client/view";
 
 function frame(overrides: Partial<HordeFrame> = {}): HordeFrame {
@@ -30,6 +34,10 @@ function frame(overrides: Partial<HordeFrame> = {}): HordeFrame {
     nextWaveElites: 120,
     nextWaveSectors: 0b0000_0101,
     nextWaveFinal: false,
+    nextWaveLandings: new Int32Array(),
+    hqCell: -1,
+    canCallWave: false,
+    callWaveGold: 0,
     encodeMs: 0,
     sentAt: 0,
     ...overrides,
@@ -143,6 +151,65 @@ describe("HordeHud", () => {
 
     expect(waiting.querySelector("[data-horde-hud]")).toBeNull();
     expect(classic.querySelector("[data-horde-hud]")).toBeNull();
+  });
+});
+
+describe("calling the next wave", () => {
+  it("offers the early call with its bonus once the wave can be called", async () => {
+    const hud = new HordeHud();
+    const bus = new EventBus();
+    const calls: SendCallWaveIntentEvent[] = [];
+    bus.on(SendCallWaveIntentEvent, (e) => calls.push(e));
+    hud.game = hordeGame({
+      status: frame({ canCallWave: true, callWaveGold: 23_000 }),
+    });
+    hud.eventBus = bus;
+    document.body.append(hud);
+    hud.tick();
+    await hud.updateComplete;
+
+    const button = hud.querySelector<HTMLButtonElement>("[data-horde-call]");
+    expect(button?.textContent).toContain("horde_hud.call_wave");
+    button!.click();
+    expect(calls).toHaveLength(1);
+  });
+
+  it("hides the button while the wave can't be called", async () => {
+    const hud = new HordeHud();
+    hud.game = hordeGame({ status: frame({ canCallWave: false }) });
+    document.body.append(hud);
+    hud.tick();
+    await hud.updateComplete;
+
+    expect(hud.querySelector("[data-horde-call]")).toBeNull();
+  });
+});
+
+describe("wave arrows", () => {
+  it("point from each landing at the HQ", () => {
+    // A 10x10 grid with the HQ at (5, 5) and landings due north and west.
+    const arrows = waveArrows(
+      frame({
+        width: 10,
+        height: 10,
+        hqCell: 55,
+        nextWaveLandings: Int32Array.from([5, 50]),
+      }),
+    );
+    expect(Array.from(arrows)).toEqual([5.5, 0.5, 0, 1, 0.5, 5.5, 1, 0]);
+  });
+
+  it("are hidden with no wave announced, no HQ, or the game over", () => {
+    const landings = Int32Array.from([5]);
+    const base = {
+      width: 10,
+      height: 10,
+      hqCell: 55,
+      nextWaveLandings: landings,
+    };
+    expect(waveArrows(frame({ ...base, nextWave: 0 }))).toHaveLength(0);
+    expect(waveArrows(frame({ ...base, hqCell: -1 }))).toHaveLength(0);
+    expect(waveArrows(frame({ ...base, outcome: "lost" }))).toHaveLength(0);
   });
 });
 

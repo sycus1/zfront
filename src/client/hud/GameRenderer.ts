@@ -278,6 +278,7 @@ export function createRenderer(
     console.error("horde hud not found");
   }
   hordeHud.game = game;
+  hordeHud.eventBus = eventBus;
 
   const immunityTimer = document.querySelector(
     "immunity-timer",

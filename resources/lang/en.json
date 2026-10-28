@@ -305,6 +305,7 @@
     "trade_ship_captured": "Your trade ship was captured by {name}",
     "unit_destroyed": "Your {unit} was destroyed",
     "unit_voluntarily_deleted": "Unit voluntarily deleted",
+    "wave_called": "Wave {wave} called early: +{gold} gold",
     "wave_cleared": "Wave {wave} cleared: +{gold} gold"
   },
   "fullscreen": {
@@ -578,6 +579,7 @@
   },
   "horde_hud": {
     "alive": "{count} zombies",
+    "call_wave": "Send it now (+{gold} gold)",
     "final_wave": "Final wave in {time}",
     "from": "From {directions}",
     "from_everywhere": "From every side",

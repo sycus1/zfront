@@ -34,6 +34,9 @@ import { LobbyConfig } from "./ClientGameRunner";
 import { LocalServer } from "./LocalServer";
 import { PlayerView } from "./view";
 
+/** zfront: call the announced horde wave now. */
+export class SendCallWaveIntentEvent implements GameEvent {}
+
 export class PauseGameIntentEvent implements GameEvent {
   constructor(public readonly paused: boolean) {}
 }
@@ -212,6 +215,9 @@ export class Transport {
     this.subscribe(BuildUnitIntentEvent, (e) => this.onBuildUnitIntent(e));
 
     this.subscribe(PauseGameIntentEvent, (e) => this.onPauseGameIntent(e));
+    this.subscribe(SendCallWaveIntentEvent, () =>
+      this.sendIntent({ type: "call_wave" }),
+    );
     this.subscribe(SendWinnerEvent, (e) => this.onSendWinnerEvent(e));
     this.subscribe(SendLiveStatsEvent, (e) => this.onSendLiveStatsEvent(e));
     this.subscribe(SendHashEvent, (e) => this.onSendHashEvent(e));

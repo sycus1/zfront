@@ -4,7 +4,8 @@
  * The worker sends the horde as one byte per coarse (map4x) cell. The pass
  * uploads it as an R8 texture each time a new frame arrives and draws it on
  * a map-sized quad: density as a red overlay (linearly filtered into blobs),
- * elites as pulsing markers.
+ * elites as pulsing markers, and an arrow at each place the announced wave
+ * comes ashore, pointing at the HQ.
  *
  * Spike instrumentation: transfer latency, worker encode time and upload
  * time are accumulated on `globalThis.__zfrontHorde` for measurement.
@@ -67,6 +68,35 @@ function newStats(): HordeRenderStats {
   return s;
 }
 
+/** Arrows drawn at most; the default wave has 8 landings. */
+export const MAX_ARROWS = 8;
+
+/**
+ * Arrows for the announced wave: per arrow, its landing cell's centre and
+ * the unit direction to the HQ, in coarse cells. Empty once no wave is
+ * announced or there is no HQ to point at.
+ */
+export function waveArrows(frame: HordeFrame): Float32Array {
+  const out = new Float32Array(MAX_ARROWS * 4);
+  if (frame.outcome !== "playing" || frame.nextWave === 0 || frame.hqCell < 0) {
+    return out.subarray(0, 0);
+  }
+  const w = frame.width;
+  const hx = (frame.hqCell % w) + 0.5;
+  const hy = Math.floor(frame.hqCell / w) + 0.5;
+  let n = 0;
+  for (const cell of frame.nextWaveLandings) {
+    if (n >= MAX_ARROWS) break;
+    const x = (cell % w) + 0.5;
+    const y = Math.floor(cell / w) + 0.5;
+    const len = Math.hypot(hx - x, hy - y);
+    if (len < 1) continue;
+    out.set([x, y, (hx - x) / len, (hy - y) / len], n * 4);
+    n++;
+  }
+  return out.subarray(0, n * 4);
+}
+
 export class HordePass {
   private program: WebGLProgram;
   private vao: WebGLVertexArrayObject;
@@ -77,6 +107,12 @@ export class HordePass {
   private uHorde: WebGLUniformLocation;
   private uGridSize: WebGLUniformLocation;
   private uTime: WebGLUniformLocation;
+  private uArrows: WebGLUniformLocation;
+  private uArrowCount: WebGLUniformLocation;
+  private uArrowFinal: WebGLUniformLocation;
+  private arrows = new Float32Array(MAX_ARROWS * 4);
+  private arrowCount = 0;
+  private arrowFinal = false;
   private readonly stats: HordeRenderStats;
   private readonly timerExt: { TIME_ELAPSED_EXT: number } | null;
   private query: WebGLQuery | null = null;
@@ -89,13 +125,16 @@ export class HordePass {
     this.program = createProgram(
       gl,
       shaderSrc(hordeVertSrc, { MAP_W: mapW, MAP_H: mapH }),
-      shaderSrc(hordeFragSrc, {}),
+      shaderSrc(hordeFragSrc, { MAX_ARROWS }),
       "HordePass",
     );
     this.uCamera = gl.getUniformLocation(this.program, "uCamera")!;
     this.uHorde = gl.getUniformLocation(this.program, "uHorde")!;
     this.uGridSize = gl.getUniformLocation(this.program, "uGridSize")!;
     this.uTime = gl.getUniformLocation(this.program, "uTime")!;
+    this.uArrows = gl.getUniformLocation(this.program, "uArrows")!;
+    this.uArrowCount = gl.getUniformLocation(this.program, "uArrowCount")!;
+    this.uArrowFinal = gl.getUniformLocation(this.program, "uArrowFinal")!;
     this.vao = createMapQuad(gl, mapW, mapH);
     const g = globalThis as { __zfrontHorde?: HordeRenderStats };
     this.stats = g.__zfrontHorde ??= newStats();
@@ -137,6 +176,10 @@ export class HordePass {
       gl.UNSIGNED_BYTE,
       frame.cells,
     );
+    const arrows = waveArrows(frame);
+    this.arrows.set(arrows);
+    this.arrowCount = arrows.length / 4;
+    this.arrowFinal = frame.nextWaveFinal;
     const upload = performance.now() - start;
 
     const s = this.stats;
@@ -163,6 +206,9 @@ export class HordePass {
     gl.uniform1i(this.uHorde, 0);
     gl.uniform2i(this.uGridSize, this.gridW, this.gridH);
     gl.uniform1f(this.uTime, timeSec);
+    gl.uniform4fv(this.uArrows, this.arrows);
+    gl.uniform1i(this.uArrowCount, this.arrowCount);
+    gl.uniform1i(this.uArrowFinal, this.arrowFinal ? 1 : 0);
     gl.uniformMatrix3fv(this.uCamera, false, cam);
     gl.bindVertexArray(this.vao);
     gl.drawArrays(gl.TRIANGLES, 0, 6);

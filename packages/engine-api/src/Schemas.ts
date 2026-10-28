@@ -39,6 +39,7 @@ export type Intent =
   | KickPlayerIntent
   | TogglePauseIntent
   | UpdateGameConfigIntent
+  | CallWaveIntent
   | ToggleGameStartTimer;
 
 export type AttackIntent = z.infer<typeof AttackIntentSchema>;
@@ -62,6 +63,7 @@ export type MarkDisconnectedIntent = z.infer<
 export type DeleteUnitIntent = z.infer<typeof DeleteUnitIntentSchema>;
 export type KickPlayerIntent = z.infer<typeof KickPlayerIntentSchema>;
 export type TogglePauseIntent = z.infer<typeof TogglePauseIntentSchema>;
+export type CallWaveIntent = z.infer<typeof CallWaveIntentSchema>;
 export type UpdateGameConfigIntent = z.infer<
   typeof UpdateGameConfigIntentSchema
 >;
@@ -507,6 +509,11 @@ export const ToggleGameStartTimerIntentSchema = z.object({
   type: z.literal("toggle_game_start_timer"),
 });
 
+// zfront: call the announced horde wave now.
+export const CallWaveIntentSchema = z.object({
+  type: z.literal("call_wave"),
+});
+
 export const IntentSchema = z.discriminatedUnion("type", [
   AttackIntentSchema,
   CancelAttackIntentSchema,
@@ -527,6 +534,7 @@ export const IntentSchema = z.discriminatedUnion("type", [
   TogglePauseIntentSchema,
   UpdateGameConfigIntentSchema,
   ToggleGameStartTimerIntentSchema,
+  CallWaveIntentSchema,
 ]);
 
 // StampedIntent = Intent with server-stamped clientID (used in turns and execution)

@@ -1,8 +1,10 @@
 import type { HordeFrame } from "@openfront/engine-api/game/GameUpdates";
 import { renderNumber } from "@openfront/engine-lib/Format";
+import { EventBus } from "@openfront/shared/EventBus";
 import { html, LitElement, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { Controller } from "../../Controller";
+import { SendCallWaveIntentEvent } from "../../Transport";
 import { translateText } from "../../Utils";
 import { GameView } from "../../view";
 
@@ -16,12 +18,14 @@ export function formatCountdown(ticks: number): string {
 
 /**
  * zfront: the wave counter, HQ health bar and the next wave's countdown and
- * directions, top centre. Shown in horde games once the first wave timer
+ * directions, top centre, with a button to call the next wave early once
+ * the last one is cleared. Shown in horde games once the first wave timer
  * starts.
  */
 @customElement("horde-hud")
 export class HordeHud extends LitElement implements Controller {
   public game: GameView;
+  public eventBus: EventBus;
 
   @state()
   private status: HordeFrame | null = null;
@@ -133,6 +137,19 @@ export class HordeHud extends LitElement implements Controller {
             elites: renderNumber(s.nextWaveElites),
           })}
         </div>
+        ${
+          s.canCallWave
+            ? html`<button
+                class="pointer-events-auto mt-1.5 w-full rounded bg-red-700 px-2 py-1 font-semibold hover:bg-red-600"
+                data-horde-call
+                @click=${() => this.eventBus?.emit(new SendCallWaveIntentEvent())}
+              >
+                ${translateText("horde_hud.call_wave", {
+                  gold: renderNumber(s.callWaveGold),
+                })}
+              </button>`
+            : nothing
+        }
       </div>
     `;
   }

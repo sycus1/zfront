@@ -283,6 +283,16 @@ _Started 2026-10-28._ Gold now comes from fighting the horde rather than a flat 
 
 Every wave up to 10 is now cleared, so the clear bonus pays each time. With `hqIncome` 80 and `killBounty` 4 the fort lost three of five, and with 100 and 3 it barely held Lincolnshire, so the economy is the main lever: lower `hqIncome` or `killBounty` to make the late waves bite again. The undefended HQ now falls earlier (wave 2 or 3, was 4 or 5) because the waves land closer.
 
+## MVP: wave controls
+
+_Started 2026-10-28._ Calling a wave early, and arrows on the map showing where the next wave lands.
+
+- **Call wave early.** Once the wave under way is cleared (or before the first wave), the HUD offers "Send it now (+gold)". Pressing it sends a `call_wave` intent and the announced wave starts on the next tick. Every survivor gets `callEarlyGoldPerTick` (100, the same as the HQ income) for each tick of the break skipped, so calling early gives the same money in less time. It can't be called while the last wave is still alive, so a player can't stack waves. Any human still standing can call it, which will matter for co-op.
+- **Refugees aren't affected.** A cleared wave already counts as survived (see "MVP: economy"), so calling the next one early doesn't bring extra refugees or raise the zone cap.
+- **Landing arrows.** The landings of each wave are now picked when it is announced rather than when it starts, and the horde frame carries them along with the HQ's cell. The horde pass draws a pulsing arrow at each landing pointing at the HQ: amber, or red for the final wave. The PRNG draws come in the same order as before, so the balance runs are unchanged.
+
+With `npm run balance:horde -- --call-early`, the bot calls each wave from 2 on as soon as it can. Every result is the same as without it (the Yorkshire fort ends on HQ 41,599 instead of 46,736), and the games end sooner: the turret games in 511 to 810 seconds instead of 810.
+
 ## Prerequisites
 
 - npm 12.1 or later. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`. The machine currently has npm 11.19.
