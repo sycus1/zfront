@@ -9,10 +9,10 @@ zfront plays on real maps, in the browser, like OpenFront. Instead of fighting o
 ## Core loop
 
 1. **Spawn.** Pick where to start on the map of England. You get an HQ and a small claimed zone around it.
-2. **Build.** During the calm, build economy and defences inside your zone, and expand the zone with cash.
+2. **Build.** During the calm, build economy and defences inside your zone. The zone grows by itself as your population grows: settlers claim free land toward the safest frontier, up to a cap that rises with every wave survived.
 3. **Warning.** The next wave is announced: where it comes from, how big it is, and a countdown.
 4. **Wave.** The horde follows the terrain toward your noise and structures. Turrets, mines, squads and missiles fight it off.
-5. **Earn.** Kills, clearing the wave and calling a wave early all pay cash. Spend it to expand, upgrade and unlock higher tiers, then go back to step 2.
+5. **Earn.** Kills, clearing the wave and calling a wave early all pay cash, and surviving a wave brings refugees. Spend cash to build, upgrade and unlock higher tiers, then go back to step 2.
 6. **End.** You **win** by surviving N waves (default 15, configurable). You **lose** if your HQ is destroyed.
 
 ## MVP scope ("Hold the Line"): single-player with no AI players, browser, zfront.app
@@ -21,7 +21,7 @@ zfront plays on real maps, in the browser, like OpenFront. Instead of fighting o
 
 - **Map.** England, with water, plains, highland, mountain and impassable terrain (see the map decision below).
 - **Terrain movement cost.** Zombies move more slowly up higher ground. Mountains above a threshold block normal zombies, and water blocks them completely.
-- **HQ and build zone.** The HQ is the lose condition. Its zone grows as you spend cash.
+- **HQ and build zone.** The HQ is the lose condition. The zone grows with population, never by clicking land or spending cash on it (`packages/engine/src/horde/Settlement.ts`).
 - **Cash economy.**
   - Income: an HQ trickle, scavenger depots, kill bounties and a bonus for clearing a wave.
   - Spending: building, upgrading and repairing.
