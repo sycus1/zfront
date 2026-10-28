@@ -1,5 +1,6 @@
 import { TileRef } from "@openfront/engine-api/game/GameMap";
 import { UnitType } from "@openfront/engine-api/game/GameTypes";
+import { settlesOnItsOwn } from "../horde/Settlement";
 import { SpatialQuery } from "../pathfinding/spatial/SpatialQuery";
 import { Game, Player } from "./Game";
 
@@ -8,6 +9,10 @@ export function canBuildTransportShip(
   player: Player,
   tile: TileRef,
 ): TileRef | false {
+  // zfront: in horde mode humans grow by settling, not by landing troops.
+  if (settlesOnItsOwn(game, player)) {
+    return false;
+  }
   if (
     player.unitCount(UnitType.TransportShip) >= game.config().boatMaxNumber()
   ) {
