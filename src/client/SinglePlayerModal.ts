@@ -26,18 +26,13 @@ import { fallbackPlayerName, ResolvedPlayerName } from "./PlayerName";
 import { UsernameInput } from "./UsernameInput";
 import { UserSettings } from "./UserSettings";
 import {
-  getBotsForCompactMap,
-  getNationsForCompactMap,
   getRandomMapType,
   getUpdatedDisabledUnits,
   parseBoundedFloatFromInput,
   parseBoundedIntegerFromInput,
   preventDisallowedKeys,
-  sliderToNationsConfig,
   toOptionalNumber,
 } from "./utilities/GameConfigHelpers";
-
-import { terrainMapFileLoader } from "./TerrainMapFileLoader";
 
 /** What a start has to wait for before it can dispatch join-lobby. */
 type StartPreparation = {
@@ -48,7 +43,6 @@ type StartPreparation = {
 const DEFAULT_OPTIONS = {
   selectedMap: GameMapType.Britannia,
   selectedDifficulty: Difficulty.Easy,
-  bots: 400,
   infiniteGold: false,
   infiniteTroops: false,
   compactMap: false,
@@ -78,9 +72,6 @@ export class SinglePlayerModal extends BaseModal {
   @state() private selectedMap: GameMapType = DEFAULT_OPTIONS.selectedMap;
   @state() private selectedDifficulty: Difficulty =
     DEFAULT_OPTIONS.selectedDifficulty;
-  @state() private nations: number = 0;
-  @state() private defaultNationCount: number = 0;
-  @state() private bots: number = DEFAULT_OPTIONS.bots;
   @state() private infiniteGold: boolean = DEFAULT_OPTIONS.infiniteGold;
   @state() private infiniteTroops: boolean = DEFAULT_OPTIONS.infiniteTroops;
   @state() private compactMap: boolean = DEFAULT_OPTIONS.compactMap;
@@ -119,13 +110,6 @@ export class SinglePlayerModal extends BaseModal {
   // Which attempt the starting overlay is up for, so a retired attempt's
   // cleanup cannot hide the overlay a newer attempt has shown.
   private overlayAttempt: number = 0;
-
-  private mapLoader = terrainMapFileLoader;
-
-  connectedCallback() {
-    super.connectedCallback();
-    void this.loadNationCount();
-  }
 
   protected renderHeaderSlot() {
     return modalHeader({
@@ -218,7 +202,9 @@ export class SinglePlayerModal extends BaseModal {
               },
               difficulty: {
                 selected: this.selectedDifficulty,
-                disabled: this.nations === 0,
+                // Difficulty only tunes the AI players, which solo games
+                // don't have.
+                disabled: true,
               },
               gameMode: {
                 selected: this.gameMode,
@@ -228,17 +214,6 @@ export class SinglePlayerModal extends BaseModal {
               },
               options: {
                 titleKey: "game_settings.options",
-                bots: {
-                  value: this.bots,
-                  labelKey: "game_settings.bots",
-                  disabledKey: "common.disabled",
-                },
-                nations: {
-                  value: this.nations,
-                  defaultValue: this.defaultNationCount,
-                  labelKey: "game_settings.nations",
-                  disabledKey: "common.disabled",
-                },
                 toggles: [
                   {
                     labelKey: "game_settings.instant_build",
@@ -285,8 +260,6 @@ export class SinglePlayerModal extends BaseModal {
             }
             @game-mode-selected=${this.handleConfigGameModeSelected}
             @team-count-selected=${this.handleConfigTeamCountSelected}
-            @bots-changed=${this.handleBotsChange}
-            @nations-changed=${this.handleNationsChange}
             @option-toggle-changed=${this.handleConfigOptionToggleChanged}
             @unit-toggle-changed=${this.handleConfigUnitToggleChanged}
           ></game-config-settings>
@@ -340,8 +313,6 @@ export class SinglePlayerModal extends BaseModal {
    */
   public async startTutorial(): Promise<void> {
     this.resetOptions();
-    // A nation count of 0 means "nations disabled"; wait for the real one.
-    await this.loadNationCount();
     new UserSettings().setTutorialDismissed(false);
     await this.startGame();
   }
@@ -356,9 +327,6 @@ export class SinglePlayerModal extends BaseModal {
     this.selectedDifficulty = DEFAULT_OPTIONS.selectedDifficulty;
     this.gameMode = DEFAULT_OPTIONS.gameMode;
     this.useRandomMap = DEFAULT_OPTIONS.useRandomMap;
-    this.bots = DEFAULT_OPTIONS.bots;
-    this.nations = 0;
-    this.defaultNationCount = 0;
     this.infiniteGold = DEFAULT_OPTIONS.infiniteGold;
     this.infiniteTroops = DEFAULT_OPTIONS.infiniteTroops;
     this.compactMap = DEFAULT_OPTIONS.compactMap;
@@ -379,14 +347,9 @@ export class SinglePlayerModal extends BaseModal {
     this.overtimeStartMinutes = DEFAULT_OPTIONS.overtimeStartMinutes;
   }
 
-  protected onOpen(): void {
-    void this.loadNationCount();
-  }
-
   private handleSelectRandomMap() {
     this.useRandomMap = true;
     this.selectedMap = getRandomMapType();
-    void this.loadNationCount();
   }
 
   private handleConfigRandomMapSelected = () => {
@@ -396,7 +359,6 @@ export class SinglePlayerModal extends BaseModal {
   private handleMapSelection(value: GameMapType) {
     this.selectedMap = value;
     this.useRandomMap = false;
-    void this.loadNationCount();
   }
 
   private handleConfigMapSelected = (e: Event) => {
@@ -430,12 +392,6 @@ export class SinglePlayerModal extends BaseModal {
 
   private handleCompactMapChange(val: boolean) {
     this.compactMap = val;
-    this.bots = getBotsForCompactMap(this.bots, val);
-    this.nations = getNationsForCompactMap(
-      this.nations,
-      this.defaultNationCount,
-      val,
-    );
   }
 
   private handleConfigOptionToggleChanged = (e: Event) => {
@@ -480,24 +436,6 @@ export class SinglePlayerModal extends BaseModal {
       unit,
       checked,
     );
-  };
-
-  private handleBotsChange = (e: Event) => {
-    const customEvent = e as CustomEvent<{ value: number }>;
-    const value = customEvent.detail.value;
-    if (isNaN(value) || value < 0 || value > 400) {
-      return;
-    }
-    this.bots = value;
-  };
-
-  private handleNationsChange = (e: Event) => {
-    const customEvent = e as CustomEvent<{ value: number }>;
-    const value = customEvent.detail.value;
-    if (isNaN(value) || value < 0 || value > 400) {
-      return;
-    }
-    this.nations = value;
   };
 
   private handleMaxTimerToggle = (
@@ -680,7 +618,8 @@ export class SinglePlayerModal extends BaseModal {
             playerTeams: this.teamCount,
             difficulty: this.selectedDifficulty,
             maxTimerValue: finalMaxTimerValue,
-            bots: this.bots,
+            // zfront: solo games have no AI players (requirements-draft.md).
+            bots: 0,
             infiniteGold: this.infiniteGold,
             donateGold: this.gameMode === GameMode.Team,
             donateTroops: this.gameMode === GameMode.Team,
@@ -690,10 +629,7 @@ export class SinglePlayerModal extends BaseModal {
             disabledUnits: this.disabledUnits.filter((unit): unit is UnitType =>
               Object.values(UnitType).includes(unit),
             ),
-            nations: sliderToNationsConfig(
-              this.nations,
-              this.defaultNationCount,
-            ),
+            nations: "disabled",
             ...(this.goldMultiplier && this.goldMultiplierValue
               ? { goldMultiplier: this.goldMultiplierValue }
               : {}),
@@ -815,24 +751,6 @@ export class SinglePlayerModal extends BaseModal {
         this.overlayAttempt = 0;
         overlay?.hide();
       }
-    }
-  }
-
-  private async loadNationCount() {
-    const currentMap = this.selectedMap;
-    try {
-      const mapData = this.mapLoader.getMapData(currentMap);
-      const manifest = await mapData.manifest();
-      // Only update if the map hasn't changed
-      if (this.selectedMap === currentMap) {
-        this.defaultNationCount = manifest.nations.length;
-        this.nations = this.compactMap
-          ? Math.max(0, Math.floor(manifest.nations.length * 0.25))
-          : manifest.nations.length;
-      }
-    } catch (error) {
-      console.warn("Failed to load nation count", error);
-      // Leave existing values unchanged so the UI stays consistent
     }
   }
 }

@@ -48,4 +48,19 @@ describe("SinglePlayerModal start", () => {
     expect(config.playerTeams).toBe(4);
     expect(config.disabledUnits).toEqual([UnitType.Warship]);
   });
+
+  it("starts solo games with no AI players", async () => {
+    const modal = createModal();
+    const events: any[] = [];
+    modal.addEventListener("join-lobby", (e: Event) =>
+      events.push((e as CustomEvent).detail),
+    );
+
+    await modal.startGame();
+
+    const config = events[0].gameStartInfo.config;
+    expect(config.bots).toBe(0);
+    expect(config.nations).toBe("disabled");
+    expect(config.horde).toBe(true);
+  });
 });

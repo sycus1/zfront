@@ -210,7 +210,7 @@ export interface GameConfigSettingsData {
   };
   options: {
     titleKey: string;
-    bots: {
+    bots?: {
       value: number;
       labelKey: string;
       disabledKey: string;
@@ -579,22 +579,27 @@ export class GameConfigSettings extends LitElement {
           settings.options.titleKey,
           html`
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div
-                class="col-span-2 rounded-xl p-4 flex flex-col justify-center border transition-all duration-200 ${
-                  settings.options.bots.value > 0 ? ACTIVE_CARD : INACTIVE_CARD
-                }"
-              >
-                <fluent-slider
-                  min="0"
-                  max="400"
-                  step="1"
-                  .value=${settings.options.bots.value}
-                  labelKey=${settings.options.bots.labelKey}
-                  disabledKey=${settings.options.bots.disabledKey}
-                  @value-changed=${this.handleBotsChanged}
-                ></fluent-slider>
-              </div>
-
+              ${
+                settings.options.bots
+                  ? html`<div
+                      class="col-span-2 rounded-xl p-4 flex flex-col justify-center border transition-all duration-200 ${
+                        settings.options.bots.value > 0
+                          ? ACTIVE_CARD
+                          : INACTIVE_CARD
+                      }"
+                    >
+                      <fluent-slider
+                        min="0"
+                        max="400"
+                        step="1"
+                        .value=${settings.options.bots.value}
+                        labelKey=${settings.options.bots.labelKey}
+                        disabledKey=${settings.options.bots.disabledKey}
+                        @value-changed=${this.handleBotsChanged}
+                      ></fluent-slider>
+                    </div>`
+                  : nothing
+              }
               ${
                 settings.options.nations && !settings.options.nations.hidden
                   ? html`<div
