@@ -304,7 +304,8 @@
     "sent_troops_to_player": "Sent {troops} troops to {name}",
     "trade_ship_captured": "Your trade ship was captured by {name}",
     "unit_destroyed": "Your {unit} was destroyed",
-    "unit_voluntarily_deleted": "Unit voluntarily deleted"
+    "unit_voluntarily_deleted": "Unit voluntarily deleted",
+    "wave_cleared": "Wave {wave} cleared: +{gold} gold"
   },
   "fullscreen": {
     "enter": "Enter fullscreen",

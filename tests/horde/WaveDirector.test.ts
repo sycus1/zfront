@@ -15,6 +15,7 @@ const OPTS: DirectorOptions = {
   elitePoints: 20,
   wavesPerDirection: 3,
   minSpawnDistance: 5,
+  maxSpawnDistance: 0,
   emittersPerWave: 4,
   wavesToWin: 8,
 };
@@ -151,6 +152,31 @@ describe("WaveDirector", () => {
       expect(plan.sectors & (1 << sectorOf(dx, dy))).not.toBe(0);
       expect(dx * dx + dy * dy).toBeGreaterThanOrEqual(25);
     }
+  });
+
+  test("prefers cells within the spawn band", () => {
+    // Edge cells are 10 to 14 cells from the centre; the band keeps the
+    // ones within 11, the middles of the edges.
+    const d = new WaveDirector({ ...OPTS, maxSpawnDistance: 11 }, W);
+    d.survey(edgeCells(), CENTRE, reachable());
+    const random = new PseudoRandom(5);
+    const [plan] = planWaves(d, random, 1);
+    for (const c of d.emitterCells(plan, 8, random)) {
+      const dx = (c % W) - 10;
+      const dy = Math.floor(c / W) - 10;
+      expect(dx * dx + dy * dy).toBeLessThanOrEqual(121);
+    }
+    // Only N, E, S and W have cells that close.
+    expect(d.availableSectors()).toBe(0b01010101);
+  });
+
+  test("ignores the band when no cell is inside it", () => {
+    const d = new WaveDirector(
+      { ...OPTS, minSpawnDistance: 5, maxSpawnDistance: 6 },
+      W,
+    );
+    d.survey(edgeCells(), CENTRE, reachable());
+    expect(d.availableSectors()).toBe(0xff);
   });
 
   test("falls back to nearby cells when none are far enough", () => {
