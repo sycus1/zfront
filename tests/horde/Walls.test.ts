@@ -111,6 +111,8 @@ const SMALL_WAVES: Partial<HordeOptions> = {
   elitesPerWave: 0,
   structureHp: 600,
   pressureShift: 4,
+  shamblerSpeed: 1,
+  eliteSpeed: 1,
 };
 
 /** A survivor owning tiles 40..59 square, a city at (50, 50) and the HQ. */

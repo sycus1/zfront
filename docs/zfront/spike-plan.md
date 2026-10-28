@@ -211,7 +211,43 @@ _Started 2026-10-26._
   - Each wave has a points budget (`firstWaveSize`, growing by `waveGrowthPercent`). Elites cost `elitePoints` each and scale with the budget; the rest are shamblers.
   - Waves come from compass directions around the HQ: one direction for waves 1–3, two for 4–6, three for 7–9, and every direction for the final wave. Directions are picked with the seeded PRNG from those that have reachable coast or map edge at least `minSpawnDistance` cells from the HQ.
   - The next wave is planned as soon as the current one starts, so the HUD shows its countdown, size and directions during the calm.
-- **Still to do for the MVP:** wall tiers (barricade, stone, reinforced) and repair, a real turret and the other buildings, the cash economy, "call wave early", direction arrows on the map, and tuning the numbers after a play-test.
+- **Still to do for the MVP:** wall tiers (barricade, stone, reinforced) and repair, a real turret and the other buildings, the cash economy, "call wave early" and direction arrows on the map. Wave balance is done (next section).
+
+## MVP: balance
+
+_Done 2026-10-28._ A play-test had the HQ fall in under a minute: the first wave of 20,000 came 10 seconds after spawning, waves were 30 seconds apart, and shamblers covered a coarse cell every tick (20 tiles a second).
+
+**Balance harness.** `npm run balance:horde` plays solo games on Britannia with the real engine and a scripted player, from five HQ positions (Yorkshire, Lincolnshire, Hampshire, Powys, Cumbria), and prints each wave's size, the HQ's health, kills and losses. Strategies: `none` builds nothing, `turrets` rings the HQ with Defense Posts as gold allows, and `fort` builds one turret, a ring of walls 10 tiles out, then more turrets. The scripted player holds land 20 tiles round the HQ, standing in for expanding with troops. Try other numbers with `--set waveInterval=900,turretKillsPerTick=10`.
+
+**Targets.** Ten waves in about 11 minutes. An undefended HQ survives the first few waves and falls around wave 4 or 5. A player who spends on defence wins, and the last waves still hurt.
+
+**New defaults** (`DEFAULT_HORDE_OPTIONS`):
+
+| Option               | Before | After | Why                                                                                                                             |
+| -------------------- | ------ | ----- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `firstWaveDelay`     | 100    | 600   | A minute to build before the first wave.                                                                                        |
+| `waveInterval`       | 300    | 600   | A minute between waves: ten waves take 11 minutes.                                                                              |
+| `firstWaveSize`      | 20,000 | 2,500 | Wave 1 is a gentle start.                                                                                                       |
+| `waveGrowthPercent`  | 50     | 35    | Wave 10 is about 37,000, 15 times wave 1.                                                                                       |
+| `elitesPerWave`      | 50     | 2     | 50 elites pressing on the HQ did most of the damage on their own.                                                               |
+| `shamblerSpeed`      | (new)  | 3     | Shamblers step every 3 ticks, about 7 tiles a second. They also attack as they step, so this cuts their damage rate to a third. |
+| `eliteSpeed`         | 1      | 2     | Elites stay faster than shamblers.                                                                                              |
+| `pressureShift`      | 6      | 5     | Doubles damage per attack, to make up some of the slower attacks.                                                               |
+| `turretKillsPerTick` | 30     | 12    | Four Defense Posts cleared even the last wave without a scratch.                                                                |
+
+**Results** with the new defaults (HQ health is out of 50,000):
+
+| Strategy  | Yorkshire      | Lincolnshire   | Hampshire      | Powys          | Cumbria        |
+| --------- | -------------- | -------------- | -------------- | -------------- | -------------- |
+| `none`    | lost, wave 5   | lost, wave 5   | lost, wave 5   | lost, wave 4   | lost, wave 4   |
+| `turrets` | won, HQ 29,229 | won, HQ 40,324 | won, HQ 40,719 | won, HQ 50,000 | won, HQ 26,239 |
+| `fort`    | won, HQ 4,319  | won, HQ 16,910 | won, HQ 1,427  | won, HQ 40,557 | won, HQ 48,638 |
+
+**Findings for the next MVP items:**
+
+- **Walls are poor value.** At 10,000 gold each, the 40-wall ring isn't closed until wave 7 and the fort only just survives. Cheaper barricades (the first wall tier) should make walling a real choice.
+- **Defense Posts get dearer each time** (50,000, then 100,000, up to 250,000), so the turret player ends with four. A real turret with a flat cost belongs with the defences work.
+- **Gold is still OpenFront's 100 per tick.** The cash economy will change every number above, so rerun the harness after it lands.
 
 ## Prerequisites
 
