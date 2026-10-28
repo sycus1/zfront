@@ -19,6 +19,8 @@ const SMALL_WAVES: Partial<HordeOptions> = {
   elitesPerWave: 5,
   structureHp: 600,
   pressureShift: 4,
+  shamblerSpeed: 1,
+  eliteSpeed: 1,
 };
 
 async function hordeGame(

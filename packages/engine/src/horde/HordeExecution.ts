@@ -58,6 +58,12 @@ export interface HordeOptions {
   minSpawnDistance: number;
   maxElites: number;
   eliteHp: number;
+  /**
+   * Ticks between horde (shambler) steps (lower is faster). Shamblers
+   * press on what blocks them as they step, so this also spaces out their
+   * attacks.
+   */
+  shamblerSpeed: number;
   /** Ticks between elite steps (lower is faster). */
   eliteSpeed: number;
   elitePressure: number;
@@ -85,29 +91,33 @@ export interface HordeOptions {
   flowMaxDelay: number;
 }
 
-// Spike defaults, sized to show a big horde in a solo game within minutes:
-// waves of 20k, 30k, 45k, 67k, 100k... points every 30 seconds.
+// MVP defaults, tuned with `npm run balance:horde` (see "MVP: balance" in
+// docs/zfront/spike-plan.md): a minute to build before the first wave of
+// 2,500, a wave a minute growing by 35% to about 37k on wave 10, and
+// shamblers that walk a coarse cell every 3 ticks. An undefended HQ falls
+// on wave 4 or 5; a ring of Defense Posts wins with the HQ damaged.
 export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
-  firstWaveDelay: 100,
-  waveInterval: 300,
-  firstWaveSize: 20_000,
-  waveGrowthPercent: 50,
+  firstWaveDelay: 600,
+  waveInterval: 600,
+  firstWaveSize: 2_500,
+  waveGrowthPercent: 35,
   emittersPerWave: 8,
   emitRate: 200,
-  elitesPerWave: 50,
+  elitesPerWave: 2,
   elitePoints: 20,
   wavesPerDirection: 3,
   minSpawnDistance: 40,
   maxElites: 500,
   eliteHp: 300,
-  eliteSpeed: 1,
+  shamblerSpeed: 3,
+  eliteSpeed: 2,
   elitePressure: 200,
   blockedMagnitude: 20,
   cellCap: 2_000,
   turretRange: 8,
-  turretKillsPerTick: 30,
+  turretKillsPerTick: 12,
   turretEliteDamage: 20,
-  pressureShift: 6,
+  pressureShift: 5,
   structureHp: 3_000,
   wallHp: 10_000,
   hqHp: 50_000,
@@ -263,7 +273,9 @@ export class HordeExecution implements Execution {
       this.planNextWave();
     }
     this.emit();
-    this.field.step(this.hordeFlow.dist);
+    if (ticks % this.opts.shamblerSpeed === 0) {
+      this.field.step(this.hordeFlow.dist);
+    }
     this.elites.step(this.field, this.hordeFlow.dist);
     this.fireTurrets();
     this.applyPressure();
@@ -281,6 +293,11 @@ export class HordeExecution implements Execution {
       outcome: this.outcome,
       ...this.hordeProfile,
     };
+  }
+
+  /** Points in the wave under way (or last started), 0 before the first. */
+  currentWaveBudget(): number {
+    return this.currentPlan?.budget ?? 0;
   }
 
   /** The wave announced next, or null when none is left. */
@@ -823,6 +840,7 @@ const HordeOptionsSchema = z.object({
   minSpawnDistance: zInt(),
   maxElites: zInt(),
   eliteHp: zInt(),
+  shamblerSpeed: zInt(),
   eliteSpeed: zInt(),
   elitePressure: zInt(),
   blockedMagnitude: zInt(),
@@ -884,7 +902,7 @@ const OUTCOMES: readonly HordeOutcome[] = ["playing", "won", "lost"];
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 3,
+  version: 4,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -931,6 +949,11 @@ export const HordeExecutionSnapshot = execSnapshotType({
       nextPlan: null,
       ticks: 0,
       flowWalls: [],
+    }),
+    // 3 -> 4: shambler speed. Older games stepped the horde every tick.
+    3: (d) => ({
+      ...d,
+      options: { ...d.options, shamblerSpeed: 1 },
     }),
   },
   cls: () => HordeExecution,

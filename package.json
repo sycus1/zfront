@@ -23,6 +23,7 @@
     "test": "vitest run",
     "perf": "npx tsx tests/perf/run-all.ts",
     "perf:game": "npx tsx tests/perf/fullgame/FullGamePerf.ts",
+    "balance:horde": "npx tsx tests/perf/HordeBalance.ts",
     "replay:game": "npx tsx tests/replay/ReplayGame.ts",
     "perf:client": "npx tsx tests/perf/client/ClientUpdatePerf.ts",
     "perf:client-mem": "npx tsx tests/perf/client/ClientMemoryPerf.ts",
