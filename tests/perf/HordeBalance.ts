@@ -18,6 +18,11 @@
  *   npm run balance:horde -- [--strategy none,turrets,fort]
  *                            [--spawn yorkshire,lincolnshire,...]
  *                            [--seed balance] [--set waveInterval=600,...]
+ *                            [--zone 20]
+ *
+ * --zone gives the player land within that many tiles of the HQ at the
+ * start, standing in for expanding by hand. --zone 0 gives none, so the
+ * zone grows only by the engine's own rules (settlers, in horde mode).
  */
 import {
   Difficulty,
@@ -69,6 +74,8 @@ interface Options {
   strategies: Strategy[];
   spawns: string[];
   seed: string;
+  /** Radius in tiles of the land handed to the player at the start. */
+  zone: number;
 }
 
 function parseArgs(argv: string[]): Options {
@@ -77,6 +84,7 @@ function parseArgs(argv: string[]): Options {
     strategies: [...STRATEGIES],
     spawns: Object.keys(SPAWNS),
     seed: "balance",
+    zone: 20,
   };
   for (let i = 0; i < argv.length; i++) {
     const next = () => argv[++i];
@@ -100,6 +108,9 @@ function parseArgs(argv: string[]): Options {
             throw new Error(`unknown option ${k}`);
           opts.horde[k as keyof HordeOptions] = parseInt(v, 10);
         }
+        break;
+      case "--zone":
+        opts.zone = parseInt(next(), 10);
         break;
       case "--seed":
         opts.seed = next();
@@ -125,8 +136,6 @@ const TURRET_RING = ring(6, 6);
 const WALL_RING = ring(10, 2);
 /** Ticks before an order that came to nothing is tried again. */
 const RETRY = 50;
-/** Radius in tiles of the land the scripted player holds. */
-const ZONE = 20;
 
 interface Order {
   tick: number;
@@ -184,6 +193,8 @@ interface WaveRow {
   lost: number;
   turrets: number;
   walls: number;
+  /** Tiles the player holds at the end of the wave. */
+  tiles: number;
 }
 
 interface Result {
@@ -195,6 +206,7 @@ interface Result {
 
 async function play(
   horde: Partial<HordeOptions>,
+  zone: number,
   seed: string,
   spawn: [number, number],
   strategy: Strategy,
@@ -233,13 +245,13 @@ async function play(
   const me = game.player("survivor");
   const hq = me.spawnTile()!;
   const hqXY: [number, number] = [game.x(hq), game.y(hq)];
-  // A player expands with troops in the first seconds; stand in for that
-  // with a land zone round the HQ, big enough for the fort's wall ring.
-  for (let dy = -ZONE; dy <= ZONE; dy++) {
-    for (let dx = -ZONE; dx <= ZONE; dx++) {
+  // Stands in for expanding by hand in the first seconds. The default 20
+  // is big enough for the fort's wall ring.
+  for (let dy = -zone; dy <= zone; dy++) {
+    for (let dx = -zone; dx <= zone; dx++) {
       const x = hqXY[0] + dx;
       const y = hqXY[1] + dy;
-      if (dx * dx + dy * dy > ZONE * ZONE || !game.isValidCoord(x, y)) continue;
+      if (dx * dx + dy * dy > zone * zone || !game.isValidCoord(x, y)) continue;
       const t = game.ref(x, y);
       if (game.isLand(t) && !game.hasOwner(t)) me.conquer(t);
     }
@@ -269,6 +281,7 @@ async function play(
         lost: 0,
         turrets: 0,
         walls: 0,
+        tiles: 0,
       };
     }
     row.hqEnd = s.hqHp;
@@ -276,6 +289,7 @@ async function play(
     row.lost += s.structuresDestroyed - lastLost;
     row.turrets = me.units(UnitType.DefensePost).length;
     row.walls = me.units(UnitType.Wall).length;
+    row.tiles = me.numTilesOwned();
     lastKilled = s.killed;
     lastLost = s.structuresDestroyed;
     if (s.outcome !== "playing") break;
@@ -305,7 +319,13 @@ async function main(): Promise<void> {
   const summary: string[][] = [];
   for (const strategy of opts.strategies) {
     for (const name of opts.spawns) {
-      const r = await play(opts.horde, opts.seed, SPAWNS[name], strategy);
+      const r = await play(
+        opts.horde,
+        opts.zone,
+        opts.seed,
+        SPAWNS[name],
+        strategy,
+      );
       console.log(`\n${strategy} @ ${name}: ${r.outcome} after ${r.seconds}s`);
       console.log(
         table(
@@ -318,6 +338,7 @@ async function main(): Promise<void> {
             "lost",
             "turrets",
             "walls",
+            "tiles",
           ],
           r.rows.map((w) => [
             String(w.wave),
@@ -328,6 +349,7 @@ async function main(): Promise<void> {
             String(w.lost),
             String(w.turrets),
             String(w.walls),
+            String(w.tiles),
           ]),
         ),
       );
