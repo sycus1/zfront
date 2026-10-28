@@ -7,6 +7,7 @@ import {
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import { simpleHash } from "@openfront/engine-lib/Util";
 import { Execution, Game } from "../game/Game";
+import { settlesOnItsOwn } from "../horde/Settlement";
 import { AttackExecution } from "./AttackExecution";
 import { BoatRetreatExecution } from "./BoatRetreatExecution";
 import { ConstructionExecution } from "./ConstructionExecution";
@@ -53,6 +54,15 @@ export class Executor {
     const player = this.mg.playerByClientID(intent.clientID);
     if (!player) {
       console.warn(`player with clientID ${intent.clientID} not found`);
+      return new NoOpExecution();
+    }
+
+    // zfront: in horde mode humans grow by settling (horde/Settlement.ts),
+    // so attacks and boat landings are dropped.
+    if (
+      (intent.type === "attack" || intent.type === "boat") &&
+      settlesOnItsOwn(this.mg, player)
+    ) {
       return new NoOpExecution();
     }
 

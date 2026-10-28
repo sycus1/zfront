@@ -264,7 +264,7 @@ _Started 2026-10-28._ Wall tiers, repair and a real turret. Mines and bait come 
 | `turrets` | won, HQ 34,775 | won, HQ 33,523 | won, HQ 42,362 | won, HQ 35,931 | won, HQ 48,357 |
 | `fort`    | won, HQ 47,379 | lost, wave 9   | won, HQ 50,000 | won, HQ 41,742 | won, HQ 50,000 |
 
-The `turrets` strategy now upgrades its turrets to level 3, and `fort` upgrades walls and turrets in turn. The Lincolnshire fort loses because its turrets keep falling and being rebuilt, so the walls are never upgraded.
+These are with population growth (#9) merged in: with `--zone 0` the settlers fill the 1,500-tile base zone before wave 1, so the results match the default `--zone 20` exactly. The `turrets` strategy now upgrades its turrets to level 3, and `fort` upgrades walls and turrets in turn. The Lincolnshire fort loses because its turrets keep falling and being rebuilt, so the walls are never upgraded.
 
 ## Prerequisites
 

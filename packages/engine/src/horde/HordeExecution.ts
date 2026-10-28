@@ -18,6 +18,7 @@ import type { ExecRecord, SnapshotReader } from "../snapshot/SnapshotContext";
 import { Elites } from "./Elites";
 import { FlowField, WALL_COST } from "./FlowField";
 import { buildCostField, HordeField } from "./HordeField";
+import { settle, SettleOptions, welcomeRefugees } from "./Settlement";
 import { WaveDirector, WavePlan } from "./WaveDirector";
 
 /**
@@ -38,7 +39,7 @@ import { WaveDirector, WavePlan } from "./WaveDirector";
  * never feed back into the simulation.
  */
 
-export interface HordeOptions {
+export interface HordeOptions extends SettleOptions {
   /** Ticks from the end of the spawn phase to the first wave. */
   firstWaveDelay: number;
   waveInterval: number;
@@ -148,6 +149,13 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   wavesToWin: 10,
   flowDebounce: 10,
   flowMaxDelay: 50,
+  settleInterval: 10,
+  settlePercent: 50,
+  settleTiles: 20,
+  settleCost: 200,
+  zoneBaseTiles: 1_500,
+  zoneTilesPerWave: 1_000,
+  refugeesPerWave: 10_000,
 };
 
 const TARGET_TYPES: readonly UnitType[] = [
@@ -161,6 +169,8 @@ const TARGET_TYPES: readonly UnitType[] = [
 
 export interface HordeStats {
   wave: number;
+  /** Waves survived: cleared, or outlasted until the next one started. */
+  wavesSurvived: number;
   alive: number;
   elites: number;
   killed: number;
@@ -195,6 +205,7 @@ export class HordeExecution implements Execution {
   private director!: WaveDirector;
 
   private wave = 0;
+  private wavesSurvived = 0;
   /** The wave under way (or last started), and the one announced next. */
   private currentPlan: WavePlan | null = null;
   private nextPlan: WavePlan | null = null;
@@ -317,11 +328,14 @@ export class HordeExecution implements Execution {
     this.fireTurrets();
     this.applyPressure();
     if (ticks % this.opts.repairInterval === 0) this.repair();
+    this.checkCleared();
+    if (ticks % this.opts.settleInterval === 0) this.settleAll();
   }
 
   stats(): HordeStats {
     return {
       wave: this.wave,
+      wavesSurvived: this.wavesSurvived,
       alive: this.field?.total() ?? 0,
       elites: this.elites?.count ?? 0,
       killed: this.killed,
@@ -414,6 +428,7 @@ export class HordeExecution implements Execution {
       mix(this.elites.hp[k]);
     }
     mix(this.wave);
+    mix(this.wavesSurvived);
     for (const plan of [this.currentPlan, this.nextPlan]) {
       if (plan === null) continue;
       mix(plan.wave);
@@ -602,6 +617,8 @@ export class HordeExecution implements Execution {
     const plan = this.nextPlan;
     if (plan === null) return;
     this.nextPlan = null;
+    // Still standing when the next wave starts: the last one counts as survived.
+    this.survived(this.wave);
     this.currentPlan = plan;
     this.wave = plan.wave;
     this.surveySpawns();
@@ -626,6 +643,57 @@ export class HordeExecution implements Execution {
     );
     for (let j = 0; j < plan.elites; j++) {
       this.elites.spawn(eliteCells[j], this.opts.eliteHp);
+    }
+  }
+
+  /** The wave under way is cleared once it has all spawned and all died. */
+  private checkCleared(): void {
+    if (
+      this.emitterCells.length === 0 &&
+      this.field.total() === 0 &&
+      this.elites.count === 0
+    ) {
+      this.survived(this.wave);
+    }
+  }
+
+  private survived(wave: number): void {
+    if (wave <= this.wavesSurvived) return;
+    this.wavesSurvived = wave;
+    welcomeRefugees(this.mg!, this.opts, wave);
+  }
+
+  /** Settlers claim free land for each human, in player order. */
+  private settleAll(): void {
+    const mg = this.mg!;
+    const covered = new Uint8Array(this.width * this.height);
+    const view = {
+      cellOf: (t: TileRef) => this.cellOf(t),
+      density: this.field.density,
+      covered,
+    };
+    for (const p of mg.players()) {
+      if (p.type() !== PlayerType.Human || !p.isAlive()) continue;
+      covered.fill(0);
+      this.markCover(p, covered);
+      settle(mg, p, this.opts, this.wavesSurvived, view);
+    }
+  }
+
+  private markCover(owner: Player, covered: Uint8Array): void {
+    const w = this.width;
+    const n = covered.length;
+    const offsets = this.turretOffsets;
+    for (const t of this.hordeTurrets) {
+      if (!t.isActive() || t.owner() !== owner) continue;
+      const c = this.cellOf(t.tile());
+      const cx = c % w;
+      for (let k = 0; k < offsets.length; k += 2) {
+        const x = cx + offsets[k];
+        const cell = c + offsets[k + 1];
+        if (x < 0 || x >= w || cell < 0 || cell >= n) continue;
+        covered[cell] = 1;
+      }
     }
   }
 
@@ -795,6 +863,7 @@ export class HordeExecution implements Execution {
       options: this.opts,
       random: this.random.getState(),
       wave: this.wave,
+      wavesSurvived: this.wavesSurvived,
       currentPlan: this.currentPlan,
       nextPlan: this.nextPlan,
       nextWaveTick: this.nextWaveTick,
@@ -829,6 +898,7 @@ export class HordeExecution implements Execution {
     this.opts = opts;
     this.mg = null;
     this.wave = s.wave;
+    this.wavesSurvived = s.wavesSurvived;
     this.currentPlan = s.currentPlan;
     this.nextPlan = s.nextPlan;
     this.nextWaveTick = s.nextWaveTick;
@@ -979,6 +1049,13 @@ const HordeOptionsSchema = z.object({
   wavesToWin: zInt(),
   flowDebounce: zInt(),
   flowMaxDelay: zInt(),
+  settleInterval: zInt(),
+  settlePercent: zInt(),
+  settleTiles: zInt(),
+  settleCost: zInt(),
+  zoneBaseTiles: zInt(),
+  zoneTilesPerWave: zInt(),
+  refugeesPerWave: zInt(),
 });
 
 const WavePlanSchema = z.object({
@@ -995,6 +1072,7 @@ const HordeStateSchema = z.object({
   options: HordeOptionsSchema,
   random: zRandom(),
   wave: zInt(),
+  wavesSurvived: zInt(),
   currentPlan: WavePlanSchema.nullable(),
   nextPlan: WavePlanSchema.nullable(),
   nextWaveTick: zInt(),
@@ -1028,7 +1106,7 @@ const OUTCOMES: readonly HordeOutcome[] = ["playing", "won", "lost"];
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 5,
+  version: 6,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -1081,12 +1159,29 @@ export const HordeExecutionSnapshot = execSnapshotType({
       ...d,
       options: { ...d.options, shamblerSpeed: 1 },
     }),
-    // 4 -> 5: wall tiers, turret levels and repair. Health is now kept as
+    // 4 -> 5: population-driven growth. Settling is off (no cost, no
+    // zone), so an old game keeps the land it had; every wave before the
+    // one under way counts as survived.
+    4: (d) => ({
+      ...d,
+      options: {
+        ...d.options,
+        settleInterval: 10,
+        settlePercent: 50,
+        settleTiles: 0,
+        settleCost: 0,
+        zoneBaseTiles: 0,
+        zoneTilesPerWave: 0,
+        refugeesPerWave: 0,
+      },
+      wavesSurvived: Math.max(0, d.wave - 1),
+    }),
+    // 5 -> 6: wall tiers, turret levels and repair. Health is now kept as
     // damage by unit id; the old health-by-tile map can't be converted
     // without the units, so damaged structures come back at full health.
-    // Every wall tier keeps the old wall health, turrets get no high-ground
-    // bonus and nothing repairs, as before.
-    4: (d) => ({
+    // Every wall tier keeps the old wall health, turret levels add nothing,
+    // turrets get no high-ground bonus and nothing repairs, as before.
+    5: (d) => ({
       ...d,
       options: {
         ...d.options,

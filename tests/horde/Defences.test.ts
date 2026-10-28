@@ -289,22 +289,22 @@ describe("defence defaults and migration", () => {
     expect(o.repairHp).toBeGreaterThan(0);
   });
 
-  test("a version 4 snapshot migrates with every tier at the old wall health", () => {
-    const v4 = {
+  test("a version 5 snapshot migrates with every tier at the old wall health", () => {
+    const v5 = {
       initialized: true,
       options: { wallHp: 10_000 },
       hpTiles: [5],
       hpValues: [3],
     };
-    const v5 = HordeExecutionSnapshot.migrations[4](v4);
-    expect(v5.options).toMatchObject({
+    const v6 = HordeExecutionSnapshot.migrations[5](v5);
+    expect(v6.options).toMatchObject({
       wallHp: 10_000,
       stoneWallHp: 10_000,
       reinforcedWallHp: 10_000,
       turretHighGroundBonus: 0,
       repairHp: 0,
     });
-    expect(v5.damageIds).toEqual([]);
-    expect(v5.lastHitIds).toEqual([]);
+    expect(v6.damageIds).toEqual([]);
+    expect(v6.lastHitIds).toEqual([]);
   });
 });

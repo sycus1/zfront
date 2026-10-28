@@ -53,6 +53,7 @@ import {
   within,
 } from "@openfront/engine-lib/Util";
 import { z } from "zod";
+import { settlesOnItsOwn } from "../horde/Settlement";
 import {
   newPlayerInfo,
   playerInfoData,
@@ -1664,6 +1665,10 @@ export class PlayerImpl implements Player {
   }
 
   public canAttack(tile: TileRef): boolean {
+    // zfront: in horde mode humans grow by settling, not by attacking.
+    if (settlesOnItsOwn(this.mg, this)) {
+      return false;
+    }
     const owner = this.mg.owner(tile);
     if (owner === this) {
       return false;
