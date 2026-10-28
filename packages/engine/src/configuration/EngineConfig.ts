@@ -158,9 +158,6 @@ export class EngineConfig extends Config {
   waterNukes(): boolean {
     return this._gameConfig.waterNukes ?? false;
   }
-  horde(): boolean {
-    return this._gameConfig.horde ?? false;
-  }
   infiniteGold(): boolean {
     return this._gameConfig.infiniteGold;
   }
@@ -361,12 +358,18 @@ export class EngineConfig extends Config {
       case UnitType.MissileSilo:
         return this.costWrapper(() => 1_000_000, UnitType.MissileSilo);
       case UnitType.DefensePost:
+        // zfront: in horde mode the Defense Post is the turret, at a flat
+        // price for each one and each level.
+        if (this.horde()) {
+          return this.costWrapper(() => 50_000, UnitType.DefensePost);
+        }
         return this.costWrapper(
           (numUnits: number) => Math.min(250_000, (numUnits + 1) * 50_000),
           UnitType.DefensePost,
         );
       case UnitType.Wall:
-        return this.costWrapper(() => 10_000, UnitType.Wall);
+        // A barricade, and each tier above it, costs the same.
+        return this.costWrapper(() => 5_000, UnitType.Wall);
       case UnitType.SAMLauncher:
         return this.costWrapper(
           (numUnits: number) => Math.min(3_000_000, (numUnits + 1) * 1_500_000),

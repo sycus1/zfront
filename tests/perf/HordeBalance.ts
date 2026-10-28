@@ -10,9 +10,10 @@
  *
  * Strategies:
  *   none     builds nothing: the HQ should fall within the first few waves.
- *   turrets  builds Defense Posts in a ring round the HQ whenever it can.
- *   fort     builds one turret, seals the HQ in a ring of walls, then adds
- *            more turrets inside.
+ *   turrets  builds turrets (Defense Posts) in a ring round the HQ, then
+ *            upgrades them to level 2 and 3.
+ *   fort     builds one turret, seals the HQ in a ring of barricades, adds
+ *            more turrets inside, then upgrades walls and turrets in turn.
  *
  * Usage:
  *   npm run balance:horde -- [--strategy none,turrets,fort]
@@ -39,6 +40,7 @@ import { loadTerrainMap } from "@openfront/engine-lib/game/TerrainMapLoader";
 import { EngineConfig } from "@openfront/engine/configuration/EngineConfig";
 import { ConstructionExecution } from "@openfront/engine/execution/ConstructionExecution";
 import { SpawnExecution } from "@openfront/engine/execution/SpawnExecution";
+import { UpgradeStructureExecution } from "@openfront/engine/execution/UpgradeStructureExecution";
 import { Game, Player } from "@openfront/engine/game/Game";
 import { createGame } from "@openfront/engine/game/GameImpl";
 import {
@@ -153,26 +155,45 @@ function spend(
   ordered: Map<number, Order>,
 ) {
   if (s === "none") return;
-  // Each step builds at its offsets in order before the next step starts.
-  const plan: [UnitType, [number, number][]][] =
+  // Steps run in order: each builds at its offsets (level 1), or upgrades
+  // what was built there to its level, before the next step starts.
+  const T = UnitType.DefensePost;
+  const W = UnitType.Wall;
+  const plan: [UnitType, [number, number][], number][] =
     s === "turrets"
-      ? [[UnitType.DefensePost, TURRET_RING]]
+      ? [
+          [T, TURRET_RING, 1],
+          [T, TURRET_RING, 2],
+          [T, TURRET_RING, 3],
+        ]
       : [
-          [UnitType.DefensePost, TURRET_RING.slice(0, 1)],
-          [UnitType.Wall, WALL_RING],
-          [UnitType.DefensePost, TURRET_RING],
+          [T, TURRET_RING.slice(0, 1), 1],
+          [W, WALL_RING, 1],
+          [T, TURRET_RING, 1],
+          [W, WALL_RING, 2],
+          [T, TURRET_RING, 2],
+          [W, WALL_RING, 3],
+          [T, TURRET_RING, 3],
         ];
-  for (const [type, offsets] of plan) {
+  for (const [type, offsets, level] of plan) {
     for (const [dx, dy] of offsets) {
       const x = hq[0] + dx;
       const y = hq[1] + dy;
       if (!game.isValidCoord(x, y)) continue;
       const tile = game.ref(x, y);
       const order = ordered.get(tile);
-      if (order !== undefined) {
-        if (me.units(type).some((u) => u.tile() === order.at)) continue;
-        if (game.ticks() - order.tick < RETRY) continue;
+      const unit =
+        order === undefined
+          ? undefined
+          : me.units(type).find((u) => u.tile() === order.at);
+      if (level > 1) {
+        if (unit === undefined || unit.level() >= level) continue;
+        if (!me.canUpgradeUnit(unit)) return;
+        game.addExecution(new UpgradeStructureExecution(me, unit.id()));
+        return;
       }
+      if (unit !== undefined) continue;
+      if (order !== undefined && game.ticks() - order.tick < RETRY) continue;
       if (me.gold() < game.unitInfo(type).cost(game, me)) return;
       // Structures may be moved to the nearest free spot; walls never are.
       const at = me.canBuild(type, tile);
@@ -184,6 +205,11 @@ function spend(
   }
 }
 
+function levels(me: Player, type: UnitType): string {
+  const units = me.units(type);
+  return `${units.length}/${units.reduce((n, u) => n + u.level(), 0)}`;
+}
+
 interface WaveRow {
   wave: number;
   size: number;
@@ -191,8 +217,9 @@ interface WaveRow {
   hqEnd: number;
   killed: number;
   lost: number;
-  turrets: number;
-  walls: number;
+  /** Count and total levels, as "count/levels". */
+  turrets: string;
+  walls: string;
   /** Tiles the player holds at the end of the wave. */
   tiles: number;
 }
@@ -279,16 +306,16 @@ async function play(
         hqEnd: s.hqHp,
         killed: 0,
         lost: 0,
-        turrets: 0,
-        walls: 0,
+        turrets: "",
+        walls: "",
         tiles: 0,
       };
     }
     row.hqEnd = s.hqHp;
     row.killed += s.killed - lastKilled;
     row.lost += s.structuresDestroyed - lastLost;
-    row.turrets = me.units(UnitType.DefensePost).length;
-    row.walls = me.units(UnitType.Wall).length;
+    row.turrets = levels(me, UnitType.DefensePost);
+    row.walls = levels(me, UnitType.Wall);
     row.tiles = me.numTilesOwned();
     lastKilled = s.killed;
     lastLost = s.structuresDestroyed;
@@ -347,8 +374,8 @@ async function main(): Promise<void> {
             String(w.hqEnd),
             String(w.killed),
             String(w.lost),
-            String(w.turrets),
-            String(w.walls),
+            w.turrets,
+            w.walls,
             String(w.tiles),
           ]),
         ),
