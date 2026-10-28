@@ -1145,13 +1145,7 @@ export class PlayerImpl implements Player {
     const range =
       type === UnitType.Wall ? 1.5 : this.mg.config().structureMinDist();
     const closest = findClosestBy(
-      this.mg.nearbyUnits(
-        targetTile,
-        range,
-        type,
-        undefined,
-        true,
-      ),
+      this.mg.nearbyUnits(targetTile, range, type, undefined, true),
       (entry) => entry.distSquared,
     );
 
