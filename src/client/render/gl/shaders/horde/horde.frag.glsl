@@ -1,8 +1,8 @@
 #version 300 es
 precision highp float;
 
-// Horde cells (R8, normalized): 0 empty, 1-253 density, 254 a wall,
-// 255 an elite. One texel per coarse cell (2x2 tiles).
+// Horde cells (R8, normalized): 0 empty, 1-251 density, 252-254 a wall
+// (barricade, stone, reinforced), 255 an elite. One texel per coarse cell (2x2 tiles).
 uniform sampler2D uHorde;
 uniform ivec2 uGridSize;
 uniform float uTime;
@@ -10,7 +10,7 @@ uniform float uTime;
 in vec2 vUV;
 out vec4 fragColor;
 
-const float WALL = 254.0;
+const float WALL = 252.0;
 const float ELITE = 255.0;
 
 int byteAt(ivec2 cell) {
@@ -36,12 +36,15 @@ void main() {
     fragColor = vec4(vec3(0.95, 0.85, 0.2) * pulse, 1.0);
     return;
   }
-  if (raw == int(WALL)) {
-    // Stone block with a darker rim, so a line of walls reads as segments.
+  if (raw >= int(WALL)) {
+    // A block with a darker rim, so a line of walls reads as segments:
+    // brown timber, grey stone, then dark steel.
+    vec3 tint = raw == int(WALL)
+      ? vec3(0.55, 0.4, 0.25)
+      : raw == int(WALL) + 1 ? vec3(0.62, 0.6, 0.56) : vec3(0.36, 0.4, 0.46);
     vec2 f = fract(p);
     float edge = min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y));
-    float shade = edge < 0.12 ? 0.42 : 0.62;
-    fragColor = vec4(vec3(shade, shade * 0.97, shade * 0.9), 1.0);
+    fragColor = vec4(tint * (edge < 0.12 ? 0.68 : 1.0), 1.0);
     return;
   }
 

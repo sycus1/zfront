@@ -249,6 +249,23 @@ _Done 2026-10-28._ A play-test had the HQ fall in under a minute: the first wave
 - **Defense Posts get dearer each time** (50,000, then 100,000, up to 250,000), so the turret player ends with four. A real turret with a flat cost belongs with the defences work.
 - **Gold is still OpenFront's 100 per tick.** The cash economy will change every number above, so rerun the harness after it lands.
 
+## MVP: defences
+
+_Started 2026-10-28._ Wall tiers, repair and a real turret. Mines and bait come in a separate PR.
+
+- **Wall tiers.** A wall is built as a barricade and upgraded (the usual upgrade action, on the wall itself or a tile touching it) to stone and then reinforced. Each step costs 5,000 gold (a wall used to cost 10,000), and health goes 4,000, 12,000, 30,000, so the higher tiers are the better deal for the money. Clicking two tiles along still builds the next wall in the line. The renderer draws each tier in its own colour: timber, stone, steel.
+- **Turret.** In horde mode the Defense Post is the turret, shown as "Turret". It costs a flat 50,000 for each turret and each upgrade (OpenFront's price rose with every post), and has 3 levels. Each level above 1 adds `turretLevelPercent` (50%) of the base kill rate and elite damage, so level 3 has twice the firepower. Range is `turretRange` (8 coarse cells) plus `turretHighGroundBonus` (2) cells for every 10 points of terrain height, so a turret on a hill reaches further. Line of sight is not modelled yet. Outside horde mode the Defense Post keeps OpenFront's rules.
+- **Repair.** A structure that hasn't been attacked for `repairDelay` ticks (5 s) gets `repairHp` (100) health back every `repairInterval` ticks (1 s), at `repairGoldPerHp` (1) gold per point, paid by its owner. Repair stops when the owner can't pay. The HQ doesn't repair. Damage is now kept by unit id, so a new wall on the tile of a fallen one starts at full health.
+- **Rebalance.** With a flat turret price the turret player had five turrets by wave 3 and the HQ was never touched, whatever the kill rate. Turret health stays the same at every level; when it grew with level, turrets soaked up the whole horde. New numbers: `turretKillsPerTick` 12 → 8, `waveGrowthPercent` 35 → 40 (wave 10 is about 52,000), turrets at 50,000.
+
+| Strategy  | Yorkshire      | Lincolnshire   | Hampshire      | Powys          | Cumbria        |
+| --------- | -------------- | -------------- | -------------- | -------------- | -------------- |
+| `none`    | lost, wave 5   | lost, wave 5   | lost, wave 5   | lost, wave 4   | lost, wave 4   |
+| `turrets` | won, HQ 34,775 | won, HQ 33,523 | won, HQ 42,362 | won, HQ 35,931 | won, HQ 48,357 |
+| `fort`    | won, HQ 47,379 | lost, wave 9   | won, HQ 50,000 | won, HQ 41,742 | won, HQ 50,000 |
+
+These are with population growth (#9) merged in: with `--zone 0` the settlers fill the 1,500-tile base zone before wave 1, so the results match the default `--zone 20` exactly. The `turrets` strategy now upgrades its turrets to level 3, and `fort` upgrades walls and turrets in turn. The Lincolnshire fort loses because its turrets keep falling and being rebuilt, so the walls are never upgraded.
+
 ## Prerequisites
 
 - npm 12.1 or later. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`. The machine currently has npm 11.19.

@@ -169,6 +169,26 @@ export class Config {
     return 30;
   }
 
+  /** zfront: zombie waves (packages/engine/src/horde). */
+  horde(): boolean {
+    return this._gameConfig.horde ?? false;
+  }
+
+  /**
+   * Highest level a unit can be upgraded to. zfront: walls have three tiers
+   * (barricade, stone, reinforced) and turrets three levels.
+   */
+  maxUnitLevel(type: UnitType): number {
+    switch (type) {
+      case UnitType.Wall:
+        return 3;
+      case UnitType.DefensePost:
+        return this.horde() ? 3 : Number.MAX_SAFE_INTEGER;
+      default:
+        return Number.MAX_SAFE_INTEGER;
+    }
+  }
+
   isUnitDisabled(unitType: UnitType): boolean {
     return this._gameConfig.disabledUnits?.includes(unitType) ?? false;
   }
@@ -215,10 +235,18 @@ export class Config {
         };
         break;
       case UnitType.DefensePost:
-        info = { constructionDuration: this.instantBuild() ? 0 : 5 * 10 };
+        info = {
+          constructionDuration: this.instantBuild() ? 0 : 5 * 10,
+          // zfront: the Defense Post is the horde mode's turret.
+          upgradable: this.horde(),
+        };
         break;
       case UnitType.Wall:
-        info = { constructionDuration: this.instantBuild() ? 0 : 10 };
+        // zfront: upgrading a wall takes it to the next tier.
+        info = {
+          constructionDuration: this.instantBuild() ? 0 : 10,
+          upgradable: true,
+        };
         break;
       case UnitType.SAMLauncher:
         info = {

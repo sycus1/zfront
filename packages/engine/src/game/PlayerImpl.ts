@@ -1140,14 +1140,12 @@ export class PlayerImpl implements Player {
     type: UnitType,
     targetTile: TileRef,
   ): Unit | false {
+    // zfront: walls stand two tiles apart, so only the wall under the
+    // cursor (or touching it) is upgraded; anywhere else builds a new one.
+    const range =
+      type === UnitType.Wall ? 1.5 : this.mg.config().structureMinDist();
     const closest = findClosestBy(
-      this.mg.nearbyUnits(
-        targetTile,
-        this.mg.config().structureMinDist(),
-        type,
-        undefined,
-        true,
-      ),
+      this.mg.nearbyUnits(targetTile, range, type, undefined, true),
       (entry) => entry.distSquared,
     );
 
@@ -1183,6 +1181,9 @@ export class PlayerImpl implements Player {
       return false;
     }
     if (unit.owner() !== this) {
+      return false;
+    }
+    if (unit.level() >= this.mg.config().maxUnitLevel(unit.type())) {
       return false;
     }
     return true;

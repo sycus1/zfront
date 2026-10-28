@@ -217,7 +217,7 @@ describe("Wall unit", () => {
     game.player("survivor").buildUnit(UnitType.Wall, game.ref(42, 58), {});
     run(game, 3);
     const frame = horde.encodeFrame()!;
-    expect(frame.cells[29 * frame.width + 21]).toBe(254);
+    expect(frame.cells[29 * frame.width + 21]).toBe(252);
   });
 
   test("a snapshot with walls under pressure restores identically", async () => {

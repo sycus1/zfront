@@ -78,7 +78,22 @@ export interface HordeOptions extends SettleOptions {
   /** Structure damage per tick is pressure >> pressureShift. */
   pressureShift: number;
   structureHp: number;
+  /** Wall health by tier: barricade, stone, reinforced (levels 1-3). */
   wallHp: number;
+  stoneWallHp: number;
+  reinforcedWallHp: number;
+  /** Each turret level above 1 adds this percent of the base kill rate. */
+  turretLevelPercent: number;
+  /** Extra turret range, in coarse cells, per 10 points of terrain height. */
+  turretHighGroundBonus: number;
+  /** Ticks without an attack before a structure starts to repair. */
+  repairDelay: number;
+  /** Ticks between repair steps. */
+  repairInterval: number;
+  /** Health each damaged structure gets back per repair step. */
+  repairHp: number;
+  /** Gold the owner pays per point of health repaired. */
+  repairGoldPerHp: number;
   /** HQ health. When it falls, the player loses. */
   hqHp: number;
   /** Waves to survive to win; 0 means endless. */
@@ -92,16 +107,17 @@ export interface HordeOptions extends SettleOptions {
   flowMaxDelay: number;
 }
 
-// MVP defaults, tuned with `npm run balance:horde` (see "MVP: balance" in
-// docs/zfront/spike-plan.md): a minute to build before the first wave of
-// 2,500, a wave a minute growing by 35% to about 37k on wave 10, and
-// shamblers that walk a coarse cell every 3 ticks. An undefended HQ falls
-// on wave 4 or 5; a ring of Defense Posts wins with the HQ damaged.
+// MVP defaults, tuned with `npm run balance:horde` (see "MVP: balance" and
+// "MVP: defences" in docs/zfront/spike-plan.md): a minute to build before
+// the first wave of 2,500, a wave a minute growing by 40% to about 52k on
+// wave 10, and shamblers that walk a coarse cell every 3 ticks. An
+// undefended HQ falls on wave 4 or 5; a ring of upgraded turrets wins with
+// the HQ damaged.
 export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   firstWaveDelay: 600,
   waveInterval: 600,
   firstWaveSize: 2_500,
-  waveGrowthPercent: 35,
+  waveGrowthPercent: 40,
   emittersPerWave: 8,
   emitRate: 200,
   elitesPerWave: 2,
@@ -116,11 +132,19 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   blockedMagnitude: 20,
   cellCap: 2_000,
   turretRange: 8,
-  turretKillsPerTick: 12,
+  turretLevelPercent: 50,
+  turretHighGroundBonus: 2,
+  turretKillsPerTick: 8,
   turretEliteDamage: 20,
   pressureShift: 5,
   structureHp: 3_000,
-  wallHp: 10_000,
+  wallHp: 4_000,
+  stoneWallHp: 12_000,
+  reinforcedWallHp: 30_000,
+  repairDelay: 50,
+  repairInterval: 10,
+  repairHp: 100,
+  repairGoldPerHp: 1,
   hqHp: 50_000,
   wavesToWin: 10,
   flowDebounce: 10,
@@ -171,7 +195,11 @@ export class HordeExecution implements Execution {
   private hordeFlow!: FlowField;
   private elites!: Elites;
   private spawnCells!: Int32Array;
+  /** The disc within base turret range, nearest cells first. */
   private turretOffsets!: Int32Array;
+  /** The disc within the longest turret range, and each cell's distance squared. */
+  private turretReach!: Int32Array;
+  private turretReachD2!: Int32Array;
   /** Terrain movement cost; the live cost adds structure cells on top. */
   private terrainCost!: Uint8Array;
   private director!: WaveDirector;
@@ -190,7 +218,9 @@ export class HordeExecution implements Execution {
   private hordeStructureAt = new Map<number, Unit>();
   private hordeTurrets: Unit[] = [];
   private hordeHqAt = new Map<number, Player>();
-  private structureHp = new Map<TileRef, number>();
+  /** Damage taken by unit id, and the tick each was last attacked. */
+  private damage = new Map<number, number>();
+  private lastHit = new Map<number, number>();
   /** HQ health by player smallID. */
   private hqHp = new Map<number, number>();
   private hqsFallen = 0;
@@ -247,12 +277,19 @@ export class HordeExecution implements Execution {
       this.width,
       this.height,
     );
-    this.turretOffsets = discOffsets(opts.turretRange, this.width);
+    this.turretOffsets = discOffsets(opts.turretRange, this.width).offsets;
+    const reach = discOffsets(
+      opts.turretRange + 3 * opts.turretHighGroundBonus,
+      this.width,
+    );
+    this.turretReach = reach.offsets;
+    this.turretReachD2 = reach.d2;
     this.director = new WaveDirector(opts, this.width);
     this.hordeStructureAt = new Map();
     this.hordeTurrets = [];
     this.hordeHqAt = new Map();
-    this.structureHp = new Map();
+    this.damage = new Map();
+    this.lastHit = new Map();
     this.hqHp = new Map();
     this.emitterCells = [];
     this.emitterRemaining = [];
@@ -290,6 +327,7 @@ export class HordeExecution implements Execution {
     this.elites.step(this.field, this.hordeFlow.dist);
     this.fireTurrets();
     this.applyPressure();
+    if (ticks % this.opts.repairInterval === 0) this.repair();
     this.checkCleared();
     if (ticks % this.opts.settleInterval === 0) this.settleAll();
   }
@@ -335,9 +373,12 @@ export class HordeExecution implements Execution {
     const cells = new Uint8Array(d.length);
     for (let i = 0; i < d.length; i++) {
       const v = d[i];
-      if (v !== 0) cells[i] = v >= 253 * 8 ? 253 : (v + 7) >> 3;
+      if (v !== 0) cells[i] = v >= 251 * 8 ? 251 : (v + 7) >> 3;
     }
-    for (const c of this.hordeWallCells) cells[c] = 254;
+    for (const c of this.hordeWallCells) {
+      const level = this.hordeStructureAt.get(c)?.level() ?? 1;
+      cells[c] = 251 + Math.min(3, Math.max(1, level));
+    }
     for (let k = 0; k < this.elites.count; k++) {
       cells[this.elites.cell[k]] = 255;
     }
@@ -400,6 +441,10 @@ export class HordeExecution implements Execution {
     for (const [id, hp] of this.hqHp) {
       mix(id);
       mix(hp);
+    }
+    for (const [id, dmg] of this.damage) {
+      mix(id);
+      mix(dmg);
     }
     return h >>> 0;
   }
@@ -674,15 +719,20 @@ export class HordeExecution implements Execution {
   private fireTurrets(): void {
     const w = this.width;
     const n = w * this.height;
-    const r2 = this.opts.turretRange * this.opts.turretRange;
-    const offsets = this.turretOffsets;
+    const offsets = this.turretReach;
+    const d2 = this.turretReachD2;
     for (const t of this.hordeTurrets) {
       if (!t.isActive()) continue;
       const c = this.cellOf(t.tile());
       const cx = c % w;
       const cy = (c - cx) / w;
-      let budget = this.opts.turretKillsPerTick;
+      const range = this.turretRangeAt(t.tile());
+      const r2 = range * range;
+      // Each level above 1 adds turretLevelPercent of the base firepower.
+      const power = 100 + (t.level() - 1) * this.opts.turretLevelPercent;
+      let budget = Math.floor((this.opts.turretKillsPerTick * power) / 100);
       for (let k = 0; k < offsets.length && budget > 0; k += 2) {
+        if (d2[k >> 1] > r2) break;
         const x = cx + offsets[k];
         const cell = c + offsets[k + 1];
         if (x < 0 || x >= w || cell < 0 || cell >= n) continue;
@@ -698,7 +748,9 @@ export class HordeExecution implements Execution {
         const dx = ex - cx;
         const dy = ey - cy;
         if (dx * dx + dy * dy <= r2 && this.elites.hp[e] > 0) {
-          this.elites.hp[e] -= this.opts.turretEliteDamage;
+          this.elites.hp[e] -= Math.floor(
+            (this.opts.turretEliteDamage * power) / 100,
+          );
           break;
         }
       }
@@ -714,20 +766,63 @@ export class HordeExecution implements Execution {
         if (owner !== undefined) this.damageHq(owner, pressure);
         return;
       }
-      const key = u.tile();
-      const maxHp =
-        u.type() === UnitType.Wall ? this.opts.wallHp : this.opts.structureHp;
-      const hp =
-        (this.structureHp.get(key) ?? maxHp) -
-        (pressure >> this.opts.pressureShift);
-      if (hp > 0) {
-        this.structureHp.set(key, hp);
+      const id = u.id();
+      const damage =
+        (this.damage.get(id) ?? 0) + (pressure >> this.opts.pressureShift);
+      this.lastHit.set(id, this.ticks);
+      if (damage < this.maxHp(u)) {
+        this.damage.set(id, damage);
         return;
       }
-      this.structureHp.delete(key);
+      this.damage.delete(id);
+      this.lastHit.delete(id);
       u.delete(false);
       this.structuresDestroyed++;
     });
+  }
+
+  /** Full health of a structure: walls by tier, everything else the same. */
+  private maxHp(u: Unit): number {
+    if (u.type() !== UnitType.Wall) return this.opts.structureHp;
+    const o = this.opts;
+    const tier = Math.min(3, Math.max(1, u.level()));
+    return [o.wallHp, o.stoneWallHp, o.reinforcedWallHp][tier - 1];
+  }
+
+  private turretRangeAt(tile: TileRef): number {
+    return turretRange(this.opts, this.mg!.map().magnitude(tile));
+  }
+
+  /**
+   * Structures that haven't been attacked for `repairDelay` ticks get
+   * health back, paid for in gold by their owner; repair stops when the
+   * owner can't pay. Units that are gone are forgotten.
+   */
+  private repair(): void {
+    const o = this.opts;
+    if (o.repairHp <= 0) return;
+    for (const [id, damage] of this.damage) {
+      const u = this.mg!.unit(id);
+      if (u === undefined || !u.isActive()) {
+        this.damage.delete(id);
+        this.lastHit.delete(id);
+        continue;
+      }
+      if (this.ticks - (this.lastHit.get(id) ?? 0) < o.repairDelay) continue;
+      let heal = Math.min(damage, o.repairHp);
+      if (o.repairGoldPerHp > 0) {
+        const affordable = u.owner().gold() / BigInt(o.repairGoldPerHp);
+        if (affordable < BigInt(heal)) heal = Number(affordable);
+        if (heal <= 0) continue;
+        u.owner().removeGold(BigInt(heal * o.repairGoldPerHp));
+      }
+      if (heal >= damage) {
+        this.damage.delete(id);
+        this.lastHit.delete(id);
+      } else {
+        this.damage.set(id, damage - heal);
+      }
+    }
   }
 
   private damageHq(owner: Player, pressure: number): void {
@@ -780,8 +875,10 @@ export class HordeExecution implements Execution {
       eliteCells: e ? Array.from(e.cell.subarray(0, e.count)) : [],
       eliteHp: e ? Array.from(e.hp.subarray(0, e.count)) : [],
       eliteCooldown: e ? Array.from(e.cooldown.subarray(0, e.count)) : [],
-      hpTiles: [...this.structureHp.keys()],
-      hpValues: [...this.structureHp.values()],
+      damageIds: [...this.damage.keys()],
+      damageValues: [...this.damage.values()],
+      lastHitIds: [...this.lastHit.keys()],
+      lastHitTicks: [...this.lastHit.values()],
       hqIds: [...this.hqHp.keys()],
       hqValues: [...this.hqHp.values()],
       hqsFallen: this.hqsFallen,
@@ -832,12 +929,25 @@ export class HordeExecution implements Execution {
       this.elites.spawn(s.eliteCells[k], s.eliteHp[k]);
       this.elites.cooldown[k] = s.eliteCooldown[k];
     }
-    this.structureHp = new Map(
-      s.hpTiles.map((t, i) => [t as TileRef, s.hpValues[i]]),
+    this.damage = new Map(s.damageIds.map((id, i) => [id, s.damageValues[i]]));
+    this.lastHit = new Map(
+      s.lastHitIds.map((id, i) => [id, s.lastHitTicks[i]]),
     );
     this.hqHp = new Map(s.hqIds.map((id, i) => [id, s.hqValues[i]]));
     if (s.flowCells !== null) this.computeFlow(s.flowCells, s.flowWalls);
   }
+}
+
+/**
+ * Turret range in coarse cells for a turret on terrain of height
+ * `magnitude`: longer on high ground, up to 3 bonuses on the highest peaks.
+ */
+export function turretRange(
+  opts: Pick<HordeOptions, "turretRange" | "turretHighGroundBonus">,
+  magnitude: number,
+): number {
+  const mag = Math.min(30, Math.max(0, magnitude));
+  return opts.turretRange + Math.floor((mag * opts.turretHighGroundBonus) / 10);
 }
 
 function newProfile() {
@@ -878,9 +988,13 @@ function coastalCells(
 
 /**
  * (dx, cell offset) pairs for every cell within `r`, nearest first and then
- * in row-major order, so turrets always pick targets the same way.
+ * in row-major order, so turrets always pick targets the same way, with
+ * each cell's distance squared.
  */
-function discOffsets(r: number, w: number): Int32Array {
+function discOffsets(
+  r: number,
+  w: number,
+): { offsets: Int32Array; d2: Int32Array } {
   const pts: [number, number, number][] = [];
   for (let dy = -r; dy <= r; dy++) {
     for (let dx = -r; dx <= r; dx++) {
@@ -889,12 +1003,14 @@ function discOffsets(r: number, w: number): Int32Array {
     }
   }
   pts.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
-  const out = new Int32Array(pts.length * 2);
-  pts.forEach(([, dy, dx], k) => {
-    out[2 * k] = dx;
-    out[2 * k + 1] = dy * w + dx;
+  const offsets = new Int32Array(pts.length * 2);
+  const d2 = new Int32Array(pts.length);
+  pts.forEach(([dist2, dy, dx], k) => {
+    offsets[2 * k] = dx;
+    offsets[2 * k + 1] = dy * w + dx;
+    d2[k] = dist2;
   });
-  return out;
+  return { offsets, d2 };
 }
 
 const HordeOptionsSchema = z.object({
@@ -916,11 +1032,19 @@ const HordeOptionsSchema = z.object({
   blockedMagnitude: zInt(),
   cellCap: zInt(),
   turretRange: zInt(),
+  turretLevelPercent: zInt(),
+  turretHighGroundBonus: zInt(),
   turretKillsPerTick: zInt(),
   turretEliteDamage: zInt(),
   pressureShift: zInt(),
   structureHp: zInt(),
   wallHp: zInt(),
+  stoneWallHp: zInt(),
+  reinforcedWallHp: zInt(),
+  repairDelay: zInt(),
+  repairInterval: zInt(),
+  repairHp: zInt(),
+  repairGoldPerHp: zInt(),
   hqHp: zInt(),
   wavesToWin: zInt(),
   flowDebounce: zInt(),
@@ -959,8 +1083,10 @@ const HordeStateSchema = z.object({
   eliteCells: z.array(zInt()),
   eliteHp: z.array(zInt()),
   eliteCooldown: z.array(zInt()),
-  hpTiles: z.array(zInt()),
-  hpValues: z.array(zInt()),
+  damageIds: z.array(zInt()),
+  damageValues: z.array(zInt()),
+  lastHitIds: z.array(zInt()),
+  lastHitTicks: z.array(zInt()),
   hqIds: z.array(zInt()),
   hqValues: z.array(zInt()),
   hqsFallen: zInt(),
@@ -980,7 +1106,7 @@ const OUTCOMES: readonly HordeOutcome[] = ["playing", "won", "lost"];
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 5,
+  version: 6,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -1049,6 +1175,29 @@ export const HordeExecutionSnapshot = execSnapshotType({
         refugeesPerWave: 0,
       },
       wavesSurvived: Math.max(0, d.wave - 1),
+    }),
+    // 5 -> 6: wall tiers, turret levels and repair. Health is now kept as
+    // damage by unit id; the old health-by-tile map can't be converted
+    // without the units, so damaged structures come back at full health.
+    // Every wall tier keeps the old wall health, turret levels add nothing,
+    // turrets get no high-ground bonus and nothing repairs, as before.
+    5: (d) => ({
+      ...d,
+      options: {
+        ...d.options,
+        stoneWallHp: d.options.wallHp,
+        reinforcedWallHp: d.options.wallHp,
+        turretLevelPercent: 0,
+        turretHighGroundBonus: 0,
+        repairDelay: 0,
+        repairInterval: 1,
+        repairHp: 0,
+        repairGoldPerHp: 0,
+      },
+      damageIds: [],
+      damageValues: [],
+      lastHitIds: [],
+      lastHitTicks: [],
     }),
   },
   cls: () => HordeExecution,
