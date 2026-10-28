@@ -42,6 +42,11 @@ export interface DirectorOptions {
   wavesPerDirection: number;
   /** Spawn cells closer than this to the HQ (in coarse cells) are skipped. */
   minSpawnDistance: number;
+  /**
+   * Spawn cells further than this from the HQ are only used when there are
+   * none in between, so a wave arrives before the next one; 0 means no limit.
+   */
+  maxSpawnDistance: number;
   emittersPerWave: number;
   /** Waves to survive to win; 0 means endless (no final wave). */
   wavesToWin: number;
@@ -72,8 +77,9 @@ export class WaveDirector {
 
   /**
    * Sorts the spawn cells into sectors around `centre`, keeping only cells
-   * the horde can walk from (by the current flow field) and, when any are
-   * left, those at least `minSpawnDistance` away.
+   * the horde can walk from (by the current flow field). Cells between
+   * `minSpawnDistance` and `maxSpawnDistance` are used when there are any;
+   * failing that, any beyond `minSpawnDistance`; failing that, all of them.
    */
   survey(spawnCells: Int32Array, centre: number, dist: Uint32Array): void {
     const w = this.width;
@@ -81,12 +87,17 @@ export class WaveDirector {
     const cy = (centre - cx) / w;
     const near: number[][] = [];
     const far: number[][] = [];
+    const band: number[][] = [];
     for (let s = 0; s < NUM_SECTORS; s++) {
       near.push([]);
       far.push([]);
+      band.push([]);
     }
     const min2 = this.opts.minSpawnDistance * this.opts.minSpawnDistance;
+    const max = this.opts.maxSpawnDistance;
+    const max2 = max > 0 ? max * max : Number.MAX_SAFE_INTEGER;
     let anyFar = false;
+    let anyBand = false;
     for (let k = 0; k < spawnCells.length; k++) {
       const cell = spawnCells[k];
       if (dist[cell] === UNREACHABLE) continue;
@@ -94,16 +105,23 @@ export class WaveDirector {
       const dx = x - cx;
       const dy = (cell - x) / w - cy;
       const s = sectorOf(dx, dy);
-      if (dx * dx + dy * dy >= min2) {
-        far[s].push(cell);
-        anyFar = true;
-      } else {
+      const d2 = dx * dx + dy * dy;
+      if (d2 < min2) {
         near[s].push(cell);
+        continue;
+      }
+      far[s].push(cell);
+      anyFar = true;
+      if (d2 <= max2) {
+        band[s].push(cell);
+        anyBand = true;
       }
     }
-    this.bySector = anyFar
-      ? far
-      : near.map((cells, s) => [...cells, ...far[s]]);
+    this.bySector = anyBand
+      ? band
+      : anyFar
+        ? far
+        : near.map((cells, s) => [...cells, ...far[s]]);
   }
 
   /** Bit mask of the sectors that have spawn cells. */

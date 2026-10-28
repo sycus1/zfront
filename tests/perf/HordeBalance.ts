@@ -10,10 +10,11 @@
  *
  * Strategies:
  *   none     builds nothing: the HQ should fall within the first few waves.
- *   turrets  builds turrets (Defense Posts) in a ring round the HQ, then
- *            upgrades them to level 2 and 3.
+ *   turrets  builds turrets (Defense Posts) in a ring round the HQ and
+ *            upgrades them, then does the same with an outer ring.
  *   fort     builds one turret, seals the HQ in a ring of barricades, adds
- *            more turrets inside, then upgrades walls and turrets in turn.
+ *            more turrets inside, then upgrades walls and turrets in turn
+ *            and adds an outer ring of turrets.
  *
  * Usage:
  *   npm run balance:horde -- [--strategy none,turrets,fort]
@@ -135,6 +136,8 @@ function ring(radius: number, step: number): [number, number][] {
 }
 
 const TURRET_RING = ring(6, 6);
+/** An outer ring for once the inner one is full. */
+const OUTER_RING = ring(14, 7);
 const WALL_RING = ring(10, 2);
 /** Ticks before an order that came to nothing is tried again. */
 const RETRY = 50;
@@ -164,7 +167,10 @@ function spend(
       ? [
           [T, TURRET_RING, 1],
           [T, TURRET_RING, 2],
+          [T, OUTER_RING, 1],
           [T, TURRET_RING, 3],
+          [T, OUTER_RING, 2],
+          [T, OUTER_RING, 3],
         ]
       : [
           [T, TURRET_RING.slice(0, 1), 1],
@@ -172,8 +178,11 @@ function spend(
           [T, TURRET_RING, 1],
           [W, WALL_RING, 2],
           [T, TURRET_RING, 2],
+          [T, OUTER_RING, 1],
           [W, WALL_RING, 3],
           [T, TURRET_RING, 3],
+          [T, OUTER_RING, 2],
+          [T, OUTER_RING, 3],
         ];
   for (const [type, offsets, level] of plan) {
     for (const [dx, dy] of offsets) {
@@ -222,6 +231,10 @@ interface WaveRow {
   walls: string;
   /** Tiles the player holds at the end of the wave. */
   tiles: number;
+  /** Gold in the bank at the end of the wave. */
+  gold: number;
+  /** Zombies left alive at the end of the wave. */
+  alive: number;
 }
 
 interface Result {
@@ -309,6 +322,8 @@ async function play(
         turrets: "",
         walls: "",
         tiles: 0,
+        gold: 0,
+        alive: 0,
       };
     }
     row.hqEnd = s.hqHp;
@@ -317,6 +332,8 @@ async function play(
     row.turrets = levels(me, UnitType.DefensePost);
     row.walls = levels(me, UnitType.Wall);
     row.tiles = me.numTilesOwned();
+    row.gold = Number(me.gold());
+    row.alive = s.alive + s.elites;
     lastKilled = s.killed;
     lastLost = s.structuresDestroyed;
     if (s.outcome !== "playing") break;
@@ -366,6 +383,8 @@ async function main(): Promise<void> {
             "turrets",
             "walls",
             "tiles",
+            "gold",
+            "alive",
           ],
           r.rows.map((w) => [
             String(w.wave),
@@ -377,6 +396,8 @@ async function main(): Promise<void> {
             w.turrets,
             w.walls,
             String(w.tiles),
+            String(w.gold),
+            String(w.alive),
           ]),
         ),
       );

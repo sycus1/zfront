@@ -649,6 +649,9 @@ export class EngineConfig extends Config {
   }
 
   goldAdditionRate(player: PlayerLike): Gold {
+    // zfront: in horde mode humans earn from the horde economy instead
+    // (packages/engine/src/horde/Economy.ts).
+    if (this.horde() && player.type() === PlayerType.Human) return 0n;
     const multiplier = this.goldMultiplierFor(player);
     let baseRate: bigint;
     if (player.type() === PlayerType.Bot) {

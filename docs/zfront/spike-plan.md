@@ -266,6 +266,23 @@ _Started 2026-10-28._ Wall tiers, repair and a real turret. Mines and bait come 
 
 These are with population growth (#9) merged in: with `--zone 0` the settlers fill the 1,500-tile base zone before wave 1, so the results match the default `--zone 20` exactly. The `turrets` strategy now upgrades its turrets to level 3, and `fort` upgrades walls and turrets in turn. The Lincolnshire fort loses because its turrets keep falling and being rebuilt, so the walls are never upgraded.
 
+## MVP: economy
+
+_Started 2026-10-28._ Gold now comes from fighting the horde rather than a flat rate.
+
+- **Income.** In horde mode humans no longer get OpenFront's flat gold per tick. Instead each human still standing gets `hqIncome` (100) gold a tick from their HQ, the owner of a turret gets `killBounty` (4) for each shambler it kills and `eliteBounty` (100) for each elite it finishes, and every survivor gets `clearBonusPerWave` × N (5,000 × N) for clearing wave N, with a "Wave N cleared" message.
+- **Clearing a wave.** A wave is cleared once all of it has spawned and at most `clearedPercent` (2%) of it is still alive, so a few stragglers on a far shore don't hold it open. The same moment counts the wave as survived for population growth, so refugees can arrive before the next wave instead of only when it starts.
+- **Spawn band.** Waves used to come ashore at the furthest coast in their direction, sometimes 90 coarse cells away, and were still walking when the next wave started, so no wave was ever cleared. They now land 30 to 60 cells (`minSpawnDistance`, `maxSpawnDistance`) from the HQ where there is coast in that band, and fall back to the old choice where there isn't.
+- **Rebalance.** Closer landings make every wave hit harder, so waves are now 75 seconds apart (`waveInterval` 600 → 750) and grow by 35% (`waveGrowthPercent` 40 → 35, wave 10 is about 37,000).
+
+| Strategy  | Yorkshire      | Lincolnshire   | Hampshire      | Powys          | Cumbria        |
+| --------- | -------------- | -------------- | -------------- | -------------- | -------------- |
+| `none`    | lost, wave 2   | lost, wave 3   | lost, wave 3   | lost, wave 3   | lost, wave 3   |
+| `turrets` | won, HQ 48,727 | won, HQ 49,492 | won, HQ 49,797 | won, HQ 49,710 | won, HQ 50,000 |
+| `fort`    | won, HQ 46,736 | won, HQ 8,708  | won, HQ 48,820 | won, HQ 49,778 | won, HQ 50,000 |
+
+Every wave up to 10 is now cleared, so the clear bonus pays each time. With `hqIncome` 80 and `killBounty` 4 the fort lost three of five, and with 100 and 3 it barely held Lincolnshire, so the economy is the main lever: lower `hqIncome` or `killBounty` to make the late waves bite again. The undefended HQ now falls earlier (wave 2 or 3, was 4 or 5) because the waves land closer.
+
 ## Prerequisites
 
 - npm 12.1 or later. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`. The machine currently has npm 11.19.

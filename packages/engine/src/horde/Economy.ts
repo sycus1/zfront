@@ -1,0 +1,72 @@
+import { MessageType, PlayerType } from "@openfront/engine-api/game/GameTypes";
+import { Game, Player } from "../game/Game";
+
+/**
+ * The horde mode's cash economy (zfront). OpenFront's flat gold per tick is
+ * off for humans in horde mode (EngineConfig.goldAdditionRate); instead
+ * each human earns:
+ *
+ * - an HQ trickle every tick while their HQ stands,
+ * - a bounty for every zombie their turrets kill, more for an elite,
+ * - a bonus for clearing a wave (all of it spawned and nearly all of it
+ *   dead before the next one starts), which grows with the wave number.
+ *
+ * Integers only; gold is a bigint on the player.
+ */
+
+export interface EconomyOptions {
+  /** Gold per tick to each human whose HQ stands. */
+  hqIncome: number;
+  /** Gold per shambler killed, to the turret's owner. */
+  killBounty: number;
+  /** Gold per elite killed, to the owner of the turret that finished it. */
+  eliteBounty: number;
+  /** Gold for clearing wave N is N times this, to every surviving human. */
+  clearBonusPerWave: number;
+  /**
+   * A wave counts as cleared once it has all spawned and at most this
+   * percent of its size is still alive (HordeExecution.checkCleared).
+   */
+  clearedPercent: number;
+}
+
+/** Pays the HQ trickle to every human still standing. */
+export function payHqIncome(game: Game, opts: EconomyOptions): void {
+  if (opts.hqIncome <= 0) return;
+  const income = BigInt(opts.hqIncome);
+  for (const p of game.players()) {
+    if (p.type() === PlayerType.Human && p.isAlive()) p.addGold(income);
+  }
+}
+
+/** Pays `owner` for `shamblers` shamblers and `elites` elites killed. */
+export function payBounty(
+  owner: Player,
+  opts: EconomyOptions,
+  shamblers: number,
+  elites: number,
+): void {
+  const gold = shamblers * opts.killBounty + elites * opts.eliteBounty;
+  if (gold > 0) owner.addGold(BigInt(gold));
+}
+
+/** Pays the bonus for clearing wave `wave` and tells each player. */
+export function payClearBonus(
+  game: Game,
+  opts: EconomyOptions,
+  wave: number,
+): void {
+  const gold = wave * opts.clearBonusPerWave;
+  if (gold <= 0) return;
+  for (const p of game.players()) {
+    if (p.type() !== PlayerType.Human || !p.isAlive()) continue;
+    p.addGold(BigInt(gold));
+    game.displayMessage(
+      "events_display.wave_cleared",
+      MessageType.DONATION_RECEIVED,
+      p.id(),
+      BigInt(gold),
+      { wave, gold },
+    );
+  }
+}

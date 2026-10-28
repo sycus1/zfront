@@ -15,6 +15,12 @@ import { z } from "zod";
 import { Execution, Game, Player, Unit } from "../game/Game";
 import { execSnapshotType } from "../snapshot/ExecutionSnapshot";
 import type { ExecRecord, SnapshotReader } from "../snapshot/SnapshotContext";
+import {
+  payBounty,
+  payClearBonus,
+  payHqIncome,
+  EconomyOptions,
+} from "./Economy";
 import { Elites } from "./Elites";
 import { FlowField, WALL_COST } from "./FlowField";
 import { buildCostField, HordeField } from "./HordeField";
@@ -39,7 +45,7 @@ import { WaveDirector, WavePlan } from "./WaveDirector";
  * never feed back into the simulation.
  */
 
-export interface HordeOptions extends SettleOptions {
+export interface HordeOptions extends SettleOptions, EconomyOptions {
   /** Ticks from the end of the spawn phase to the first wave. */
   firstWaveDelay: number;
   waveInterval: number;
@@ -57,6 +63,8 @@ export interface HordeOptions extends SettleOptions {
   wavesPerDirection: number;
   /** Waves don't come ashore closer than this to the HQ (coarse cells). */
   minSpawnDistance: number;
+  /** Nor further than this, where there is coast in between; 0 = no limit. */
+  maxSpawnDistance: number;
   maxElites: number;
   eliteHp: number;
   /**
@@ -107,23 +115,25 @@ export interface HordeOptions extends SettleOptions {
   flowMaxDelay: number;
 }
 
-// MVP defaults, tuned with `npm run balance:horde` (see "MVP: balance" and
-// "MVP: defences" in docs/zfront/spike-plan.md): a minute to build before
-// the first wave of 2,500, a wave a minute growing by 40% to about 52k on
-// wave 10, and shamblers that walk a coarse cell every 3 ticks. An
-// undefended HQ falls on wave 4 or 5; a ring of upgraded turrets wins with
-// the HQ damaged.
+// MVP defaults, tuned with `npm run balance:horde` (see "MVP: balance",
+// "MVP: defences" and "MVP: economy" in docs/zfront/spike-plan.md): a minute
+// to build before the first wave of 2,500, a wave every 75 seconds growing
+// by 35% to about 37k on wave 10, coming ashore 30 to 60 coarse cells out,
+// and shamblers that walk a coarse cell every 3 ticks. Gold comes from the
+// HQ, turret kills and cleared waves. An undefended HQ falls on wave 2 or 3;
+// a ring of upgraded turrets wins.
 export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   firstWaveDelay: 600,
-  waveInterval: 600,
+  waveInterval: 750,
   firstWaveSize: 2_500,
-  waveGrowthPercent: 40,
+  waveGrowthPercent: 35,
   emittersPerWave: 8,
   emitRate: 200,
   elitesPerWave: 2,
   elitePoints: 20,
   wavesPerDirection: 3,
-  minSpawnDistance: 40,
+  minSpawnDistance: 30,
+  maxSpawnDistance: 60,
   maxElites: 500,
   eliteHp: 300,
   shamblerSpeed: 3,
@@ -135,6 +145,11 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   turretLevelPercent: 50,
   turretHighGroundBonus: 2,
   turretKillsPerTick: 8,
+  hqIncome: 100,
+  killBounty: 4,
+  eliteBounty: 100,
+  clearBonusPerWave: 5_000,
+  clearedPercent: 2,
   turretEliteDamage: 20,
   pressureShift: 5,
   structureHp: 3_000,
@@ -320,6 +335,7 @@ export class HordeExecution implements Execution {
       this.nextWaveTick = ticks + this.opts.waveInterval;
       this.planNextWave();
     }
+    payHqIncome(this.mg!, this.opts);
     this.emit();
     if (ticks % this.opts.shamblerSpeed === 0) {
       this.field.step(this.hordeFlow.dist);
@@ -646,13 +662,19 @@ export class HordeExecution implements Execution {
     }
   }
 
-  /** The wave under way is cleared once it has all spawned and all died. */
+  /**
+   * The wave under way is cleared once it has all spawned and no more than
+   * `clearedPercent` of its size is still alive, so a few stragglers stuck
+   * on a far shore don't hold it open.
+   */
   private checkCleared(): void {
-    if (
-      this.emitterCells.length === 0 &&
-      this.field.total() === 0 &&
-      this.elites.count === 0
-    ) {
+    const plan = this.currentPlan;
+    if (plan === null || this.emitterCells.length > 0) return;
+    const left = this.field.total() + this.elites.count;
+    if (left * 100 <= plan.budget * this.opts.clearedPercent) {
+      if (this.wave > this.wavesSurvived) {
+        payClearBonus(this.mg!, this.opts, this.wave);
+      }
       this.survived(this.wave);
     }
   }
@@ -731,6 +753,8 @@ export class HordeExecution implements Execution {
       // Each level above 1 adds turretLevelPercent of the base firepower.
       const power = 100 + (t.level() - 1) * this.opts.turretLevelPercent;
       let budget = Math.floor((this.opts.turretKillsPerTick * power) / 100);
+      let shamblers = 0;
+      let elites = 0;
       for (let k = 0; k < offsets.length && budget > 0; k += 2) {
         if (d2[k >> 1] > r2) break;
         const x = cx + offsets[k];
@@ -739,6 +763,7 @@ export class HordeExecution implements Execution {
         const removed = this.field.remove(cell, budget);
         budget -= removed;
         this.killed += removed;
+        shamblers += removed;
       }
       // One elite per turret per tick: the first in range.
       for (let e = 0; e < this.elites.count; e++) {
@@ -751,9 +776,11 @@ export class HordeExecution implements Execution {
           this.elites.hp[e] -= Math.floor(
             (this.opts.turretEliteDamage * power) / 100,
           );
+          if (this.elites.hp[e] <= 0) elites++;
           break;
         }
       }
+      payBounty(t.owner(), this.opts, shamblers, elites);
     }
     this.killed += this.elites.removeDead();
   }
@@ -1024,6 +1051,7 @@ const HordeOptionsSchema = z.object({
   elitePoints: zInt(),
   wavesPerDirection: zInt(),
   minSpawnDistance: zInt(),
+  maxSpawnDistance: zInt(),
   maxElites: zInt(),
   eliteHp: zInt(),
   shamblerSpeed: zInt(),
@@ -1035,6 +1063,11 @@ const HordeOptionsSchema = z.object({
   turretLevelPercent: zInt(),
   turretHighGroundBonus: zInt(),
   turretKillsPerTick: zInt(),
+  hqIncome: zInt(),
+  killBounty: zInt(),
+  eliteBounty: zInt(),
+  clearBonusPerWave: zInt(),
+  clearedPercent: zInt(),
   turretEliteDamage: zInt(),
   pressureShift: zInt(),
   structureHp: zInt(),
@@ -1106,7 +1139,7 @@ const OUTCOMES: readonly HordeOutcome[] = ["playing", "won", "lost"];
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 6,
+  version: 7,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -1198,6 +1231,22 @@ export const HordeExecutionSnapshot = execSnapshotType({
       damageValues: [],
       lastHitIds: [],
       lastHitTicks: [],
+    }),
+    // 6 -> 7: the cash economy and the spawn band. An old game kept
+    // OpenFront's 100 gold a tick from the player config, so the HQ
+    // trickle takes that over; there were no bounties or clear bonus, and
+    // waves could come ashore at any distance.
+    6: (d) => ({
+      ...d,
+      options: {
+        ...d.options,
+        hqIncome: 100,
+        killBounty: 0,
+        eliteBounty: 0,
+        clearBonusPerWave: 0,
+        clearedPercent: 0,
+        maxSpawnDistance: 0,
+      },
     }),
   },
   cls: () => HordeExecution,
