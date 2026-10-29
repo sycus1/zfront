@@ -25,7 +25,10 @@
  *   npm run balance:horde -- [--strategy none,turrets,fort]
  *                            [--spawn yorkshire,lincolnshire,...]
  *                            [--seed balance] [--set waveInterval=600,...]
- *                            [--zone 20] [--call-early]
+ *                            [--zone 20] [--call-early] [--map Bath]
+ *
+ * --map plays another map; its HQ goes on the open land nearest the
+ * middle (spawn "centre"), since the named spawns are Britannia places.
  *
  * --zone gives the player land within that many tiles of the HQ at the
  * start, standing in for expanding by hand. --zone 0 gives none, so the
@@ -69,6 +72,8 @@ const PROJECT_ROOT = path.resolve(
 
 /** HQ positions in tiles: a spread of inland and coastal starts. */
 const SPAWNS: Record<string, [number, number]> = {
+  // Any map: the open land tile nearest the middle.
+  centre: [-1, -1],
   yorkshire: [1118, 1202],
   lincolnshire: [1271, 1403],
   hampshire: [1148, 1820],
@@ -80,6 +85,7 @@ const STRATEGIES = ["none", "turrets", "fort", "spans", "scavenge"] as const;
 type Strategy = (typeof STRATEGIES)[number];
 
 interface Options {
+  map: GameMapType;
   /** Horde options to try instead of the defaults. */
   horde: Partial<HordeOptions>;
   strategies: Strategy[];
@@ -92,9 +98,10 @@ interface Options {
 
 function parseArgs(argv: string[]): Options {
   const opts: Options = {
+    map: GameMapType.Britannia,
     horde: {},
     strategies: [...STRATEGIES],
-    spawns: Object.keys(SPAWNS),
+    spawns: Object.keys(SPAWNS).filter((s) => s !== "centre"),
     seed: "balance",
     zone: 20,
     callEarly: false,
@@ -102,6 +109,14 @@ function parseArgs(argv: string[]): Options {
   for (let i = 0; i < argv.length; i++) {
     const next = () => argv[++i];
     switch (argv[i]) {
+      case "--map": {
+        const name = next();
+        if (!(name in GameMapType)) throw new Error(`unknown map ${name}`);
+        opts.map = GameMapType[name as keyof typeof GameMapType];
+        // Britannia's named spawns mean nothing on other maps.
+        if (opts.map !== GameMapType.Britannia) opts.spawns = ["centre"];
+        break;
+      }
       case "--strategy":
         opts.strategies = next().split(",") as Strategy[];
         for (const s of opts.strategies) {
@@ -136,6 +151,22 @@ function parseArgs(argv: string[]): Options {
     }
   }
   return opts;
+}
+
+/** The land tile below mountain height nearest the middle of the map. */
+function openTileNearCentre(game: Game): [number, number] {
+  const cx = Math.floor(game.width() / 2);
+  const cy = Math.floor(game.height() / 2);
+  for (let r = 0; r < Math.max(cx, cy); r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const t = game.ref(cx + dx, cy + dy);
+        if (game.isLand(t) && game.magnitude(t) < 10) return [cx + dx, cy + dy];
+      }
+    }
+  }
+  throw new Error("no open land on the map");
 }
 
 /** Ring of tile offsets at `radius`, `step` tiles apart, clockwise from north. */
@@ -279,6 +310,7 @@ interface Result {
 }
 
 async function play(
+  map: GameMapType,
   horde: Partial<HordeOptions>,
   zone: number,
   callEarly: boolean,
@@ -287,7 +319,7 @@ async function play(
   strategy: Strategy,
 ): Promise<Result> {
   const gameConfig: GameConfig = {
-    gameMap: GameMapType.Britannia,
+    gameMap: map,
     gameMapSize: GameMapSize.Normal,
     gameMode: GameMode.FFA,
     gameType: GameType.Singleplayer,
@@ -310,6 +342,7 @@ async function play(
     await loadMapFiles(loader, gameConfig.gameMap, gameConfig.gameMapSize),
   );
   const game = createGame([], [], terrain.gameMap, terrain.miniGameMap, config);
+  if (spawn[0] < 0) spawn = openTileNearCentre(game);
   const info = new PlayerInfo("survivor", PlayerType.Human, null, "survivor");
   game.addExecution(
     new SpawnExecution(seed, info, game.ref(spawn[0], spawn[1])),
@@ -404,6 +437,7 @@ async function main(): Promise<void> {
   for (const strategy of opts.strategies) {
     for (const name of opts.spawns) {
       const r = await play(
+        opts.map,
         opts.horde,
         opts.zone,
         opts.callEarly,

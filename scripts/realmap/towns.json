@@ -1,0 +1,23 @@
+{
+  "sheffield": {
+    "name": "Sheffield",
+    "lat": 53.3797,
+    "lon": -1.4701,
+    "sizeKm": 4,
+    "metresPerTile": 3
+  },
+  "bath": {
+    "name": "Bath",
+    "lat": 51.3811,
+    "lon": -2.359,
+    "sizeKm": 4,
+    "metresPerTile": 3
+  },
+  "whitby": {
+    "name": "Whitby",
+    "lat": 54.4775,
+    "lon": -0.6148,
+    "sizeKm": 4,
+    "metresPerTile": 3
+  }
+}
