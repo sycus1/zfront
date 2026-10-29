@@ -6,7 +6,8 @@
  * a map-sized quad: density as a red overlay (linearly filtered into blobs),
  * elites as pulsing markers, an arrow at each place the announced wave
  * comes ashore, pointing at the HQ, and tracers from each turret that is
- * shooting to what it hit.
+ * shooting to what it hit. It also finds each blob's zombie count
+ * (`hordeBlobs`) for the renderer to write inside the blob.
  *
  * Spike instrumentation: transfer latency, worker encode time and upload
  * time are accumulated on `globalThis.__zfrontHorde` for measurement.
@@ -126,6 +127,89 @@ export function turretTracers(frame: HordeFrame): Float32Array {
   return out;
 }
 
+/** Blobs labelled at most, largest first, so a scattered horde stays legible. */
+export const MAX_BLOB_LABELS = 64;
+
+export interface HordeBlob {
+  /** The blob's density-weighted centre, in tiles. */
+  x: number;
+  y: number;
+  /** Zombies in it, elites included. */
+  count: number;
+}
+
+/**
+ * The horde's blobs: groups of touching (8-neighbour) density and elite
+ * cells, largest first. The frame only carries density in buckets of 8, so
+ * each blob gets its share of `frame.alive` by bucket weight, plus its
+ * elites. Blobs that round to no zombies are left out.
+ */
+export function hordeBlobs(frame: HordeFrame): HordeBlob[] {
+  const { width: w, height: h, cells } = frame;
+  const seen = new Uint8Array(cells.length);
+  const stack: number[] = [];
+  const raw: { sx: number; sy: number; weight: number; elites: number }[] = [];
+  let total = 0;
+  for (let start = 0; start < cells.length; start++) {
+    if (seen[start] || !isHorde(cells[start])) continue;
+    seen[start] = 1;
+    stack.push(start);
+    let sx = 0;
+    let sy = 0;
+    let weight = 0;
+    let elites = 0;
+    while (stack.length > 0) {
+      const c = stack.pop()!;
+      const x = c % w;
+      const y = (c - x) / w;
+      // An elite cell has no density of its own; weigh it as one bucket so
+      // the centre still leans towards it.
+      const v = cells[c] === ELITE_BYTE ? 1 : cells[c];
+      if (cells[c] === ELITE_BYTE) elites++;
+      else weight += v;
+      sx += (x + 0.5) * v;
+      sy += (y + 0.5) * v;
+      for (let dy = -1; dy <= 1; dy++) {
+        const ny = y + dy;
+        if (ny < 0 || ny >= h) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          if (nx < 0 || nx >= w) continue;
+          const n = ny * w + nx;
+          if (seen[n] || !isHorde(cells[n])) continue;
+          seen[n] = 1;
+          stack.push(n);
+        }
+      }
+    }
+    total += weight;
+    raw.push({ sx, sy, weight, elites });
+  }
+  const blobs: HordeBlob[] = [];
+  for (const b of raw) {
+    const shamblers = total > 0 ? (frame.alive * b.weight) / total : 0;
+    const count = Math.round(shamblers) + b.elites;
+    if (count <= 0) continue;
+    const mass = b.weight + b.elites;
+    // Coarse cells are 2x2 tiles; the text shader adds half a tile.
+    blobs.push({
+      x: (b.sx / mass) * 2 - 0.5,
+      y: (b.sy / mass) * 2 - 0.5,
+      count,
+    });
+  }
+  blobs.sort((a, b) => b.count - a.count);
+  return blobs.slice(0, MAX_BLOB_LABELS);
+}
+
+const ELITE_BYTE = 255;
+/** Bytes from here up to the elite byte are buildings and walls. */
+const FIRST_BUILDING_BYTE = 248;
+
+function isHorde(b: number): boolean {
+  return b === ELITE_BYTE || (b > 0 && b < FIRST_BUILDING_BYTE);
+}
+
 export class HordePass {
   private program: WebGLProgram;
   private vao: WebGLVertexArrayObject;
@@ -174,6 +258,11 @@ export class HordePass {
     const g = globalThis as { __zfrontHorde?: HordeRenderStats };
     this.stats = g.__zfrontHorde ??= newStats();
     this.timerExt = gl.getExtension("EXT_disjoint_timer_query_webgl2");
+  }
+
+  /** The debug toggle that skips the horde draw. */
+  get hidden(): boolean {
+    return this.stats.hidden;
   }
 
   update(frame: HordeFrame): void {

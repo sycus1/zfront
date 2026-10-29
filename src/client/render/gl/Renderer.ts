@@ -12,6 +12,7 @@
 import type { HordeFrame } from "@openfront/engine-api/game/GameUpdates";
 import type { MapLayer } from "@openfront/engine-api/game/MapFiles";
 import type { Config } from "@openfront/engine-lib/configuration/Config";
+import { renderNumber } from "@openfront/engine-lib/Format";
 import { translateText } from "../../Utils";
 import type { SpiralRibbon } from "../frame/SpiralTrails";
 import type {
@@ -41,7 +42,7 @@ import { DefenseCoveragePass } from "./passes/DefenseCoveragePass";
 import { FalloutBloomPass } from "./passes/FalloutBloomPass";
 import { FalloutLightPass } from "./passes/FalloutLightPass";
 import { FxPass } from "./passes/fx-pass";
-import { HordePass } from "./passes/HordePass";
+import { hordeBlobs, HordePass } from "./passes/HordePass";
 import { LightmapPass } from "./passes/LightmapPass";
 import { MapLayerPass } from "./passes/MapLayerPass";
 import { MoveIndicatorPass } from "./passes/MoveIndicatorPass";
@@ -713,6 +714,18 @@ export class GPURenderer {
 
   updateHorde(frame: HordeFrame): void {
     this.hordePass.update(frame);
+    this.worldTextPass.setHordeCountLabels(
+      this.hordePass.hidden
+        ? []
+        : hordeBlobs(frame).map((b) => ({
+            x: b.x,
+            y: b.y,
+            text: renderNumber(b.count),
+            colorR: 1,
+            colorG: 1,
+            colorB: 1,
+          })),
+    );
   }
 
   uploadLiveTrailDelta(
