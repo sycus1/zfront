@@ -17,6 +17,7 @@ import { execSnapshotType } from "../snapshot/ExecutionSnapshot";
 import type { ExecRecord, SnapshotReader } from "../snapshot/SnapshotContext";
 import {
   payBounty,
+  payCallEarlyBonus,
   payClearBonus,
   payHqIncome,
   EconomyOptions,
@@ -150,6 +151,7 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   eliteBounty: 100,
   clearBonusPerWave: 5_000,
   clearedPercent: 2,
+  callEarlyGoldPerTick: 100,
   turretEliteDamage: 20,
   pressureShift: 5,
   structureHp: 3_000,
@@ -228,6 +230,8 @@ export class HordeExecution implements Execution {
   private ticks = 0;
   private emitterCells: number[] = [];
   private emitterRemaining: number[] = [];
+  /** Where the announced wave comes ashore, picked when it is announced. */
+  private nextLandings: number[] = [];
 
   private hordeStructureSig = -1;
   private hordeStructureAt = new Map<number, Unit>();
@@ -308,6 +312,8 @@ export class HordeExecution implements Execution {
     this.hqHp = new Map();
     this.emitterCells = [];
     this.emitterRemaining = [];
+    this.nextLandings = [];
+    HORDES.set(mg, this);
   }
 
   isActive(): boolean {
@@ -373,6 +379,36 @@ export class HordeExecution implements Execution {
     return this.nextPlan;
   }
 
+  /** Coarse cells where the announced wave comes ashore. Do not mutate. */
+  upcomingLandings(): readonly number[] {
+    return this.nextLandings;
+  }
+
+  /**
+   * Ticks of break that calling the next wave now would skip, or 0 when it
+   * can't be called: only between waves, once the last one is cleared (or
+   * before the first), and only while one is announced.
+   */
+  callableTicks(): number {
+    if (this.mg === null || this.outcome !== "playing") return 0;
+    if (this.nextPlan === null || this.wavesSurvived < this.wave) return 0;
+    return Math.max(0, this.nextWaveTick - this.ticks);
+  }
+
+  /**
+   * `caller` calls the announced wave now. Every survivor gets the early
+   * call bonus for the break skipped. Returns false when it can't be called
+   * (see callableTicks) or the caller is not a human still standing.
+   */
+  callWave(caller: Player): boolean {
+    const skipped = this.callableTicks();
+    if (skipped <= 0) return false;
+    if (caller.type() !== PlayerType.Human || !caller.isAlive()) return false;
+    payCallEarlyBonus(this.mg!, this.opts, this.nextPlan!.wave, skipped);
+    this.nextWaveTick = this.ticks;
+    return true;
+  }
+
   /** Density per coarse cell, for rendering and tests. Do not mutate. */
   density(): Uint16Array {
     return this.field.density;
@@ -421,6 +457,10 @@ export class HordeExecution implements Execution {
       nextWaveElites: next?.elites ?? 0,
       nextWaveSectors: next?.sectors ?? 0,
       nextWaveFinal: next?.final ?? false,
+      nextWaveLandings: Int32Array.from(this.nextLandings),
+      hqCell: this.firstHqCell(),
+      callWaveGold: this.callableTicks() * this.opts.callEarlyGoldPerTick,
+      canCallWave: this.callableTicks() > 0,
       encodeMs: 0,
       sentAt: 0,
     };
@@ -451,6 +491,8 @@ export class HordeExecution implements Execution {
       mix(plan.budget);
       mix(plan.sectors);
     }
+    for (const c of this.nextLandings) mix(c);
+    mix(this.nextWaveTick);
     mix(this.killed);
     mix(this.structuresDestroyed);
     mix(OUTCOMES.indexOf(this.outcome));
@@ -463,6 +505,12 @@ export class HordeExecution implements Execution {
       mix(dmg);
     }
     return h >>> 0;
+  }
+
+  /** The first human HQ's coarse cell, or -1. */
+  private firstHqCell(): number {
+    for (const cell of this.hordeHqAt.keys()) return cell;
+    return -1;
   }
 
   private firstHqHp(): number {
@@ -616,7 +664,13 @@ export class HordeExecution implements Execution {
   private planNextWave(): void {
     if (this.nextPlan !== null || this.allWavesStarted()) return;
     this.surveySpawns();
-    this.nextPlan = this.director.plan(this.currentPlan, this.random);
+    const plan = this.director.plan(this.currentPlan, this.random);
+    this.nextPlan = plan;
+    this.nextLandings = this.director.emitterCells(
+      plan,
+      this.opts.emittersPerWave,
+      this.random,
+    );
   }
 
   /** Sorts spawn cells by direction around the first HQ (or the map centre). */
@@ -638,11 +692,17 @@ export class HordeExecution implements Execution {
     this.currentPlan = plan;
     this.wave = plan.wave;
     this.surveySpawns();
-    const cells = this.director.emitterCells(
-      plan,
-      this.opts.emittersPerWave,
-      this.random,
-    );
+    // Landings are picked when the wave is announced; a game restored from
+    // before that (version 7) picks them now.
+    const cells =
+      this.nextLandings.length > 0
+        ? this.nextLandings
+        : this.director.emitterCells(
+            plan,
+            this.opts.emittersPerWave,
+            this.random,
+          );
+    this.nextLandings = [];
     if (cells.length === 0) return;
     const n = cells.length;
     const share = Math.floor(plan.shamblers / n);
@@ -899,6 +959,7 @@ export class HordeExecution implements Execution {
         this.mg !== null ? this.field.density.slice() : new Uint16Array(),
       emitterCells: [...this.emitterCells],
       emitterRemaining: [...this.emitterRemaining],
+      nextLandings: [...this.nextLandings],
       eliteCells: e ? Array.from(e.cell.subarray(0, e.count)) : [],
       eliteHp: e ? Array.from(e.hp.subarray(0, e.count)) : [],
       eliteCooldown: e ? Array.from(e.cooldown.subarray(0, e.count)) : [],
@@ -952,6 +1013,7 @@ export class HordeExecution implements Execution {
     this.field.setDensity(s.density);
     this.emitterCells = [...s.emitterCells];
     this.emitterRemaining = [...s.emitterRemaining];
+    this.nextLandings = [...s.nextLandings];
     for (let k = 0; k < s.eliteCells.length; k++) {
       this.elites.spawn(s.eliteCells[k], s.eliteHp[k]);
       this.elites.cooldown[k] = s.eliteCooldown[k];
@@ -1068,6 +1130,7 @@ const HordeOptionsSchema = z.object({
   eliteBounty: zInt(),
   clearBonusPerWave: zInt(),
   clearedPercent: zInt(),
+  callEarlyGoldPerTick: zInt(),
   turretEliteDamage: zInt(),
   pressureShift: zInt(),
   structureHp: zInt(),
@@ -1113,6 +1176,7 @@ const HordeStateSchema = z.object({
   density: zU16Array(),
   emitterCells: z.array(zInt()),
   emitterRemaining: z.array(zInt()),
+  nextLandings: z.array(zInt()),
   eliteCells: z.array(zInt()),
   eliteHp: z.array(zInt()),
   eliteCooldown: z.array(zInt()),
@@ -1137,9 +1201,17 @@ type HordeState = z.infer<typeof HordeStateSchema>;
 
 const OUTCOMES: readonly HordeOutcome[] = ["playing", "won", "lost"];
 
+/** The horde running in each game, for executions that act on it. */
+const HORDES = new WeakMap<Game, HordeExecution>();
+
+/** The game's horde, or null outside horde mode (or before it starts). */
+export function hordeOf(game: Game): HordeExecution | null {
+  return HORDES.get(game) ?? null;
+}
+
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 7,
+  version: 8,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -1247,6 +1319,14 @@ export const HordeExecutionSnapshot = execSnapshotType({
         clearedPercent: 0,
         maxSpawnDistance: 0,
       },
+    }),
+    // 7 -> 8: calling a wave early, and landings picked when a wave is
+    // announced. An old game had no early call; no landings means the
+    // announced wave picks them when it starts, as before.
+    7: (d) => ({
+      ...d,
+      options: { ...d.options, callEarlyGoldPerTick: 0 },
+      nextLandings: [],
     }),
   },
   cls: () => HordeExecution,

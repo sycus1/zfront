@@ -198,8 +198,8 @@ describe.each(VARIANTS)("full game snapshots: %s", (_, overrides) => {
       // alive at a tick boundary. BasicExecutions.test.ts covers it directly.
       // zfront: Horde only runs when the horde mode is on, which this
       // fixture game doesn't enable. tests/horde/HordeExecution.test.ts
-      // round-trips it directly.
-      const neverStored = new Set(["Pause", "Horde"]);
+      // round-trips it directly. CallWave, like Pause, finishes inside init.
+      const neverStored = new Set(["Pause", "Horde", "CallWave"]);
       const missing = EXECUTION_SNAPSHOT_TYPES.map((t) => t.name).filter(
         (name) => !reference.execTypes.has(name) && !neverStored.has(name),
       );

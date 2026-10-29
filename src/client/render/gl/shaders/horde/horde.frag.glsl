@@ -6,6 +6,11 @@ precision highp float;
 uniform sampler2D uHorde;
 uniform ivec2 uGridSize;
 uniform float uTime;
+// The announced wave's landings: xy the landing cell's centre, zw the unit
+// direction to the HQ, in coarse cells.
+uniform vec4 uArrows[MAX_ARROWS];
+uniform int uArrowCount;
+uniform bool uArrowFinal;
 
 in vec2 vUV;
 out vec4 fragColor;
@@ -23,6 +28,24 @@ int byteAt(ivec2 cell) {
 float densityAt(ivec2 cell) {
   int b = byteAt(cell);
   return b >= int(WALL) ? 0.0 : float(b) / 255.0;
+}
+
+// 1 inside an arrow (shaft then head, 12 cells long, pointing along the
+// direction), 0.5 on its dark rim, 0 outside.
+float arrowAt(vec2 p) {
+  float hit = 0.0;
+  for (int k = 0; k < MAX_ARROWS; k++) {
+    if (k >= uArrowCount) break;
+    vec2 d = uArrows[k].zw;
+    vec2 r = p - uArrows[k].xy;
+    float a = dot(r, d);
+    float c = abs(r.x * d.y - r.y * d.x);
+    // The head's half-width shrinks from 3.5 to 0 over its last 5 cells.
+    float half_ = a < 7.0 ? 1.2 : (12.0 - a) * 0.7;
+    if (a < 0.0 || a > 12.0 || c > half_ + 0.6) continue;
+    hit = max(hit, c > half_ ? 0.5 : 1.0);
+  }
+  return hit;
 }
 
 void main() {
@@ -45,6 +68,14 @@ void main() {
     vec2 f = fract(p);
     float edge = min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y));
     fragColor = vec4(tint * (edge < 0.12 ? 0.68 : 1.0), 1.0);
+    return;
+  }
+
+  float arrow = arrowAt(p);
+  if (arrow > 0.0) {
+    float pulse = 0.7 + 0.3 * sin(uTime * 4.0);
+    vec3 tint = uArrowFinal ? vec3(1.0, 0.2, 0.15) : vec3(1.0, 0.75, 0.15);
+    fragColor = vec4(arrow < 1.0 ? tint * 0.35 : tint, 0.9 * pulse);
     return;
   }
 

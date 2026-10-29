@@ -9,7 +9,8 @@ import { Game, Player } from "../game/Game";
  * - an HQ trickle every tick while their HQ stands,
  * - a bounty for every zombie their turrets kill, more for an elite,
  * - a bonus for clearing a wave (all of it spawned and nearly all of it
- *   dead before the next one starts), which grows with the wave number.
+ *   dead before the next one starts), which grows with the wave number,
+ * - a bonus for calling the next wave early, for each tick skipped.
  *
  * Integers only; gold is a bigint on the player.
  */
@@ -28,6 +29,8 @@ export interface EconomyOptions {
    * percent of its size is still alive (HordeExecution.checkCleared).
    */
   clearedPercent: number;
+  /** Gold for each tick of the break skipped by calling a wave early. */
+  callEarlyGoldPerTick: number;
 }
 
 /** Pays the HQ trickle to every human still standing. */
@@ -56,13 +59,42 @@ export function payClearBonus(
   opts: EconomyOptions,
   wave: number,
 ): void {
-  const gold = wave * opts.clearBonusPerWave;
+  payEveryone(
+    game,
+    wave * opts.clearBonusPerWave,
+    "events_display.wave_cleared",
+    wave,
+  );
+}
+
+/** Pays the bonus for calling wave `wave` with `ticksSkipped` of the break left. */
+export function payCallEarlyBonus(
+  game: Game,
+  opts: EconomyOptions,
+  wave: number,
+  ticksSkipped: number,
+): void {
+  payEveryone(
+    game,
+    ticksSkipped * opts.callEarlyGoldPerTick,
+    "events_display.wave_called",
+    wave,
+  );
+}
+
+/** Gold to every human still standing, with a message naming the wave. */
+function payEveryone(
+  game: Game,
+  gold: number,
+  message: string,
+  wave: number,
+): void {
   if (gold <= 0) return;
   for (const p of game.players()) {
     if (p.type() !== PlayerType.Human || !p.isAlive()) continue;
     p.addGold(BigInt(gold));
     game.displayMessage(
-      "events_display.wave_cleared",
+      message,
       MessageType.DONATION_RECEIVED,
       p.id(),
       BigInt(gold),

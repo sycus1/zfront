@@ -59,6 +59,13 @@ export interface HordeFrame {
   nextWaveSectors: number;
   /** The last wave, which comes from every side. */
   nextWaveFinal: boolean;
+  /** Coarse cells where the announced wave comes ashore. */
+  nextWaveLandings: Int32Array;
+  /** The first human HQ's coarse cell, or -1, for pointing at it. */
+  hqCell: number;
+  /** Whether the announced wave can be called now, and the bonus for it. */
+  canCallWave: boolean;
+  callWaveGold: number;
   /** Spike instrumentation: worker encode time and send time (epoch ms). */
   encodeMs: number;
   sentAt: number;

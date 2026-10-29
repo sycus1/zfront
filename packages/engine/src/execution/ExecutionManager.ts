@@ -7,6 +7,7 @@ import {
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import { simpleHash } from "@openfront/engine-lib/Util";
 import { Execution, Game } from "../game/Game";
+import { CallWaveExecution } from "../horde/CallWaveExecution";
 import { settlesOnItsOwn } from "../horde/Settlement";
 import { AttackExecution } from "./AttackExecution";
 import { BoatRetreatExecution } from "./BoatRetreatExecution";
@@ -132,6 +133,8 @@ export class Executor {
         return new MarkDisconnectedExecution(player, intent.isDisconnected);
       case "toggle_pause":
         return new PauseExecution(player, intent.paused);
+      case "call_wave":
+        return new CallWaveExecution(player);
       default:
         throw new Error(`intent type ${intent} not found`);
     }

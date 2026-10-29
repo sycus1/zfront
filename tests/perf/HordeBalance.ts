@@ -20,11 +20,14 @@
  *   npm run balance:horde -- [--strategy none,turrets,fort]
  *                            [--spawn yorkshire,lincolnshire,...]
  *                            [--seed balance] [--set waveInterval=600,...]
- *                            [--zone 20]
+ *                            [--zone 20] [--call-early]
  *
  * --zone gives the player land within that many tiles of the HQ at the
  * start, standing in for expanding by hand. --zone 0 gives none, so the
  * zone grows only by the engine's own rules (settlers, in horde mode).
+ *
+ * --call-early calls each wave from 2 on as soon as the one before it is
+ * cleared, for the early call bonus.
  */
 import {
   Difficulty,
@@ -79,6 +82,7 @@ interface Options {
   seed: string;
   /** Radius in tiles of the land handed to the player at the start. */
   zone: number;
+  callEarly: boolean;
 }
 
 function parseArgs(argv: string[]): Options {
@@ -88,6 +92,7 @@ function parseArgs(argv: string[]): Options {
     spawns: Object.keys(SPAWNS),
     seed: "balance",
     zone: 20,
+    callEarly: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const next = () => argv[++i];
@@ -114,6 +119,9 @@ function parseArgs(argv: string[]): Options {
         break;
       case "--zone":
         opts.zone = parseInt(next(), 10);
+        break;
+      case "--call-early":
+        opts.callEarly = true;
         break;
       case "--seed":
         opts.seed = next();
@@ -247,6 +255,7 @@ interface Result {
 async function play(
   horde: Partial<HordeOptions>,
   zone: number,
+  callEarly: boolean,
   seed: string,
   spawn: [number, number],
   strategy: Strategy,
@@ -308,6 +317,9 @@ async function play(
   while (game.ticks() < limit) {
     // An order is paid for when its construction starts, a tick later.
     if (game.ticks() % 2 === 0) spend(game, me, hqXY, strategy, ordered);
+    if (callEarly && exec.stats().wave >= 1 && exec.callableTicks() > 0) {
+      exec.callWave(me);
+    }
     game.executeNextTick();
     const s = exec.stats();
     if (row === null || s.wave !== row.wave) {
@@ -366,6 +378,7 @@ async function main(): Promise<void> {
       const r = await play(
         opts.horde,
         opts.zone,
+        opts.callEarly,
         opts.seed,
         SPAWNS[name],
         strategy,
