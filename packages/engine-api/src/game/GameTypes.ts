@@ -368,6 +368,10 @@ export interface BuildableUnit {
   upgradeCosts?: Gold[];
   overlappingRailroads: TileRef[];
   ghostRailPaths: TileRef[][];
+  // zfront: for a new wall post, pairs of tiles (the post, then the far end)
+  // for each span it would build, and what the spans cost on top.
+  wallLinks?: TileRef[];
+  wallLinkCost?: Gold;
 }
 
 // Total price of buying `amount` of a buildable in one intent. Upgrades use
