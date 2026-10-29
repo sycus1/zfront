@@ -183,6 +183,7 @@ describe("turrets", () => {
         ...WAVES,
         structureHp: 10_000_000,
         hqHp: 10_000_000,
+        startingTurrets: 0,
       });
       const survivor = game.player("survivor");
       const t = survivor.buildUnit(UnitType.DefensePost, game.ref(50, 44), {});
@@ -205,6 +206,70 @@ describe("turrets", () => {
     expect(turretRange(o, 20)).toBe(12);
     expect(turretRange(o, 31)).toBe(14);
     expect(turretRange({ ...o, turretHighGroundBonus: 0 }, 31)).toBe(8);
+  });
+});
+
+describe("starting turret", () => {
+  test("each survivor starts with a finished turret by the HQ, for free", async () => {
+    const free = await defenceGame(QUIET);
+    const none = await defenceGame({ ...QUIET, startingTurrets: 0 });
+    run(free.game, 2);
+    run(none.game, 2);
+    const survivor = free.game.player("survivor");
+    const turrets = survivor.units(UnitType.DefensePost);
+    expect(turrets).toHaveLength(1);
+    expect(turrets[0].isUnderConstruction()).toBe(false);
+    // Off the HQ's 2x2 coarse cell, but close by.
+    const map = free.game.map();
+    const hq = survivor.spawnTile()!;
+    const t = turrets[0].tile();
+    expect(
+      map.x(t) >> 1 !== map.x(hq) >> 1 || map.y(t) >> 1 !== map.y(hq) >> 1,
+    ).toBe(true);
+    expect(map.manhattanDist(t, hq)).toBeLessThanOrEqual(6);
+    expect(survivor.gold()).toBe(none.game.player("survivor").gold());
+    expect(none.game.player("survivor").units(UnitType.DefensePost)).toEqual(
+      [],
+    );
+    // Only at the start.
+    run(free.game, 20);
+    expect(survivor.units(UnitType.DefensePost)).toHaveLength(1);
+  });
+
+  test("the starting turret fights the first wave", async () => {
+    const { game, horde } = await defenceGame({
+      ...WAVES,
+      structureHp: 10_000_000,
+      hqHp: 10_000_000,
+    });
+    run(game, 150);
+    expect(horde.stats().killed).toBeGreaterThan(0);
+  });
+
+  test("the frame carries each firing turret's shot", async () => {
+    const { game, horde } = await defenceGame({
+      ...WAVES,
+      structureHp: 10_000_000,
+      hqHp: 10_000_000,
+    });
+    let shots: Int32Array = new Int32Array();
+    for (let k = 0; k < 300 && shots.length === 0; k++) {
+      run(game, 1);
+      shots = horde.encodeFrame()!.turretShots;
+    }
+    expect(shots).toHaveLength(2);
+    const turret = game.player("survivor").units(UnitType.DefensePost)[0];
+    const map = game.map();
+    const w = game.miniMap().width();
+    const t = turret.tile();
+    expect(shots[0]).toBe((map.y(t) >> 1) * w + (map.x(t) >> 1));
+    expect(shots[1]).not.toBe(shots[0]);
+  });
+
+  test("a version 9 snapshot migrates without a starting turret", () => {
+    const v9 = { initialized: true, options: { wallHp: 4_000 } };
+    const v10 = HordeExecutionSnapshot.migrations[9](v9);
+    expect(v10.options).toMatchObject({ wallHp: 4_000, startingTurrets: 0 });
   });
 });
 

@@ -13,6 +13,10 @@ uniform float uTime;
 uniform vec4 uArrows[MAX_ARROWS];
 uniform int uArrowCount;
 uniform bool uArrowFinal;
+// Turrets that fired on the last tick: xy the turret cell's centre, zw the
+// centre of the cell it hit, in coarse cells.
+uniform vec4 uShots[MAX_SHOTS];
+uniform int uShotCount;
 
 in vec2 vUV;
 out vec4 fragColor;
@@ -54,10 +58,60 @@ float arrowAt(vec2 p) {
   return hit;
 }
 
+// Turret fire at p: rgb the colour, a the alpha, 0 where there is none. Each
+// shot is a faint beam with bright rounds running down it, a flickering
+// muzzle flash and a burst where it lands. Each shot has its own phase so a
+// ring of turrets doesn't fire in step.
+vec4 shotAt(vec2 p) {
+  vec4 hit = vec4(0.0);
+  for (int k = 0; k < MAX_SHOTS; k++) {
+    if (k >= uShotCount) break;
+    vec2 a = uShots[k].xy;
+    vec2 b = uShots[k].zw;
+    vec2 lo = min(a, b) - 1.0;
+    vec2 hi = max(a, b) + 1.0;
+    if (p.x < lo.x || p.y < lo.y || p.x > hi.x || p.y > hi.y) continue;
+    float phase = fract(uTime * 4.0 + float(k) * 0.618);
+    vec2 d = b - a;
+    float len = length(d);
+    vec2 r = p - a;
+    if (len > 0.5) {
+      vec2 dir = d / len;
+      float along = dot(r, dir);
+      float across = abs(r.x * dir.y - r.y * dir.x);
+      if (along > 0.0 && along < len) {
+        // Two rounds in flight, half a cycle apart.
+        float run = min(abs(along - phase * len), abs(along - fract(phase + 0.5) * len));
+        if (across < 0.2 && run < 0.7) {
+          hit = max(hit, vec4(1.0, 0.95, 0.7, 1.0));
+        } else if (across < 0.07) {
+          hit = max(hit, vec4(1.0, 0.85, 0.45, 0.45));
+        }
+      }
+      float flash = step(0.5, fract(uTime * 9.0 + float(k) * 0.37));
+      if (length(r) < 0.45 + 0.25 * flash) {
+        hit = max(hit, vec4(1.0, 0.9, 0.5, 0.55 + 0.4 * flash));
+      }
+    }
+    // The burst shrinks rather than fades: a faint one would punch a hole
+    // in the horde drawn under it.
+    if (length(p - b) < 0.15 + 0.55 * (1.0 - phase)) {
+      hit = max(hit, vec4(1.0, 0.65, 0.25, 0.9));
+    }
+  }
+  return hit;
+}
+
 void main() {
   vec2 p = vUV * vec2(uGridSize);
   ivec2 cell = clamp(ivec2(p), ivec2(0), uGridSize - 1);
   int raw = byteAt(cell);
+
+  vec4 shot = shotAt(p);
+  if (shot.a > 0.0) {
+    fragColor = shot;
+    return;
+  }
 
   // Elites and walls: exact texel lookup, so they keep their cell's shape.
   if (raw == int(ELITE)) {

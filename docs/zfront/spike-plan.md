@@ -304,6 +304,16 @@ _Started 2026-10-29._ Mines, noise beacons and scavenger depots, as listed in th
 
 `balance:horde` has a new `scavenge` strategy: two depots first, then turrets, with a ring of mines (rebuilt as they go off) before the outer ring of turrets. It wins from all five starts (Yorkshire HQ 37,172, the rest above 49,000). The other strategies' results are unchanged.
 
+## Balance: starting turret
+
+_Started 2026-10-29._ Dan found there was no way to fight the first wave: the turret costs 50,000 and the HQ pays 100 a tick from nothing, so the first one is affordable only about 50 seconds in, ten seconds before the wave lands.
+
+- **A free turret at the start** (`startingTurrets`, 1). On the first horde tick after the spawn phase each human gets a finished level-1 turret a few tiles from their HQ, at no cost. It goes off the HQ's own coarse cell, so the horde still presses on the HQ rather than the turret. A free build credit was the other option; the turret wins because it works without any new UI or the player knowing to use it, and it can still be upgraded like any other. Horde snapshot version 10 (older games: none).
+- **Turret icon.** The Defense Post's shield is now a gun turret in the build bar, the build menu, the help screen and on the map (`TurretIconWhite.svg`, icon atlas column 3).
+- **Turret fire is drawn.** The horde frame carries a turret cell and target cell for each turret that hit something on the last tick (`HordeFrame.turretShots`, cosmetic only), and the horde pass draws a faint beam with rounds running down it, a muzzle flash and a burst where it lands.
+
+`balance:horde -- --zone 0`: doing nothing now lasts to wave 4 to 6 (was 2 or 3). `turrets` and `scavenge` win from all five starts with the HQ at or near full health. `fort` loses on Lincolnshire on wave 10 at 783 s; it won there with 8,708 HQ left before, so it was already marginal there.
+
 ## Prerequisites
 
 - npm 12.1 or later. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`. The machine currently has npm 11.19.

@@ -65,6 +65,11 @@ export interface HordeFrame {
   nextWaveLandings: Int32Array;
   /** The first human HQ's coarse cell, or -1, for pointing at it. */
   hqCell: number;
+  /**
+   * Cosmetic: a [turret cell, target cell] pair for each turret that hit
+   * the horde on the last tick, for drawing its shots.
+   */
+  turretShots: Int32Array;
   /** Whether the announced wave can be called now, and the bonus for it. */
   canCallWave: boolean;
   callWaveGold: number;

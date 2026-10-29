@@ -10,6 +10,8 @@ import { WinModal } from "../../../src/client/hud/layers/WinModal";
 import {
   hordeBlobs,
   MAX_BLOB_LABELS,
+  MAX_SHOTS,
+  turretTracers,
   waveArrows,
 } from "../../../src/client/render/gl/passes/HordePass";
 import {
@@ -40,6 +42,7 @@ function frame(overrides: Partial<HordeFrame> = {}): HordeFrame {
     nextWaveFinal: false,
     nextWaveLandings: new Int32Array(),
     hqCell: -1,
+    turretShots: new Int32Array(),
     canCallWave: false,
     callWaveGold: 0,
     encodeMs: 0,
@@ -323,6 +326,23 @@ describe("WinModal in a horde game", () => {
     );
     expect(m.querySelector('[data-horde-stat="waves"]')?.textContent).toContain(
       "10 / 10",
+    );
+  });
+});
+
+describe("turret tracers", () => {
+  it("run from each firing turret's cell centre to its target's", () => {
+    const tracers = turretTracers(
+      frame({ width: 10, height: 10, turretShots: Int32Array.from([55, 23]) }),
+    );
+    expect(Array.from(tracers)).toEqual([5.5, 5.5, 3.5, 2.5]);
+  });
+
+  it("are capped and empty when nothing fires", () => {
+    expect(turretTracers(frame({}))).toHaveLength(0);
+    const many = new Int32Array(2 * (MAX_SHOTS + 5));
+    expect(turretTracers(frame({ turretShots: many }))).toHaveLength(
+      MAX_SHOTS * 4,
     );
   });
 });
