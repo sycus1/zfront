@@ -15,6 +15,9 @@
  *   fort     builds one turret, seals the HQ in a ring of barricades, adds
  *            more turrets inside, then upgrades walls and turrets in turn
  *            and adds an outer ring of turrets.
+ *   scavenge builds two scavenger depots first, then turrets as above
+ *            with a ring of mines (rebuilt as they go off) before the
+ *            outer ring.
  *
  * Usage:
  *   npm run balance:horde -- [--strategy none,turrets,fort]
@@ -71,7 +74,7 @@ const SPAWNS: Record<string, [number, number]> = {
   cumbria: [951, 1088],
 };
 
-const STRATEGIES = ["none", "turrets", "fort"] as const;
+const STRATEGIES = ["none", "turrets", "fort", "scavenge"] as const;
 type Strategy = (typeof STRATEGIES)[number];
 
 interface Options {
@@ -147,6 +150,11 @@ const TURRET_RING = ring(6, 6);
 /** An outer ring for once the inner one is full. */
 const OUTER_RING = ring(14, 7);
 const WALL_RING = ring(10, 2);
+const DEPOTS: [number, number][] = [
+  [3, 0],
+  [-3, 0],
+];
+const MINE_RING = ring(18, 9);
 /** Ticks before an order that came to nothing is tried again. */
 const RETRY = 50;
 
@@ -171,27 +179,38 @@ function spend(
   const T = UnitType.DefensePost;
   const W = UnitType.Wall;
   const plan: [UnitType, [number, number][], number][] =
-    s === "turrets"
+    s === "scavenge"
       ? [
+          [UnitType.Depot, DEPOTS, 1],
           [T, TURRET_RING, 1],
           [T, TURRET_RING, 2],
+          [UnitType.Mine, MINE_RING, 1],
           [T, OUTER_RING, 1],
           [T, TURRET_RING, 3],
           [T, OUTER_RING, 2],
           [T, OUTER_RING, 3],
         ]
-      : [
-          [T, TURRET_RING.slice(0, 1), 1],
-          [W, WALL_RING, 1],
-          [T, TURRET_RING, 1],
-          [W, WALL_RING, 2],
-          [T, TURRET_RING, 2],
-          [T, OUTER_RING, 1],
-          [W, WALL_RING, 3],
-          [T, TURRET_RING, 3],
-          [T, OUTER_RING, 2],
-          [T, OUTER_RING, 3],
-        ];
+      : s === "turrets"
+        ? [
+            [T, TURRET_RING, 1],
+            [T, TURRET_RING, 2],
+            [T, OUTER_RING, 1],
+            [T, TURRET_RING, 3],
+            [T, OUTER_RING, 2],
+            [T, OUTER_RING, 3],
+          ]
+        : [
+            [T, TURRET_RING.slice(0, 1), 1],
+            [W, WALL_RING, 1],
+            [T, TURRET_RING, 1],
+            [W, WALL_RING, 2],
+            [T, TURRET_RING, 2],
+            [T, OUTER_RING, 1],
+            [W, WALL_RING, 3],
+            [T, TURRET_RING, 3],
+            [T, OUTER_RING, 2],
+            [T, OUTER_RING, 3],
+          ];
   for (const [type, offsets, level] of plan) {
     for (const [dx, dy] of offsets) {
       const x = hq[0] + dx;
@@ -237,6 +256,8 @@ interface WaveRow {
   /** Count and total levels, as "count/levels". */
   turrets: string;
   walls: string;
+  /** Scavenger depots and mines standing, as "depots/mines". */
+  other: string;
   /** Tiles the player holds at the end of the wave. */
   tiles: number;
   /** Gold in the bank at the end of the wave. */
@@ -333,6 +354,7 @@ async function play(
         lost: 0,
         turrets: "",
         walls: "",
+        other: "",
         tiles: 0,
         gold: 0,
         alive: 0,
@@ -343,6 +365,7 @@ async function play(
     row.lost += s.structuresDestroyed - lastLost;
     row.turrets = levels(me, UnitType.DefensePost);
     row.walls = levels(me, UnitType.Wall);
+    row.other = `${me.units(UnitType.Depot).length}/${me.units(UnitType.Mine).length}`;
     row.tiles = me.numTilesOwned();
     row.gold = Number(me.gold());
     row.alive = s.alive + s.elites;
@@ -395,6 +418,7 @@ async function main(): Promise<void> {
             "lost",
             "turrets",
             "walls",
+            "depots/mines",
             "tiles",
             "gold",
             "alive",
@@ -408,6 +432,7 @@ async function main(): Promise<void> {
             String(w.lost),
             w.turrets,
             w.walls,
+            w.other,
             String(w.tiles),
             String(w.gold),
             String(w.alive),

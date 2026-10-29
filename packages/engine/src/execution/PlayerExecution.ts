@@ -2,6 +2,7 @@ import { GameMap, TileRef } from "@openfront/engine-api/game/GameMap";
 import {
   Cell,
   PlayerType,
+  HordePlaced,
   Structures,
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
@@ -86,7 +87,7 @@ export class PlayerExecution implements Execution {
   tick(ticks: number) {
     this.player.decayRelations();
     for (const u of this.player.units()) {
-      if (!Structures.has(u.type()) && u.type() !== UnitType.Wall) {
+      if (!Structures.has(u.type()) && !HordePlaced.has(u.type())) {
         continue;
       }
 
@@ -100,7 +101,7 @@ export class PlayerExecution implements Execution {
       }
 
       const captor = this.mg!.player(owner.id());
-      if (u.type() === UnitType.DefensePost || u.type() === UnitType.Wall) {
+      if (u.type() === UnitType.DefensePost || HordePlaced.has(u.type())) {
         u.delete(true, captor);
       } else {
         captor.captureUnit(u);

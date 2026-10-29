@@ -112,6 +112,12 @@ export interface UnitParamsMap {
   [UnitType.City]: Record<string, never>;
 
   [UnitType.Wall]: Record<string, never>;
+
+  [UnitType.Mine]: Record<string, never>;
+
+  [UnitType.NoiseBeacon]: Record<string, never>;
+
+  [UnitType.Depot]: Record<string, never>;
 }
 
 // Type helper to get params type for a specific unit type

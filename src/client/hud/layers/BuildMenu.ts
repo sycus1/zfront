@@ -38,6 +38,9 @@ const portIcon = assetUrl("images/PortIcon.svg");
 const samlauncherIcon = assetUrl("images/SamLauncherIconWhite.svg");
 const shieldIcon = assetUrl("images/ShieldIconWhite.svg");
 const wallIcon = assetUrl("images/WallIconWhite.svg");
+const mineIcon = assetUrl("images/MineIconWhite.svg");
+const beaconIcon = assetUrl("images/BeaconIconWhite.svg");
+const depotIcon = assetUrl("images/DepotIconWhite.svg");
 
 export interface BuildItemDisplay {
   unitType: PlayerBuildableUnitType;
@@ -110,6 +113,27 @@ export const buildTable: BuildItemDisplay[][] = [
       icon: wallIcon,
       description: "build_menu.desc.wall",
       key: "unit_type.wall",
+      countable: true,
+    },
+    {
+      unitType: UnitType.Mine,
+      icon: mineIcon,
+      description: "build_menu.desc.mine",
+      key: "unit_type.mine",
+      countable: true,
+    },
+    {
+      unitType: UnitType.NoiseBeacon,
+      icon: beaconIcon,
+      description: "build_menu.desc.noise_beacon",
+      key: "unit_type.noise_beacon",
+      countable: true,
+    },
+    {
+      unitType: UnitType.Depot,
+      icon: depotIcon,
+      description: "build_menu.desc.depot",
+      key: "unit_type.depot",
       countable: true,
     },
     {
