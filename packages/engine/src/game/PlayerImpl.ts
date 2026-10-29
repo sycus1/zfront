@@ -54,6 +54,7 @@ import {
   within,
 } from "@openfront/engine-lib/Util";
 import { z } from "zod";
+import { outpostSpawn } from "../horde/Claims";
 import { hordeOf } from "../horde/HordeExecution";
 import { settlesOnItsOwn } from "../horde/Settlement";
 import { snapToCell } from "../horde/WallLinks";
@@ -1345,6 +1346,8 @@ export class PlayerImpl implements Player {
       case UnitType.NoiseBeacon:
       case UnitType.Depot:
         return this.wallSpawn(targetTile, unitType);
+      case UnitType.Outpost:
+        return outpostSpawn(this.mg, this, targetTile);
       default:
         assertNever(unitType);
     }

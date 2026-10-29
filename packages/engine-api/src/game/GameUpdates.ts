@@ -65,6 +65,9 @@ export interface HordeFrame {
   nextWaveLandings: Int32Array;
   /** The first human HQ's coarse cell, or -1, for pointing at it. */
   hqCell: number;
+  /** The first human HQ's tile, or -1, and the radius settlers fill round it. */
+  hqTile: number;
+  settleRadius: number;
   /**
    * Cosmetic: a [turret cell, target cell] pair for each turret that hit
    * the horde on the last tick, for drawing its shots.

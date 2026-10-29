@@ -29,6 +29,8 @@ export const UT_FACTORY = "Factory" as const;
 export const UT_DEFENSE_POST = "Defense Post" as const;
 export const UT_SAM_LAUNCHER = "SAM Launcher" as const;
 export const UT_MISSILE_SILO = "Missile Silo" as const;
+/** zfront: claims the land around it in horde mode. */
+export const UT_OUTPOST = "Outpost" as const;
 
 // ---------------------------------------------------------------------------
 // Derived sets
@@ -41,6 +43,7 @@ export const STRUCTURE_TYPES: ReadonlySet<string> = new Set([
   UT_DEFENSE_POST,
   UT_SAM_LAUNCHER,
   UT_MISSILE_SILO,
+  UT_OUTPOST,
 ]);
 
 export const NUKE_TYPES: ReadonlySet<string> = new Set([

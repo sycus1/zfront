@@ -168,6 +168,7 @@ export class ConstructionExecution implements Execution {
       case UnitType.Mine:
       case UnitType.NoiseBeacon:
       case UnitType.Depot:
+      case UnitType.Outpost:
         // Passive: the horde reads these straight from the unit list.
         break;
       default:
@@ -190,6 +191,7 @@ export class ConstructionExecution implements Execution {
       case UnitType.Mine:
       case UnitType.NoiseBeacon:
       case UnitType.Depot:
+      case UnitType.Outpost:
         return true;
       default:
         return false;
