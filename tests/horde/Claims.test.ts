@@ -179,18 +179,18 @@ describe("Claims", () => {
     });
   });
 
-  test("a version 10 snapshot migrates to radius settling", () => {
-    const v10 = {
+  test("a version 11 snapshot migrates to radius settling", () => {
+    const v11 = {
       options: { settleTiles: 20, zoneBaseTiles: 1_500, zoneTilesPerWave: 1 },
       wave: 2,
     };
-    const v11 = HordeExecutionSnapshot.migrations[10](v10);
-    expect(v11.options).not.toHaveProperty("zoneBaseTiles");
-    expect(v11.options).toMatchObject({
+    const v12 = HordeExecutionSnapshot.migrations[11](v11);
+    expect(v12.options).not.toHaveProperty("zoneBaseTiles");
+    expect(v12.options).toMatchObject({
       settleTiles: 20,
       settleRadius: 14,
       outpostRadius: 12,
     });
-    expect(v11.outpostTiles).toEqual([]);
+    expect(v12.outpostTiles).toEqual([]);
   });
 });

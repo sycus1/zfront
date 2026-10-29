@@ -224,6 +224,10 @@ export interface GhostPreviewData {
   rangeRadius: number;
   /** True if placing here would carry a penalty (draws the range circle red). */
   rangeWarning: boolean;
+  /** zfront: draw the 2x2-tile build grid around the ghost (horde buildings). */
+  buildGrid?: boolean;
+  /** zfront: wall spans the post would build, as tile x0, y0, x1, y1 runs. */
+  wallLinks?: number[];
 }
 
 /** Nuke trajectory preview data — Bezier control points + color thresholds. */
