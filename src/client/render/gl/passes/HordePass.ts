@@ -4,8 +4,9 @@
  * The worker sends the horde as one byte per coarse (map4x) cell. The pass
  * uploads it as an R8 texture each time a new frame arrives and draws it on
  * a map-sized quad: density as a red overlay (linearly filtered into blobs),
- * elites as pulsing markers, and an arrow at each place the announced wave
- * comes ashore, pointing at the HQ.
+ * elites as pulsing markers, an arrow at each place the announced wave
+ * comes ashore, pointing at the HQ, and tracers from each turret that is
+ * shooting to what it hit.
  *
  * Spike instrumentation: transfer latency, worker encode time and upload
  * time are accumulated on `globalThis.__zfrontHorde` for measurement.
@@ -97,6 +98,34 @@ export function waveArrows(frame: HordeFrame): Float32Array {
   return out.subarray(0, n * 4);
 }
 
+/** Turret tracers drawn at most; turrets past this fire unseen. */
+export const MAX_SHOTS = 32;
+
+/**
+ * Tracers for the turrets that fired on the frame's tick: per shot, the
+ * turret cell's centre and the target cell's centre, in coarse cells.
+ */
+export function turretTracers(frame: HordeFrame): Float32Array {
+  const shots = frame.turretShots;
+  const n = Math.min(MAX_SHOTS, shots.length >> 1);
+  const out = new Float32Array(n * 4);
+  const w = frame.width;
+  for (let k = 0; k < n; k++) {
+    const from = shots[2 * k];
+    const to = shots[2 * k + 1];
+    out.set(
+      [
+        (from % w) + 0.5,
+        Math.floor(from / w) + 0.5,
+        (to % w) + 0.5,
+        Math.floor(to / w) + 0.5,
+      ],
+      k * 4,
+    );
+  }
+  return out;
+}
+
 export class HordePass {
   private program: WebGLProgram;
   private vao: WebGLVertexArrayObject;
@@ -110,6 +139,10 @@ export class HordePass {
   private uArrows: WebGLUniformLocation;
   private uArrowCount: WebGLUniformLocation;
   private uArrowFinal: WebGLUniformLocation;
+  private uShots: WebGLUniformLocation;
+  private uShotCount: WebGLUniformLocation;
+  private shots = new Float32Array(MAX_SHOTS * 4);
+  private shotCount = 0;
   private arrows = new Float32Array(MAX_ARROWS * 4);
   private arrowCount = 0;
   private arrowFinal = false;
@@ -125,7 +158,7 @@ export class HordePass {
     this.program = createProgram(
       gl,
       shaderSrc(hordeVertSrc, { MAP_W: mapW, MAP_H: mapH }),
-      shaderSrc(hordeFragSrc, { MAX_ARROWS }),
+      shaderSrc(hordeFragSrc, { MAX_ARROWS, MAX_SHOTS }),
       "HordePass",
     );
     this.uCamera = gl.getUniformLocation(this.program, "uCamera")!;
@@ -135,6 +168,8 @@ export class HordePass {
     this.uArrows = gl.getUniformLocation(this.program, "uArrows")!;
     this.uArrowCount = gl.getUniformLocation(this.program, "uArrowCount")!;
     this.uArrowFinal = gl.getUniformLocation(this.program, "uArrowFinal")!;
+    this.uShots = gl.getUniformLocation(this.program, "uShots")!;
+    this.uShotCount = gl.getUniformLocation(this.program, "uShotCount")!;
     this.vao = createMapQuad(gl, mapW, mapH);
     const g = globalThis as { __zfrontHorde?: HordeRenderStats };
     this.stats = g.__zfrontHorde ??= newStats();
@@ -180,6 +215,9 @@ export class HordePass {
     this.arrows.set(arrows);
     this.arrowCount = arrows.length / 4;
     this.arrowFinal = frame.nextWaveFinal;
+    const shots = turretTracers(frame);
+    this.shots.set(shots);
+    this.shotCount = shots.length / 4;
     const upload = performance.now() - start;
 
     const s = this.stats;
@@ -209,6 +247,8 @@ export class HordePass {
     gl.uniform4fv(this.uArrows, this.arrows);
     gl.uniform1i(this.uArrowCount, this.arrowCount);
     gl.uniform1i(this.uArrowFinal, this.arrowFinal ? 1 : 0);
+    gl.uniform4fv(this.uShots, this.shots);
+    gl.uniform1i(this.uShotCount, this.shotCount);
     gl.uniformMatrix3fv(this.uCamera, false, cam);
     gl.bindVertexArray(this.vao);
     gl.drawArrays(gl.TRIANGLES, 0, 6);

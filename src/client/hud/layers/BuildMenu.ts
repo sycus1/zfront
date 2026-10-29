@@ -36,7 +36,7 @@ const hydrogenBombIcon = assetUrl("images/MushroomCloudIconWhite.svg");
 const atomBombIcon = assetUrl("images/NukeIconWhite.svg");
 const portIcon = assetUrl("images/PortIcon.svg");
 const samlauncherIcon = assetUrl("images/SamLauncherIconWhite.svg");
-const shieldIcon = assetUrl("images/ShieldIconWhite.svg");
+const turretIcon = assetUrl("images/TurretIconWhite.svg");
 const wallIcon = assetUrl("images/WallIconWhite.svg");
 const mineIcon = assetUrl("images/MineIconWhite.svg");
 const beaconIcon = assetUrl("images/BeaconIconWhite.svg");
@@ -103,7 +103,7 @@ export const buildTable: BuildItemDisplay[][] = [
     },
     {
       unitType: UnitType.DefensePost,
-      icon: shieldIcon,
+      icon: turretIcon,
       description: "build_menu.desc.defense_post",
       key: "unit_type.defense_post",
       countable: true,

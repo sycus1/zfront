@@ -162,8 +162,9 @@ describe("horde economy", () => {
 
   test("a wave counts as cleared once few enough are left", async () => {
     // No turrets: nothing dies, so only the threshold decides.
-    const all = await economyGame({ ...WAVES, clearedPercent: 100 });
-    const none = await economyGame({ ...WAVES, clearedPercent: 0 });
+    const calm = { ...WAVES, startingTurrets: 0 };
+    const all = await economyGame({ ...calm, clearedPercent: 100 });
+    const none = await economyGame({ ...calm, clearedPercent: 0 });
     // Everything alive is at most 100% of the wave: cleared once it's out.
     expect(ticksToClear(all.horde, all.game, 200)).toBeGreaterThan(0);
     expect(ticksToClear(none.horde, none.game, 200)).toBe(-1);

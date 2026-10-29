@@ -12,6 +12,7 @@ import {
 } from "@openfront/engine-lib/snapshot/SnapshotType";
 import { simpleHash } from "@openfront/engine-lib/Util";
 import { z } from "zod";
+import { DefensePostExecution } from "../execution/DefensePostExecution";
 import { Execution, Game, Player, Unit } from "../game/Game";
 import { execSnapshotType } from "../snapshot/ExecutionSnapshot";
 import type { ExecRecord, SnapshotReader } from "../snapshot/SnapshotContext";
@@ -109,6 +110,8 @@ export interface HordeOptions
   hqHp: number;
   /** Waves to survive to win; 0 means endless. */
   wavesToWin: number;
+  /** Free turrets built next to each human HQ when the game starts. */
+  startingTurrets: number;
   /**
    * Ticks the structure set must stay unchanged before the flow field is
    * recomputed, so placing a row of walls costs one recompute, not one each.
@@ -174,6 +177,7 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   repairGoldPerHp: 1,
   hqHp: 50_000,
   wavesToWin: 10,
+  startingTurrets: 1,
   flowDebounce: 10,
   flowMaxDelay: 50,
   settleInterval: 10,
@@ -184,6 +188,18 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   zoneTilesPerWave: 1_000,
   refugeesPerWave: 10_000,
 };
+
+/** Tile offsets from the HQ tried, in order, for the free turrets. */
+const STARTING_TURRET_SPOTS: readonly [number, number][] = [
+  [3, 0],
+  [0, 3],
+  [-3, 0],
+  [0, -3],
+  [3, 3],
+  [-3, 3],
+  [-3, -3],
+  [3, -3],
+];
 
 const TARGET_TYPES: readonly UnitType[] = [
   UnitType.City,
@@ -249,6 +265,9 @@ export class HordeExecution implements Execution {
   private hordeStructureSig = -1;
   private hordeStructureAt = new Map<number, Unit>();
   private hordeTurrets: Unit[] = [];
+  // Cosmetic: [turret cell, target cell] pairs for the turrets that hit
+  // something on the last tick. Not part of the simulation state.
+  private hordeTurretShots: number[] = [];
   private hordeHqAt = new Map<number, Player>();
   /** Damage taken by unit id, and the tick each was last attacked. */
   private damage = new Map<number, number>();
@@ -349,6 +368,7 @@ export class HordeExecution implements Execution {
     this.ticks = ticks;
     if (this.nextWaveTick < 0) {
       this.nextWaveTick = ticks + this.opts.firstWaveDelay;
+      this.buildStartingTurrets();
     }
     this.scanStructures(ticks);
     this.planNextWave();
@@ -491,6 +511,7 @@ export class HordeExecution implements Execution {
       nextWaveFinal: next?.final ?? false,
       nextWaveLandings: Int32Array.from(this.nextLandings),
       hqCell: this.firstHqCell(),
+      turretShots: Int32Array.from(this.hordeTurretShots),
       callWaveGold: this.callableTicks() * this.opts.callEarlyGoldPerTick,
       canCallWave: this.callableTicks() > 0,
       encodeMs: 0,
@@ -561,6 +582,43 @@ export class HordeExecution implements Execution {
     const x = Math.min(this.width - 1, map.x(tile) >> 1);
     const y = Math.min(this.height - 1, map.y(tile) >> 1);
     return y * this.width + x;
+  }
+
+  /**
+   * Builds `startingTurrets` finished turrets for free next to each human
+   * HQ, so there's something to fight the first wave with before the
+   * player can afford one. They go a few tiles out, off the HQ's own
+   * coarse cell, so the horde presses on the HQ and not the turret.
+   */
+  private buildStartingTurrets(): void {
+    const mg = this.mg!;
+    const map = mg.map();
+    for (const p of mg.players()) {
+      const hq = p.spawnTile();
+      if (p.type() !== PlayerType.Human || !p.isAlive() || hq === undefined) {
+        continue;
+      }
+      const hqCell = this.cellOf(hq);
+      let built = 0;
+      for (const [dx, dy] of STARTING_TURRET_SPOTS) {
+        if (built >= this.opts.startingTurrets) break;
+        const x = map.x(hq) + dx;
+        const y = map.y(hq) + dy;
+        if (!map.isValidCoord(x, y)) continue;
+        // Lend the player the price so canBuild passes; buildUnit takes it
+        // back.
+        const cost = mg.unitInfo(UnitType.DefensePost).cost(mg, p);
+        p.addGold(cost);
+        const tile = p.canBuild(UnitType.DefensePost, map.ref(x, y));
+        if (tile === false || this.cellOf(tile) === hqCell) {
+          p.removeGold(cost);
+          continue;
+        }
+        const turret = p.buildUnit(UnitType.DefensePost, tile, {});
+        mg.addExecution(new DefensePostExecution(turret));
+        built++;
+      }
+    }
   }
 
   /**
@@ -906,6 +964,7 @@ export class HordeExecution implements Execution {
     const n = w * this.height;
     const offsets = this.turretReach;
     const d2 = this.turretReachD2;
+    this.hordeTurretShots = [];
     for (const t of this.hordeTurrets) {
       if (!t.isActive()) continue;
       const c = this.cellOf(t.tile());
@@ -918,12 +977,14 @@ export class HordeExecution implements Execution {
       let budget = Math.floor((this.opts.turretKillsPerTick * power) / 100);
       let shamblers = 0;
       let elites = 0;
+      let target = -1;
       for (let k = 0; k < offsets.length && budget > 0; k += 2) {
         if (d2[k >> 1] > r2) break;
         const x = cx + offsets[k];
         const cell = c + offsets[k + 1];
         if (x < 0 || x >= w || cell < 0 || cell >= n) continue;
         const removed = this.field.remove(cell, budget);
+        if (removed > 0) target = cell;
         budget -= removed;
         this.killed += removed;
         shamblers += removed;
@@ -940,9 +1001,11 @@ export class HordeExecution implements Execution {
             (this.opts.turretEliteDamage * power) / 100,
           );
           if (this.elites.hp[e] <= 0) elites++;
+          target = ec;
           break;
         }
       }
+      if (target >= 0) this.hordeTurretShots.push(c, target);
       payBounty(t.owner(), this.opts, shamblers, elites);
     }
     this.killed += this.elites.removeDead();
@@ -1264,6 +1327,7 @@ const HordeOptionsSchema = z.object({
   repairGoldPerHp: zInt(),
   hqHp: zInt(),
   wavesToWin: zInt(),
+  startingTurrets: zInt(),
   flowDebounce: zInt(),
   flowMaxDelay: zInt(),
   settleInterval: zInt(),
@@ -1342,7 +1406,7 @@ export function hordeOf(game: Game): HordeExecution | null {
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 9,
+  version: 10,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -1477,6 +1541,12 @@ export const HordeExecutionSnapshot = execSnapshotType({
       beaconIds: [],
       beaconSince: [],
       flowBait: [],
+    }),
+    // 9 -> 10: a free turret at the start. An old game has started already
+    // (or builds none, as before).
+    9: (d) => ({
+      ...d,
+      options: { ...d.options, startingTurrets: 0 },
     }),
   },
   cls: () => HordeExecution,
