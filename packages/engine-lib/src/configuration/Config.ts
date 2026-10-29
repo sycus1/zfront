@@ -85,6 +85,9 @@ const OVERTIME_DEFAULTS = {
   dropPercentPerMinute: 2,
 };
 
+/** zfront: the default radius in tiles an Outpost claims once built. */
+export const OUTPOST_CLAIM_RADIUS = 12;
+
 export class Config {
   private unitInfoCache = new Map<UnitType, UnitInfo>();
   constructor(
@@ -168,6 +171,11 @@ export class Config {
 
   defensePostRange(): number {
     return 30;
+  }
+
+  /** zfront: radius in tiles an Outpost claims, for the placement preview. */
+  outpostClaimRadius(): number {
+    return OUTPOST_CLAIM_RADIUS;
   }
 
   /** zfront: zombie waves (packages/engine/src/horde). */
@@ -255,6 +263,9 @@ export class Config {
       case UnitType.NoiseBeacon:
       case UnitType.Depot:
         info = { constructionDuration: this.instantBuild() ? 0 : 2 * 10 };
+        break;
+      case UnitType.Outpost:
+        info = { constructionDuration: this.instantBuild() ? 0 : 5 * 10 };
         break;
       case UnitType.SAMLauncher:
         info = {

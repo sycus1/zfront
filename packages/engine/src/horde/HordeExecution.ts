@@ -4,6 +4,7 @@ import {
   HordeFrame,
   HordeOutcome,
 } from "@openfront/engine-api/game/GameUpdates";
+import { OUTPOST_CLAIM_RADIUS } from "@openfront/engine-lib/configuration/Config";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import {
   zInt,
@@ -18,6 +19,13 @@ import { execSnapshotType } from "../snapshot/ExecutionSnapshot";
 import type { ExecRecord, SnapshotReader } from "../snapshot/SnapshotContext";
 import { BuildingOptions, beaconSounding, detonate } from "./Buildings";
 import {
+  applyClaims,
+  ClaimOptions,
+  lapseOutpost,
+  outpostLimit,
+  outposts,
+} from "./Claims";
+import {
   payBounty,
   payCallEarlyBonus,
   payClearBonus,
@@ -27,7 +35,12 @@ import {
 import { Elites } from "./Elites";
 import { FlowField, ORTHO_STEP, WALL_COST } from "./FlowField";
 import { buildCostField, HordeField } from "./HordeField";
-import { settle, SettleOptions, welcomeRefugees } from "./Settlement";
+import {
+  passiveRadius,
+  settle,
+  SettleOptions,
+  welcomeRefugees,
+} from "./Settlement";
 import { WaveDirector, WavePlan } from "./WaveDirector";
 
 /**
@@ -49,7 +62,7 @@ import { WaveDirector, WavePlan } from "./WaveDirector";
  */
 
 export interface HordeOptions
-  extends SettleOptions, EconomyOptions, BuildingOptions {
+  extends SettleOptions, ClaimOptions, EconomyOptions, BuildingOptions {
   /** Ticks from the end of the spawn phase to the first wave. */
   firstWaveDelay: number;
   waveInterval: number;
@@ -184,9 +197,13 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   settlePercent: 50,
   settleTiles: 20,
   settleCost: 200,
-  zoneBaseTiles: 1_500,
-  zoneTilesPerWave: 1_000,
+  settleRadius: 14,
+  settleRadiusPerWave: 2,
   refugeesPerWave: 10_000,
+  outpostRadius: OUTPOST_CLAIM_RADIUS,
+  buildingClaimRadius: 3,
+  outpostsBase: 1,
+  wavesPerOutpost: 2,
 };
 
 /** Tile offsets from the HQ tried, in order, for the free turrets. */
@@ -209,6 +226,7 @@ const TARGET_TYPES: readonly UnitType[] = [
   UnitType.SAMLauncher,
   UnitType.Factory,
   UnitType.Depot,
+  UnitType.Outpost,
 ];
 
 export interface HordeStats {
@@ -252,6 +270,9 @@ export class HordeExecution implements Execution {
 
   private wave = 0;
   private wavesSurvived = 0;
+  /** Outposts (tile and owner smallID) at the last claim pass. */
+  private outpostTiles: TileRef[] = [];
+  private outpostOwners: number[] = [];
   /** The wave under way (or last started), and the one announced next. */
   private currentPlan: WavePlan | null = null;
   private nextPlan: WavePlan | null = null;
@@ -392,7 +413,11 @@ export class HordeExecution implements Execution {
     this.applyPressure();
     if (ticks % this.opts.repairInterval === 0) this.repair();
     this.checkCleared();
-    if (ticks % this.opts.settleInterval === 0) this.settleAll();
+    this.mg!.setOutpostLimit(outpostLimit(this.opts, this.wavesSurvived));
+    if (ticks % this.opts.settleInterval === 0) {
+      this.claimAll();
+      this.settleAll();
+    }
   }
 
   stats(): HordeStats {
@@ -511,6 +536,8 @@ export class HordeExecution implements Execution {
       nextWaveFinal: next?.final ?? false,
       nextWaveLandings: Int32Array.from(this.nextLandings),
       hqCell: this.firstHqCell(),
+      hqTile: this.firstHqTile(),
+      settleRadius: passiveRadius(this.opts, this.wavesSurvived),
       turretShots: Int32Array.from(this.hordeTurretShots),
       callWaveGold: this.callableTicks() * this.opts.callEarlyGoldPerTick,
       canCallWave: this.callableTicks() > 0,
@@ -567,6 +594,11 @@ export class HordeExecution implements Execution {
   /** The first human HQ's coarse cell, or -1. */
   private firstHqCell(): number {
     for (const cell of this.hordeHqAt.keys()) return cell;
+    return -1;
+  }
+
+  private firstHqTile(): number {
+    for (const p of this.hordeHqAt.values()) return p.spawnTile() ?? -1;
     return -1;
   }
 
@@ -887,6 +919,44 @@ export class HordeExecution implements Execution {
     welcomeRefugees(this.mg!, this.opts, wave);
   }
 
+  /**
+   * Buildings claim land for each human, in player order, after the land of
+   * any Outpost lost since the last pass has lapsed.
+   */
+  private claimAll(): void {
+    const mg = this.mg!;
+    const live = new Set<TileRef>();
+    const humans = mg
+      .players()
+      .filter((p) => p.type() === PlayerType.Human && p.isAlive());
+    for (const p of humans) {
+      for (const u of outposts(p)) live.add(u.tile());
+    }
+    for (let k = 0; k < this.outpostTiles.length; k++) {
+      const tile = this.outpostTiles[k];
+      if (live.has(tile)) continue;
+      const owner = humans.find((p) => p.smallID() === this.outpostOwners[k]);
+      if (owner === undefined) continue;
+      lapseOutpost(
+        mg,
+        owner,
+        this.opts,
+        tile,
+        owner.spawnTile(),
+        passiveRadius(this.opts, this.wavesSurvived),
+      );
+    }
+    this.outpostTiles = [];
+    this.outpostOwners = [];
+    for (const p of humans) {
+      applyClaims(mg, p, this.opts);
+      for (const u of outposts(p)) {
+        this.outpostTiles.push(u.tile());
+        this.outpostOwners.push(p.smallID());
+      }
+    }
+  }
+
   /** Settlers claim free land for each human, in player order. */
   private settleAll(): void {
     const mg = this.mg!;
@@ -1117,6 +1187,8 @@ export class HordeExecution implements Execution {
       random: this.random.getState(),
       wave: this.wave,
       wavesSurvived: this.wavesSurvived,
+      outpostTiles: [...this.outpostTiles],
+      outpostOwners: [...this.outpostOwners],
       currentPlan: this.currentPlan,
       nextPlan: this.nextPlan,
       nextWaveTick: this.nextWaveTick,
@@ -1156,6 +1228,9 @@ export class HordeExecution implements Execution {
     this.mg = null;
     this.wave = s.wave;
     this.wavesSurvived = s.wavesSurvived;
+    this.outpostTiles = s.outpostTiles.map((t) => t as TileRef);
+    this.outpostOwners = [...s.outpostOwners];
+    r.game.setOutpostLimit(outpostLimit(opts, s.wavesSurvived));
     this.currentPlan = s.currentPlan;
     this.nextPlan = s.nextPlan;
     this.nextWaveTick = s.nextWaveTick;
@@ -1334,9 +1409,13 @@ const HordeOptionsSchema = z.object({
   settlePercent: zInt(),
   settleTiles: zInt(),
   settleCost: zInt(),
-  zoneBaseTiles: zInt(),
-  zoneTilesPerWave: zInt(),
+  settleRadius: zInt(),
+  settleRadiusPerWave: zInt(),
   refugeesPerWave: zInt(),
+  outpostRadius: zInt(),
+  buildingClaimRadius: zInt(),
+  outpostsBase: zInt(),
+  wavesPerOutpost: zInt(),
 });
 
 const WavePlanSchema = z.object({
@@ -1354,6 +1433,8 @@ const HordeStateSchema = z.object({
   random: zRandom(),
   wave: zInt(),
   wavesSurvived: zInt(),
+  outpostTiles: z.array(zInt()),
+  outpostOwners: z.array(zInt()),
   currentPlan: WavePlanSchema.nullable(),
   nextPlan: WavePlanSchema.nullable(),
   nextWaveTick: zInt(),
@@ -1406,7 +1487,7 @@ export function hordeOf(game: Game): HordeExecution | null {
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 10,
+  version: 11,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -1548,6 +1629,28 @@ export const HordeExecutionSnapshot = execSnapshotType({
       ...d,
       options: { ...d.options, startingTurrets: 0 },
     }),
+    // 10 -> 11: Outposts and building claims. Settlers fill a disc round the
+    // HQ instead of a tile count; buildings in an old game start claiming
+    // land on the next pass.
+    10: (d) => {
+      const options = { ...d.options };
+      delete options.zoneBaseTiles;
+      delete options.zoneTilesPerWave;
+      return {
+        ...d,
+        options: {
+          ...options,
+          settleRadius: 14,
+          settleRadiusPerWave: 2,
+          outpostRadius: 12,
+          buildingClaimRadius: 3,
+          outpostsBase: 1,
+          wavesPerOutpost: 2,
+        },
+        outpostTiles: [],
+        outpostOwners: [],
+      };
+    },
   },
   cls: () => HordeExecution,
 });

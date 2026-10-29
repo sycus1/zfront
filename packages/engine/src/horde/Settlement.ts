@@ -10,9 +10,10 @@ import { Game, Player } from "../game/Game";
  * tile. They prefer tiles near the HQ, tiles under turret cover and tiles
  * that round off the border, and never move onto land the horde is on.
  *
- * The zone is capped at `zoneBaseTiles` plus `zoneTilesPerWave` for every
- * wave survived, so land follows progression. Surviving a wave also brings
- * `refugeesPerWave` x wave new people.
+ * Settlers only fill a disc round the HQ, `settleRadius` tiles across plus
+ * `settleRadiusPerWave` for every wave survived, so passive land follows
+ * progression; land beyond it comes from Outposts (Claims.ts). Surviving a
+ * wave also brings `refugeesPerWave` x wave new people.
  *
  * Deterministic: integer scores, ties broken by tile, border tiles visited
  * in the set's insertion order.
@@ -27,8 +28,9 @@ export interface SettleOptions {
   settleTiles: number;
   /** Population spent per tile claimed. */
   settleCost: number;
-  zoneBaseTiles: number;
-  zoneTilesPerWave: number;
+  /** Radius in tiles round the HQ that settlers fill on their own. */
+  settleRadius: number;
+  settleRadiusPerWave: number;
   refugeesPerWave: number;
 }
 
@@ -47,9 +49,12 @@ export function settlesOnItsOwn(game: Game, player: Player): boolean {
   return game.config().horde() && player.type() === PlayerType.Human;
 }
 
-/** Tiles a player's zone may hold after `wavesSurvived` waves. */
-export function zoneCap(opts: SettleOptions, wavesSurvived: number): number {
-  return opts.zoneBaseTiles + opts.zoneTilesPerWave * wavesSurvived;
+/** Radius of the disc settlers fill after `wavesSurvived` waves. */
+export function passiveRadius(
+  opts: SettleOptions,
+  wavesSurvived: number,
+): number {
+  return opts.settleRadius + opts.settleRadiusPerWave * wavesSurvived;
 }
 
 // Score weights: lower scores settle first.
@@ -65,17 +70,17 @@ export function settle(
   wavesSurvived: number,
   view: SettleView,
 ): number {
-  const room = zoneCap(opts, wavesSurvived) - player.numTilesOwned();
-  if (room <= 0 || opts.settleCost <= 0) return 0;
+  const hq = player.spawnTile();
+  if (hq === undefined || opts.settleCost <= 0) return 0;
+  const r = passiveRadius(opts, wavesSurvived);
   const threshold =
     (game.config().maxTroops(player) * opts.settlePercent) / 100;
   if (player.troops() < threshold + opts.settleCost) return 0;
 
   const map = game.map();
   const me = player.smallID();
-  const hq = player.spawnTile();
-  const hx = hq === undefined ? 0 : map.x(hq);
-  const hy = hq === undefined ? 0 : map.y(hq);
+  const hx = map.x(hq);
+  const hy = map.y(hq);
   const seen = new Set<TileRef>();
   const scores: number[] = [];
   const tiles: TileRef[] = [];
@@ -89,6 +94,9 @@ export function settle(
       if (seen.has(t)) continue;
       seen.add(t);
       if (map.hasOwner(t) || !map.isLand(t) || map.isImpassable(t)) continue;
+      const dx = map.x(t) - hx;
+      const dy = map.y(t) - hy;
+      if (dx * dx + dy * dy > r * r) continue;
       const cell = view.cellOf(t);
       if (view.density[cell] > 0) continue;
       let owned = 0;
@@ -96,7 +104,7 @@ export function settle(
       for (let j = 0; j < m; j++) {
         if (map.ownerID(nbuf2[j]) === me) owned++;
       }
-      const dist = Math.abs(map.x(t) - hx) + Math.abs(map.y(t) - hy);
+      const dist = Math.abs(dx) + Math.abs(dy);
       scores.push(
         dist * DIST_WEIGHT -
           owned * NEIGHBOUR_BONUS -
@@ -109,7 +117,7 @@ export function settle(
   const order = tiles.map((_, k) => k);
   order.sort((a, b) => scores[a] - scores[b] || tiles[a] - tiles[b]);
 
-  const limit = Math.min(room, opts.settleTiles, order.length);
+  const limit = Math.min(opts.settleTiles, order.length);
   let claimed = 0;
   for (let k = 0; k < limit; k++) {
     if (player.troops() < threshold + opts.settleCost) break;

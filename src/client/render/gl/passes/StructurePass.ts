@@ -20,6 +20,7 @@ import {
   UT_DEFENSE_POST,
   UT_FACTORY,
   UT_MISSILE_SILO,
+  UT_OUTPOST,
   UT_PORT,
   UT_SAM_LAUNCHER,
 } from "../../types";
@@ -53,6 +54,7 @@ const STRUCTURE_ORDER = [
   UT_DEFENSE_POST,
   UT_SAM_LAUNCHER,
   UT_MISSILE_SILO,
+  UT_OUTPOST,
 ] as const;
 
 const ATLAS_COLS = STRUCTURE_ORDER.length;

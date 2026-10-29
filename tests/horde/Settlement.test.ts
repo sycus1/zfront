@@ -9,9 +9,9 @@ import {
   HordeOptions,
 } from "@openfront/engine/horde/HordeExecution";
 import {
+  passiveRadius,
   settle,
   SettleView,
-  zoneCap,
 } from "@openfront/engine/horde/Settlement";
 import { setup } from "../util/Setup";
 
@@ -45,8 +45,8 @@ const OPTS: HordeOptions = {
   ...DEFAULT_HORDE_OPTIONS,
   settleTiles: 20,
   settleCost: 100,
-  zoneBaseTiles: 450,
-  zoneTilesPerWave: 100,
+  settleRadius: 16,
+  settleRadiusPerWave: 4,
   refugeesPerWave: 1_000,
 };
 
@@ -72,17 +72,35 @@ describe("Settlement", () => {
     expect(survivor.numTilesOwned()).toBe(400);
   });
 
-  test("the zone stops at the cap and each wave survived raises it", async () => {
+  test("settlers fill a disc round the HQ that grows each wave", async () => {
     const { game, survivor } = await survivorGame();
-    expect(zoneCap(OPTS, 0)).toBe(450);
-    for (let k = 0; k < 10; k++) {
-      fill(game, survivor);
-      settle(game, survivor, OPTS, 0, emptyView(game));
-    }
-    expect(survivor.numTilesOwned()).toBe(450);
-    fill(game, survivor);
-    settle(game, survivor, OPTS, 1, emptyView(game));
-    expect(survivor.numTilesOwned()).toBe(470);
+    const opts = { ...OPTS, settleRadius: 12, settleTiles: 200 };
+    expect(passiveRadius(opts, 0)).toBe(12);
+    expect(passiveRadius(opts, 1)).toBe(16);
+    const settleUntilFull = (waves: number) => {
+      for (let k = 0; k < 20; k++) {
+        fill(game, survivor);
+        settle(game, survivor, opts, waves, emptyView(game));
+      }
+    };
+    const furthest = () =>
+      Math.max(
+        ...[...survivor.tiles()]
+          .filter((t) => {
+            const x = game.x(t);
+            const y = game.y(t);
+            return x < 40 || x >= 60 || y < 40 || y >= 60;
+          })
+          .map((t) => (game.x(t) - 50) ** 2 + (game.y(t) - 50) ** 2),
+      );
+    settleUntilFull(0);
+    const atZero = survivor.numTilesOwned();
+    expect(atZero).toBeGreaterThan(400);
+    expect(furthest()).toBeLessThanOrEqual(12 * 12);
+    settleUntilFull(1);
+    expect(survivor.numTilesOwned()).toBeGreaterThan(atZero);
+    expect(furthest()).toBeLessThanOrEqual(16 * 16);
+    expect(furthest()).toBeGreaterThan(12 * 12);
   });
 
   test("settlers avoid the horde and prefer turret cover", async () => {
@@ -107,7 +125,7 @@ describe("Settlement", () => {
     expect(east).toBe(20);
   });
 
-  test("surviving a wave brings refugees and lets the zone grow", async () => {
+  test("surviving a wave brings refugees", async () => {
     const { game, survivor } = await survivorGame();
     const horde = new HordeExecution({
       ...OPTS,

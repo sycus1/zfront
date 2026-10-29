@@ -409,6 +409,10 @@ export class BuildPreviewController implements Controller {
       case UnitType.DefensePost:
         rangeRadius = this.game.config().defensePostRange();
         break;
+      case UnitType.Outpost:
+        // zfront: the land it will claim once built.
+        rangeRadius = this.game.config().outpostClaimRadius();
+        break;
     }
     let radiusTileX = this.game.x(placementTile);
     let radiusTileY = this.game.y(placementTile);
