@@ -15,6 +15,7 @@
     "generated/**/*",
     "tests/**/*",
     "src/scripts",
+    "scripts/realmap",
     "scripts/replay",
     "scripts/split-packages",
     "vite.config.ts"

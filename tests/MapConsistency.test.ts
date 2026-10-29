@@ -24,7 +24,12 @@ const EN_JSON = path.join(ROOT, "resources", "lang", "en.json");
 const allMapKeys = Object.keys(GameMapType) as GameMapName[];
 
 // Maps excluded from the frequency requirement (not part of regular playlists).
-const FREQUENCY_EXEMPTIONS: Set<GameMapName> = new Set([]);
+// Real-town maps (scripts/realmap) are solo-only while we try them out.
+const FREQUENCY_EXEMPTIONS: Set<GameMapName> = new Set([
+  "Bath",
+  "Sheffield",
+  "Whitby",
+]);
 
 // The API (openfrontio/infra `GameMapTypeSchema`, and the `maps.name`
 // varchar(29) column) rejects a game record whose map name breaks these.

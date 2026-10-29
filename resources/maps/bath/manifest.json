@@ -1,0 +1,33 @@
+{
+  "categories": ["new", "europe"],
+  "id": "Bath",
+  "layers": [
+    {
+      "id": "roads",
+      "placement": "land"
+    },
+    {
+      "id": "buildings",
+      "placement": "land"
+    }
+  ],
+  "map": {
+    "height": 1332,
+    "num_land_tiles": 1747997,
+    "width": 1332
+  },
+  "map16x": {
+    "height": 333,
+    "num_land_tiles": 108410,
+    "width": 333
+  },
+  "map4x": {
+    "height": 666,
+    "num_land_tiles": 435876,
+    "width": 666
+  },
+  "multiplayer_frequency": 0,
+  "name": "Bath",
+  "nations": [],
+  "translation_key": "map.bath"
+}

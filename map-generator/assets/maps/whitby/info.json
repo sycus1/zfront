@@ -1,0 +1,18 @@
+{
+  "id": "Whitby",
+  "name": "Whitby",
+  "translation_key": "map.whitby",
+  "categories": ["new", "europe"],
+  "multiplayer_frequency": 0,
+  "layers": [
+    {
+      "id": "roads",
+      "placement": "land"
+    },
+    {
+      "id": "buildings",
+      "placement": "land"
+    }
+  ],
+  "nations": []
+}

@@ -678,11 +678,14 @@
   },
   "map": {
     "all": "All",
+    "bath": "Bath",
     "britannia": "Britannia",
     "favorites": "Favourites",
     "featured": "Featured",
     "map": "Map",
-    "random": "Random"
+    "random": "Random",
+    "sheffield": "Sheffield",
+    "whitby": "Whitby"
   },
   "map_categories": {
     "africa": "Africa",
@@ -715,9 +718,11 @@
   },
   "map_layers": {
     "brland": "brland",
+    "buildings": "Buildings",
     "eyeland": "eyeland",
     "eyewater": "eyewater",
-    "label": "label"
+    "label": "label",
+    "roads": "Roads"
   },
   "mode_selector": {
     "teams_count": "{teamCount} teams",
