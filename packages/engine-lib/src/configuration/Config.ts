@@ -1,6 +1,7 @@
 import {
   Difficulty,
   GameType,
+  HordeOnly,
   PlayerType,
   Tick,
   UnitInfo,
@@ -190,6 +191,8 @@ export class Config {
   }
 
   isUnitDisabled(unitType: UnitType): boolean {
+    // zfront: mines, beacons and depots only mean something to the horde.
+    if (!this.horde() && HordeOnly.has(unitType)) return true;
     return this._gameConfig.disabledUnits?.includes(unitType) ?? false;
   }
   instantBuild(): boolean {
@@ -247,6 +250,11 @@ export class Config {
           constructionDuration: this.instantBuild() ? 0 : 10,
           upgradable: true,
         };
+        break;
+      case UnitType.Mine:
+      case UnitType.NoiseBeacon:
+      case UnitType.Depot:
+        info = { constructionDuration: this.instantBuild() ? 0 : 2 * 10 };
         break;
       case UnitType.SAMLauncher:
         info = {

@@ -23,6 +23,8 @@ export const WALL_COST = 255;
 export const ORTHO_STEP = 5;
 export const DIAG_STEP = 7;
 const NUM_BUCKETS = DIAG_STEP * WALL_COST + 1;
+/** Highest start distance for a source: one bucket ring ahead. */
+export const MAX_START = NUM_BUCKETS - 1;
 
 export class FlowField {
   readonly dist: Uint32Array;
@@ -43,8 +45,12 @@ export class FlowField {
     }
   }
 
-  /** Recomputes every cell's distance to the nearest source. */
-  compute(sources: ArrayLike<number>): void {
+  /**
+   * Recomputes every cell's distance to the nearest source. Each source
+   * starts at its entry in `starts` (default 0), below MAX_START: a source
+   * that starts lower draws the flow from further away, as bait does.
+   */
+  compute(sources: ArrayLike<number>, starts?: ArrayLike<number>): void {
     const w = this.width;
     const h = this.height;
     const dist = this.dist;
@@ -55,9 +61,10 @@ export class FlowField {
     let pending = 0;
     for (let k = 0; k < sources.length; k++) {
       const s = sources[k];
-      if (dist[s] === 0) continue;
-      dist[s] = 0;
-      this.push(0, s);
+      const d = Math.min(MAX_START, starts?.[k] ?? 0);
+      if (dist[s] <= d) continue;
+      dist[s] = d;
+      this.push(d % NUM_BUCKETS, s);
       pending++;
     }
 

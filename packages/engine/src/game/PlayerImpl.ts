@@ -16,6 +16,7 @@ import {
   PlayerProfile,
   PlayerType,
   Relation,
+  HordePlaced,
   Structures,
   Team,
   TerraNullius,
@@ -1327,6 +1328,9 @@ export class PlayerImpl implements Player {
       case UnitType.Factory:
         return this.landBasedStructureSpawn(targetTile, validTiles);
       case UnitType.Wall:
+      case UnitType.Mine:
+      case UnitType.NoiseBeacon:
+      case UnitType.Depot:
         return this.wallSpawn(targetTile);
       default:
         assertNever(unitType);
@@ -1443,9 +1447,10 @@ export class PlayerImpl implements Player {
   }
 
   /**
-   * zfront: a wall goes exactly where it is placed, on the player's own
-   * land, at least two tiles from any other wall or structure. That keeps
-   * one wall per 2x2 horde cell, so walls two tiles apart make a solid line.
+   * zfront: a wall (or a mine, beacon or depot) goes exactly where it is
+   * placed, on the player's own land, at least two tiles from any other of
+   * them or any structure. That keeps one per 2x2 horde cell, so walls two
+   * tiles apart make a solid line.
    */
   wallSpawn(tile: TileRef): TileRef | false {
     const mg = this.mg;
@@ -1457,7 +1462,7 @@ export class PlayerImpl implements Player {
     const crowded = mg.anyUnitNearby(
       tile,
       1.5,
-      [UnitType.Wall, ...Structures.types],
+      [...HordePlaced.types, ...Structures.types],
       () => true,
       undefined,
       true,

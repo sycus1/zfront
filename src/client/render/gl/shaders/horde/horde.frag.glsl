@@ -1,8 +1,10 @@
 #version 300 es
 precision highp float;
 
-// Horde cells (R8, normalized): 0 empty, 1-251 density, 252-254 a wall
-// (barricade, stone, reinforced), 255 an elite. One texel per coarse cell (2x2 tiles).
+// Horde cells (R8, normalized): 0 empty, 1-247 density, 248 a mine, 249 a
+// resting noise beacon, 250 a sounding one, 251 a scavenger depot, 252-254 a
+// wall (barricade, stone, reinforced), 255 an elite. One texel per coarse
+// cell (2x2 tiles).
 uniform sampler2D uHorde;
 uniform ivec2 uGridSize;
 uniform float uTime;
@@ -15,6 +17,10 @@ uniform bool uArrowFinal;
 in vec2 vUV;
 out vec4 fragColor;
 
+const float MINE = 248.0;
+const float BEACON = 249.0;
+const float BEACON_SOUNDING = 250.0;
+const float DEPOT = 251.0;
 const float WALL = 252.0;
 const float ELITE = 255.0;
 
@@ -23,11 +29,11 @@ int byteAt(ivec2 cell) {
   return int(texelFetch(uHorde, cell, 0).r * 255.0 + 0.5);
 }
 
-// Density only: walls and elites count as empty, so they don't smear into
-// the horde around them.
+// Density only: buildings and elites count as empty, so they don't smear
+// into the horde around them.
 float densityAt(ivec2 cell) {
   int b = byteAt(cell);
-  return b >= int(WALL) ? 0.0 : float(b) / 255.0;
+  return b >= int(MINE) ? 0.0 : float(b) / 255.0;
 }
 
 // 1 inside an arrow (shaft then head, 12 cells long, pointing along the
@@ -57,6 +63,25 @@ void main() {
   if (raw == int(ELITE)) {
     float pulse = 0.75 + 0.25 * sin(uTime * 6.0);
     fragColor = vec4(vec3(0.95, 0.85, 0.2) * pulse, 1.0);
+    return;
+  }
+  if (raw >= int(MINE) && raw <= int(DEPOT)) {
+    vec2 f = fract(p) - 0.5;
+    float r = length(f);
+    if (raw == int(MINE)) {
+      // A dark disc with a red light.
+      if (r > 0.42) discard;
+      fragColor = r < 0.14 ? vec4(0.95, 0.15, 0.1, 1.0) : vec4(0.15, 0.15, 0.12, 1.0);
+    } else if (raw == int(DEPOT)) {
+      // A crate: tan with a darker rim.
+      float edge = 0.5 - max(abs(f.x), abs(f.y));
+      fragColor = vec4(vec3(0.72, 0.56, 0.3) * (edge < 0.1 ? 0.6 : 1.0), 1.0);
+    } else {
+      // A blue post; a sounding beacon pulses brighter.
+      float pulse = raw == int(BEACON_SOUNDING) ? 0.7 + 0.3 * sin(uTime * 10.0) : 0.45;
+      if (r > 0.45) discard;
+      fragColor = vec4(vec3(0.3, 0.6, 1.0) * (r < 0.2 ? 1.0 : pulse), 1.0);
+    }
     return;
   }
   if (raw >= int(WALL)) {

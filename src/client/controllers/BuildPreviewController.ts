@@ -34,12 +34,13 @@ import { UIState } from "../UIState";
 import { UserSettings } from "../UserSettings";
 import { GameView } from "../view";
 
-/** True for nuke types (AtomBomb, HydrogenBomb) and walls: ghost is preserved after placement so user can place multiple or keep selection (Enter/key confirm). */
+/** True for nuke types (AtomBomb, HydrogenBomb) walls and mines: ghost is preserved after placement so user can place multiple or keep selection (Enter/key confirm). */
 export function shouldPreserveGhostAfterBuild(unitType: UnitType): boolean {
   return (
     unitType === UnitType.AtomBomb ||
     unitType === UnitType.HydrogenBomb ||
-    unitType === UnitType.Wall
+    unitType === UnitType.Wall ||
+    unitType === UnitType.Mine
   );
 }
 

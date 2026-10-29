@@ -195,7 +195,28 @@ export enum UnitType {
   Factory = "Factory",
   /** zfront: blocks the horde and soaks its pressure. Not a horde target. */
   Wall = "Wall",
+  /** zfront: single use; blows up the horde around it when enough arrive. */
+  Mine = "Mine",
+  /** zfront: bait the horde heads for while it is sounding, then rests. */
+  NoiseBeacon = "Noise Beacon",
+  /** zfront: earns gold every tick. A horde target like any structure. */
+  Depot = "Scavenger Depot",
 }
+
+/** zfront: horde-mode units placed exactly where clicked, like walls. */
+export const HordePlaced = unitTypeGroup([
+  UnitType.Wall,
+  UnitType.Mine,
+  UnitType.NoiseBeacon,
+  UnitType.Depot,
+] as const);
+
+/** zfront: units disabled outside horde mode. */
+export const HordeOnly = unitTypeGroup([
+  UnitType.Mine,
+  UnitType.NoiseBeacon,
+  UnitType.Depot,
+] as const);
 
 export enum TrainType {
   Engine = "Engine",
@@ -228,7 +249,7 @@ export const Structures = unitTypeGroup([
 
 export const BuildMenus = unitTypeGroup([
   ...Structures.types,
-  UnitType.Wall,
+  ...HordePlaced.types,
   ...BuildableAttacks.types,
 ] as const);
 

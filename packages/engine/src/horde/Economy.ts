@@ -1,4 +1,8 @@
-import { MessageType, PlayerType } from "@openfront/engine-api/game/GameTypes";
+import {
+  MessageType,
+  PlayerType,
+  UnitType,
+} from "@openfront/engine-api/game/GameTypes";
 import { Game, Player } from "../game/Game";
 
 /**
@@ -6,7 +10,8 @@ import { Game, Player } from "../game/Game";
  * off for humans in horde mode (EngineConfig.goldAdditionRate); instead
  * each human earns:
  *
- * - an HQ trickle every tick while their HQ stands,
+ * - an HQ trickle every tick while their HQ stands, and more for each
+ *   scavenger depot they have built,
  * - a bounty for every zombie their turrets kill, more for an elite,
  * - a bonus for clearing a wave (all of it spawned and nearly all of it
  *   dead before the next one starts), which grows with the wave number,
@@ -18,6 +23,8 @@ import { Game, Player } from "../game/Game";
 export interface EconomyOptions {
   /** Gold per tick to each human whose HQ stands. */
   hqIncome: number;
+  /** Gold per tick for each finished scavenger depot, to its owner. */
+  depotIncome: number;
   /** Gold per shambler killed, to the turret's owner. */
   killBounty: number;
   /** Gold per elite killed, to the owner of the turret that finished it. */
@@ -33,12 +40,18 @@ export interface EconomyOptions {
   callEarlyGoldPerTick: number;
 }
 
-/** Pays the HQ trickle to every human still standing. */
+/** Pays the HQ trickle and depot income to every human still standing. */
 export function payHqIncome(game: Game, opts: EconomyOptions): void {
-  if (opts.hqIncome <= 0) return;
-  const income = BigInt(opts.hqIncome);
   for (const p of game.players()) {
-    if (p.type() === PlayerType.Human && p.isAlive()) p.addGold(income);
+    if (p.type() !== PlayerType.Human || !p.isAlive()) continue;
+    let depots = 0;
+    if (opts.depotIncome > 0) {
+      for (const u of p.units(UnitType.Depot)) {
+        if (!u.isUnderConstruction()) depots++;
+      }
+    }
+    const income = opts.hqIncome + depots * opts.depotIncome;
+    if (income > 0) p.addGold(BigInt(income));
   }
 }
 

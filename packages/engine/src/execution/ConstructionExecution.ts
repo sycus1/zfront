@@ -165,7 +165,10 @@ export class ConstructionExecution implements Execution {
         this.mg.addExecution(new FactoryExecution(this.structure!));
         break;
       case UnitType.Wall:
-        // Passive: the horde reads walls straight from the unit list.
+      case UnitType.Mine:
+      case UnitType.NoiseBeacon:
+      case UnitType.Depot:
+        // Passive: the horde reads these straight from the unit list.
         break;
       default:
         console.warn(
@@ -184,6 +187,9 @@ export class ConstructionExecution implements Execution {
       case UnitType.City:
       case UnitType.Factory:
       case UnitType.Wall:
+      case UnitType.Mine:
+      case UnitType.NoiseBeacon:
+      case UnitType.Depot:
         return true;
       default:
         return false;

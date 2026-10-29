@@ -293,6 +293,17 @@ _Started 2026-10-28._ Calling a wave early, and arrows on the map showing where 
 
 With `npm run balance:horde -- --call-early`, the bot calls each wave from 2 on as soon as it can. Every result is the same as without it (the Yorkshire fort ends on HQ 41,599 instead of 46,736), and the games end sooner: the turret games in 511 to 810 seconds instead of 810.
 
+## MVP: new buildings
+
+_Started 2026-10-29._ Mines, noise beacons and scavenger depots, as listed in the requirements. All three are horde-mode only (disabled in other modes) and are placed exactly where clicked, like walls: on your own land, two tiles from any other wall, building or structure.
+
+- **Mine** (10,000 gold). It waits until `mineTrigger` (40) zombies are within `mineRadius` (2 coarse cells), then kills up to `mineKills` (600) of them, nearest first, and deals `mineEliteDamage` (300, a whole elite) to every elite in range. It pays the usual bounties and then it's gone. It is neither a target nor an obstacle, so the horde walks straight onto it. The build ghost stays selected, so you can lay a field.
+- **Noise beacon** (25,000). It sounds for `baitActive` ticks (30 s) from when it is built, then rests for `baitCooldown` ticks (60 s), over and over. While it sounds it is a horde target with a `baitPull` (30 cell) head start in the flow field, so the horde heads for it ahead of anything up to 30 cells nearer, and presses on it like any building. While it rests the horde ignores it. `FlowField.compute` now takes a start distance for each source.
+- **Scavenger depot** (30,000). It pays its owner `depotIncome` (20) gold a tick once built, a fifth of the HQ's income, so it pays for itself in 2.5 minutes. The horde attacks it like any building. The extra income for depots on towns or ruins from the requirements is left for later: the maps don't mark such tiles yet.
+- The horde frame draws them: a mine as a dark disc with a red light, a beacon as a blue post that pulses while it sounds, a depot as a crate. Density bytes now stop at 247 to make room (see `HordeFrame.cells`). Horde snapshot version 9.
+
+`balance:horde` has a new `scavenge` strategy: two depots first, then turrets, with a ring of mines (rebuilt as they go off) before the outer ring of turrets. It wins from all five starts (Yorkshire HQ 37,172, the rest above 49,000). The other strategies' results are unchanged.
+
 ## Prerequisites
 
 - npm 12.1 or later. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`. The machine currently has npm 11.19.

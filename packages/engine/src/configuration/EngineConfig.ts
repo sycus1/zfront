@@ -370,6 +370,12 @@ export class EngineConfig extends Config {
       case UnitType.Wall:
         // A barricade, and each tier above it, costs the same.
         return this.costWrapper(() => 5_000, UnitType.Wall);
+      case UnitType.Mine:
+        return this.costWrapper(() => 10_000, UnitType.Mine);
+      case UnitType.NoiseBeacon:
+        return this.costWrapper(() => 25_000, UnitType.NoiseBeacon);
+      case UnitType.Depot:
+        return this.costWrapper(() => 30_000, UnitType.Depot);
       case UnitType.SAMLauncher:
         return this.costWrapper(
           (numUnits: number) => Math.min(3_000_000, (numUnits + 1) * 1_500_000),

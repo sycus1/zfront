@@ -30,8 +30,10 @@ export interface HordeFrame {
   width: number;
   height: number;
   /**
-   * One byte per cell: 0 empty, 1-251 horde density (zombies / 8, clamped),
-   * 252-254 a wall (barricade, stone, reinforced), 255 an elite.
+   * One byte per cell: 0 empty, 1-247 horde density (zombies / 8, clamped),
+   * 248 a mine, 249 a resting noise beacon, 250 a sounding one, 251 a
+   * scavenger depot, 252-254 a wall (barricade, stone, reinforced), 255 an
+   * elite.
    */
   cells: Uint8Array;
   alive: number;

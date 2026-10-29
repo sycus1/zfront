@@ -15,6 +15,7 @@ import { z } from "zod";
 import { Execution, Game, Player, Unit } from "../game/Game";
 import { execSnapshotType } from "../snapshot/ExecutionSnapshot";
 import type { ExecRecord, SnapshotReader } from "../snapshot/SnapshotContext";
+import { BuildingOptions, beaconSounding, detonate } from "./Buildings";
 import {
   payBounty,
   payCallEarlyBonus,
@@ -23,7 +24,7 @@ import {
   EconomyOptions,
 } from "./Economy";
 import { Elites } from "./Elites";
-import { FlowField, WALL_COST } from "./FlowField";
+import { FlowField, ORTHO_STEP, WALL_COST } from "./FlowField";
 import { buildCostField, HordeField } from "./HordeField";
 import { settle, SettleOptions, welcomeRefugees } from "./Settlement";
 import { WaveDirector, WavePlan } from "./WaveDirector";
@@ -46,7 +47,8 @@ import { WaveDirector, WavePlan } from "./WaveDirector";
  * never feed back into the simulation.
  */
 
-export interface HordeOptions extends SettleOptions, EconomyOptions {
+export interface HordeOptions
+  extends SettleOptions, EconomyOptions, BuildingOptions {
   /** Ticks from the end of the spawn phase to the first wave. */
   firstWaveDelay: number;
   waveInterval: number;
@@ -147,11 +149,19 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   turretHighGroundBonus: 2,
   turretKillsPerTick: 8,
   hqIncome: 100,
+  depotIncome: 20,
   killBounty: 4,
   eliteBounty: 100,
   clearBonusPerWave: 5_000,
   clearedPercent: 2,
   callEarlyGoldPerTick: 100,
+  mineRadius: 2,
+  mineTrigger: 40,
+  mineKills: 600,
+  mineEliteDamage: 300,
+  baitPull: 30,
+  baitActive: 300,
+  baitCooldown: 600,
   turretEliteDamage: 20,
   pressureShift: 5,
   structureHp: 3_000,
@@ -182,6 +192,7 @@ const TARGET_TYPES: readonly UnitType[] = [
   UnitType.MissileSilo,
   UnitType.SAMLauncher,
   UnitType.Factory,
+  UnitType.Depot,
 ];
 
 export interface HordeStats {
@@ -217,6 +228,8 @@ export class HordeExecution implements Execution {
   /** The disc within the longest turret range, and each cell's distance squared. */
   private turretReach!: Int32Array;
   private turretReachD2!: Int32Array;
+  /** The disc a mine watches, nearest cells first. */
+  private mineReach!: Int32Array;
   /** Terrain movement cost; the live cost adds structure cells on top. */
   private terrainCost!: Uint8Array;
   private director!: WaveDirector;
@@ -249,9 +262,14 @@ export class HordeExecution implements Execution {
   private hordeTargetCells: number[] = [];
   /** Wall cells from the latest scan: obstacles, but not targets. */
   private hordeWallCells: number[] = [];
+  /** Cells of beacons sounding at the latest scan: targets with a head start. */
+  private hordeBaitCells: number[] = [];
+  /** The tick each noise beacon (by unit id) was first seen built. */
+  private beaconSince = new Map<number, number>();
   /** Target cells the flow field was last computed from; null before the first. */
   private flowCells: number[] | null = null;
   private flowWalls: number[] = [];
+  private flowBait: number[] = [];
   /** Ticks of the latest and the first structure change since the last recompute. */
   private lastChangeTick = -1;
   private firstPendingTick = -1;
@@ -303,12 +321,14 @@ export class HordeExecution implements Execution {
     );
     this.turretReach = reach.offsets;
     this.turretReachD2 = reach.d2;
+    this.mineReach = discOffsets(opts.mineRadius, this.width).offsets;
     this.director = new WaveDirector(opts, this.width);
     this.hordeStructureAt = new Map();
     this.hordeTurrets = [];
     this.hordeHqAt = new Map();
     this.damage = new Map();
     this.lastHit = new Map();
+    this.beaconSince = new Map();
     this.hqHp = new Map();
     this.emitterCells = [];
     this.emitterRemaining = [];
@@ -347,6 +367,7 @@ export class HordeExecution implements Execution {
       this.field.step(this.hordeFlow.dist);
     }
     this.elites.step(this.field, this.hordeFlow.dist);
+    this.fireMines();
     this.fireTurrets();
     this.applyPressure();
     if (ticks % this.opts.repairInterval === 0) this.repair();
@@ -425,7 +446,18 @@ export class HordeExecution implements Execution {
     const cells = new Uint8Array(d.length);
     for (let i = 0; i < d.length; i++) {
       const v = d[i];
-      if (v !== 0) cells[i] = v >= 251 * 8 ? 251 : (v + 7) >> 3;
+      if (v !== 0) cells[i] = v >= DENSITY_MAX * 8 ? DENSITY_MAX : (v + 7) >> 3;
+    }
+    for (const u of this.mg.units(UnitType.Depot)) {
+      cells[this.cellOf(u.tile())] = BYTE_DEPOT;
+    }
+    for (const u of this.mg.units(UnitType.Mine)) {
+      cells[this.cellOf(u.tile())] = BYTE_MINE;
+    }
+    const sounding = new Set(this.hordeBaitCells);
+    for (const u of this.mg.units(UnitType.NoiseBeacon)) {
+      const c = this.cellOf(u.tile());
+      cells[c] = sounding.has(c) ? BYTE_BEACON_SOUNDING : BYTE_BEACON;
     }
     for (const c of this.hordeWallCells) {
       const level = this.hordeStructureAt.get(c)?.level() ?? 1;
@@ -504,6 +536,10 @@ export class HordeExecution implements Execution {
       mix(id);
       mix(dmg);
     }
+    for (const [id, since] of this.beaconSince) {
+      mix(id);
+      mix(since);
+    }
     return h >>> 0;
   }
 
@@ -541,6 +577,7 @@ export class HordeExecution implements Execution {
   private scanStructures(ticks: number): void {
     const units = this.mg!.units(TARGET_TYPES);
     const walls = this.mg!.units(UnitType.Wall);
+    const bait = this.soundingBeacons(ticks);
     // Each human player's spawn tile is their HQ: always a target, and an
     // obstacle the horde presses on. When it falls the player loses.
     const hqs: TileRef[] = [];
@@ -563,10 +600,14 @@ export class HordeExecution implements Execution {
     for (const u of walls) {
       sig = Math.imul(sig ^ u.tile(), 16777619);
     }
-    sig = Math.imul(sig ^ walls.length, 16777619) >>> 0;
+    sig = Math.imul(sig ^ walls.length, 16777619);
+    for (const u of bait) {
+      sig = Math.imul(sig ^ u.tile(), 16777619);
+    }
+    sig = Math.imul(sig ^ bait.length, 16777619) >>> 0;
     const changed = sig !== this.hordeStructureSig;
     if (changed || this.hordeObstaclesStale) {
-      this.rebuildObstacles(units, walls, hqs, hqOwners);
+      this.rebuildObstacles(units, walls, bait, hqs, hqOwners);
       this.hordeObstaclesStale = false;
     }
     if (changed) {
@@ -580,14 +621,42 @@ export class HordeExecution implements Execution {
       ticks - this.lastChangeTick >= this.opts.flowDebounce ||
       ticks - this.firstPendingTick >= this.opts.flowMaxDelay
     ) {
-      this.computeFlow(this.hordeTargetCells, this.hordeWallCells);
+      this.computeFlow(
+        this.hordeTargetCells,
+        this.hordeWallCells,
+        this.hordeBaitCells,
+      );
       this.firstPendingTick = -1;
     }
+  }
+
+  /**
+   * Finished noise beacons that are sounding at `ticks`. Each one's cycle
+   * starts when it is first seen built; beacons that are gone are forgotten.
+   */
+  private soundingBeacons(ticks: number): Unit[] {
+    const sounding: Unit[] = [];
+    const seen = new Set<number>();
+    for (const u of this.mg!.units(UnitType.NoiseBeacon)) {
+      if (u.isUnderConstruction()) continue;
+      seen.add(u.id());
+      let since = this.beaconSince.get(u.id());
+      if (since === undefined) {
+        since = ticks;
+        this.beaconSince.set(u.id(), ticks);
+      }
+      if (beaconSounding(this.opts, since, ticks)) sounding.push(u);
+    }
+    for (const id of [...this.beaconSince.keys()]) {
+      if (!seen.has(id)) this.beaconSince.delete(id);
+    }
+    return sounding;
   }
 
   private rebuildObstacles(
     units: readonly Unit[],
     walls: readonly Unit[],
+    bait: readonly Unit[],
     hqs: readonly TileRef[],
     hqOwners: readonly Player[],
   ): void {
@@ -615,6 +684,16 @@ export class HordeExecution implements Execution {
       if (!this.hordeHqAt.has(cell)) this.hordeHqAt.set(cell, hqOwners[k]);
     });
     this.hordeTargetCells = cells;
+    // A sounding beacon is a target the horde presses on, with a head start.
+    const baitCells: number[] = [];
+    for (const u of bait) {
+      const cell = this.cellOf(u.tile());
+      if (obstacle[cell] !== 0) continue;
+      obstacle[cell] = 1;
+      baitCells.push(cell);
+      this.hordeStructureAt.set(cell, u);
+    }
+    this.hordeBaitCells = baitCells;
     // Walls last: a cell already holding a target stays a target.
     const wallCells: number[] = [];
     for (const u of walls) {
@@ -635,19 +714,24 @@ export class HordeExecution implements Execution {
   private computeFlow(
     cells: readonly number[],
     walls: readonly number[],
+    bait: readonly number[],
   ): void {
     const cost = this.hordeFlow.cost;
     cost.set(this.terrainCost);
     for (const c of walls) {
       if (cost[c] !== 0) cost[c] = WALL_COST;
     }
-    for (const c of cells) {
+    for (const c of [...cells, ...bait]) {
       if (cost[c] === 0) cost[c] = 1;
     }
+    // Ordinary targets start `baitPull` cells behind sounding beacons.
+    const pull = bait.length > 0 ? this.opts.baitPull * ORTHO_STEP : 0;
+    const starts = [...cells.map(() => pull), ...bait.map(() => 0)];
     const start = performance.now();
-    this.hordeFlow.compute(cells);
+    this.hordeFlow.compute([...cells, ...bait], starts);
     this.flowCells = [...cells];
     this.flowWalls = [...walls];
+    this.flowBait = [...bait];
     const ms = performance.now() - start;
     const prof = this.hordeProfile;
     prof.recomputes++;
@@ -796,6 +880,25 @@ export class HordeExecution implements Execution {
     }
     this.emitterCells.length = kept;
     this.emitterRemaining.length = kept;
+  }
+
+  /** Sets off every finished mine with enough of the horde around it. */
+  private fireMines(): void {
+    for (const u of this.mg!.units(UnitType.Mine)) {
+      if (u.isUnderConstruction()) continue;
+      const c = this.cellOf(u.tile());
+      const hit = detonate(
+        this.opts,
+        this.field,
+        this.elites,
+        c,
+        this.mineReach,
+      );
+      if (hit === null) continue;
+      this.killed += hit.shamblers;
+      payBounty(u.owner(), this.opts, hit.shamblers, hit.elites);
+      u.delete(false);
+    }
   }
 
   private fireTurrets(): void {
@@ -967,6 +1070,8 @@ export class HordeExecution implements Execution {
       damageValues: [...this.damage.values()],
       lastHitIds: [...this.lastHit.keys()],
       lastHitTicks: [...this.lastHit.values()],
+      beaconIds: [...this.beaconSince.keys()],
+      beaconSince: [...this.beaconSince.values()],
       hqIds: [...this.hqHp.keys()],
       hqValues: [...this.hqHp.values()],
       hqsFallen: this.hqsFallen,
@@ -974,6 +1079,7 @@ export class HordeExecution implements Execution {
       structureSig: this.hordeStructureSig,
       flowCells: this.flowCells === null ? null : [...this.flowCells],
       flowWalls: [...this.flowWalls],
+      flowBait: [...this.flowBait],
       lastChangeTick: this.lastChangeTick,
       firstPendingTick: this.firstPendingTick,
       killed: this.killed,
@@ -999,8 +1105,10 @@ export class HordeExecution implements Execution {
     this.hordeStructureSig = s.structureSig;
     this.hordeTargetCells = [];
     this.hordeWallCells = [];
+    this.hordeBaitCells = [];
     this.flowCells = null;
     this.flowWalls = [];
+    this.flowBait = [];
     this.lastChangeTick = s.lastChangeTick;
     this.firstPendingTick = s.firstPendingTick;
     // Rebuilt on the next scan from the same units the original game has.
@@ -1023,7 +1131,12 @@ export class HordeExecution implements Execution {
       s.lastHitIds.map((id, i) => [id, s.lastHitTicks[i]]),
     );
     this.hqHp = new Map(s.hqIds.map((id, i) => [id, s.hqValues[i]]));
-    if (s.flowCells !== null) this.computeFlow(s.flowCells, s.flowWalls);
+    this.beaconSince = new Map(
+      s.beaconIds.map((id, i) => [id, s.beaconSince[i]]),
+    );
+    if (s.flowCells !== null) {
+      this.computeFlow(s.flowCells, s.flowWalls, s.flowBait);
+    }
   }
 }
 
@@ -1131,6 +1244,14 @@ const HordeOptionsSchema = z.object({
   clearBonusPerWave: zInt(),
   clearedPercent: zInt(),
   callEarlyGoldPerTick: zInt(),
+  depotIncome: zInt(),
+  mineRadius: zInt(),
+  mineTrigger: zInt(),
+  mineKills: zInt(),
+  mineEliteDamage: zInt(),
+  baitPull: zInt(),
+  baitActive: zInt(),
+  baitCooldown: zInt(),
   turretEliteDamage: zInt(),
   pressureShift: zInt(),
   structureHp: zInt(),
@@ -1184,6 +1305,8 @@ const HordeStateSchema = z.object({
   damageValues: z.array(zInt()),
   lastHitIds: z.array(zInt()),
   lastHitTicks: z.array(zInt()),
+  beaconIds: z.array(zInt()),
+  beaconSince: z.array(zInt()),
   hqIds: z.array(zInt()),
   hqValues: z.array(zInt()),
   hqsFallen: zInt(),
@@ -1192,12 +1315,20 @@ const HordeStateSchema = z.object({
   structureSig: zInt(),
   flowCells: z.array(zInt()).nullable(),
   flowWalls: z.array(zInt()),
+  flowBait: z.array(zInt()),
   lastChangeTick: zInt(),
   firstPendingTick: zInt(),
   killed: zInt(),
   structuresDestroyed: zInt(),
 });
 type HordeState = z.infer<typeof HordeStateSchema>;
+
+// Frame bytes above the density range (see HordeFrame.cells).
+const DENSITY_MAX = 247;
+const BYTE_MINE = 248;
+const BYTE_BEACON = 249;
+const BYTE_BEACON_SOUNDING = 250;
+const BYTE_DEPOT = 251;
 
 const OUTCOMES: readonly HordeOutcome[] = ["playing", "won", "lost"];
 
@@ -1211,7 +1342,7 @@ export function hordeOf(game: Game): HordeExecution | null {
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 8,
+  version: 9,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -1327,6 +1458,25 @@ export const HordeExecutionSnapshot = execSnapshotType({
       ...d,
       options: { ...d.options, callEarlyGoldPerTick: 0 },
       nextLandings: [],
+    }),
+    // 8 -> 9: mines, noise beacons and scavenger depots. None could be
+    // built before, so their options never come into play.
+    8: (d) => ({
+      ...d,
+      options: {
+        ...d.options,
+        depotIncome: 0,
+        mineRadius: 0,
+        mineTrigger: 0,
+        mineKills: 0,
+        mineEliteDamage: 0,
+        baitPull: 0,
+        baitActive: 0,
+        baitCooldown: 0,
+      },
+      beaconIds: [],
+      beaconSince: [],
+      flowBait: [],
     }),
   },
   cls: () => HordeExecution,
