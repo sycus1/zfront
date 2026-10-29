@@ -5,6 +5,7 @@
  *  - Conquest popups: "+ 500" gold text at conquered player locations (fade only)
  *  - Bonus popups:    "+ 45K" income text at port tiles (rises upward + fades)
  *  - Ghost cost label: persistent build-cost number under the ghost cursor
+ *  - Horde counts:    zombies in each horde blob, at the blob's centre
  */
 
 import type { Config } from "@openfront/engine-lib/configuration/Config";
@@ -140,6 +141,9 @@ export class WorldTextPass {
   // Persistent attack-troop labels. Controller pushes the full list each frame
   // (already interpolated), so we just iterate and render.
   private attackTroopLabels: AttackTroopLabel[] = [];
+
+  // Zombie counts inside the horde blobs, replaced on each horde frame.
+  private hordeCountLabels: AttackTroopLabel[] = [];
 
   // Settings reference
   private settings: RenderSettings;
@@ -375,6 +379,14 @@ export class WorldTextPass {
     this.attackTroopLabels = labels;
   }
 
+  /**
+   * Replace the zombie-count labels drawn inside the horde blobs (same look
+   * as attack labels); empty array clears them.
+   */
+  setHordeCountLabels(labels: AttackTroopLabel[]): void {
+    this.hordeCountLabels = labels;
+  }
+
   // -------------------------------------------------------------------------
   // Tick — cull expired, rebuild instance buffer
   // -------------------------------------------------------------------------
@@ -383,7 +395,8 @@ export class WorldTextPass {
     if (
       this.active.length === 0 &&
       this.ghostCostLabel === null &&
-      this.attackTroopLabels.length === 0
+      this.attackTroopLabels.length === 0 &&
+      this.hordeCountLabels.length === 0
     ) {
       this.instanceCount = 0;
       return;
@@ -453,7 +466,7 @@ export class WorldTextPass {
     // a constant on-screen size regardless of how zoomed-in the camera is.
     const attackScale =
       (ATTACK_LABEL_SCREEN_SCALE * dpr) / Math.max(zoom, 0.0001);
-    for (const label of this.attackTroopLabels) {
+    for (const label of [...this.attackTroopLabels, ...this.hordeCountLabels]) {
       layoutString(
         label.text,
         this.glyph,

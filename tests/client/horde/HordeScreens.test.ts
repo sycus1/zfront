@@ -7,7 +7,11 @@ import {
   HordeHud,
 } from "../../../src/client/hud/layers/HordeHud";
 import { WinModal } from "../../../src/client/hud/layers/WinModal";
-import { waveArrows } from "../../../src/client/render/gl/passes/HordePass";
+import {
+  hordeBlobs,
+  MAX_BLOB_LABELS,
+  waveArrows,
+} from "../../../src/client/render/gl/passes/HordePass";
 import {
   SendCallWaveIntentEvent,
   SendWinnerEvent,
@@ -210,6 +214,47 @@ describe("wave arrows", () => {
     expect(waveArrows(frame({ ...base, nextWave: 0 }))).toHaveLength(0);
     expect(waveArrows(frame({ ...base, hqCell: -1 }))).toHaveLength(0);
     expect(waveArrows(frame({ ...base, outcome: "lost" }))).toHaveLength(0);
+  });
+});
+
+describe("horde blob counts", () => {
+  it("splits the alive count between separate blobs by density", () => {
+    // 6x3 grid: a two-cell blob on the left (density 3 + 3), a one-cell blob
+    // with an elite next to it on the right, and a wall that isn't horde.
+    const cells = new Uint8Array(18);
+    cells[0] = 3;
+    cells[7] = 3; // diagonal neighbour of cell 0
+    cells[4] = 2;
+    cells[11] = 255;
+    cells[15] = 253;
+    const blobs = hordeBlobs(frame({ width: 6, height: 3, cells, alive: 64 }));
+    expect(blobs).toEqual([
+      // Cells (0,0) and (1,1): centre (1,1) in cells, (1.5,1.5) in tiles.
+      { x: 1.5, y: 1.5, count: 48 },
+      // Cell (4,0) weight 2 and the elite at (5,1) weight 1.
+      {
+        x: ((4.5 * 2 + 5.5) / 3) * 2 - 0.5,
+        y: ((0.5 * 2 + 1.5) / 3) * 2 - 0.5,
+        count: 17,
+      },
+    ]);
+  });
+
+  it("drops empty blobs and keeps only the largest", () => {
+    const n = MAX_BLOB_LABELS + 10;
+    // Isolated single cells every other column.
+    const cells = new Uint8Array(n * 2);
+    for (let i = 0; i < n; i++) cells[i * 2] = i === 0 ? 50 : 1;
+    const blobs = hordeBlobs(
+      frame({ width: n * 2, height: 1, cells, alive: 1000, elites: 0 }),
+    );
+    expect(blobs).toHaveLength(MAX_BLOB_LABELS);
+    expect(blobs[0].x).toBe(0.5);
+    expect(
+      hordeBlobs(
+        frame({ width: 1, height: 1, cells: Uint8Array.of(1), alive: 0 }),
+      ),
+    ).toEqual([]);
   });
 });
 
