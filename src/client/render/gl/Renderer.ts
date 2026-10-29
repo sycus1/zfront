@@ -1086,6 +1086,7 @@ export class GPURenderer {
     this.railroadPass.updateGhostPreview(data);
     this.rangeCirclePass.updateGhostPreview(data);
     this.crosshairPass.updateGhostPreview(data);
+    this.hordePass.updateGhostPreview(data);
     // The multiplier badge (x5) rides on the cost label but must show even
     // when there is no cost line — e.g. infinite gold (cost 0) or the
     // cursor-cost-label setting turned off.

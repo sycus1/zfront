@@ -15,6 +15,8 @@
  *   fort     builds one turret, seals the HQ in a ring of barricades, adds
  *            more turrets inside, then upgrades walls and turrets in turn
  *            and adds an outer ring of turrets.
+ *   spans    plays like fort, but with a post every 10 tiles round the
+ *            ring, joined by wall spans, instead of a barricade every 2.
  *   scavenge builds two scavenger depots first, then turrets as above
  *            with a ring of mines (rebuilt as they go off) before the
  *            outer ring.
@@ -74,7 +76,7 @@ const SPAWNS: Record<string, [number, number]> = {
   cumbria: [951, 1088],
 };
 
-const STRATEGIES = ["none", "turrets", "fort", "scavenge"] as const;
+const STRATEGIES = ["none", "turrets", "fort", "spans", "scavenge"] as const;
 type Strategy = (typeof STRATEGIES)[number];
 
 interface Options {
@@ -150,6 +152,8 @@ const TURRET_RING = ring(6, 6);
 /** An outer ring for once the inner one is full. */
 const OUTER_RING = ring(14, 7);
 const WALL_RING = ring(10, 2);
+/** Wall posts for the spans strategy: corners and midpoints, 5 cells apart. */
+const POST_RING = ring(10, 10);
 const DEPOTS: [number, number][] = [
   [3, 0],
   [-3, 0],
@@ -178,6 +182,7 @@ function spend(
   // what was built there to its level, before the next step starts.
   const T = UnitType.DefensePost;
   const W = UnitType.Wall;
+  const walls = s === "spans" ? POST_RING : WALL_RING;
   const plan: [UnitType, [number, number][], number][] =
     s === "scavenge"
       ? [
@@ -201,12 +206,12 @@ function spend(
           ]
         : [
             [T, TURRET_RING.slice(0, 1), 1],
-            [W, WALL_RING, 1],
+            [W, walls, 1],
             [T, TURRET_RING, 1],
-            [W, WALL_RING, 2],
+            [W, walls, 2],
             [T, TURRET_RING, 2],
             [T, OUTER_RING, 1],
-            [W, WALL_RING, 3],
+            [W, walls, 3],
             [T, TURRET_RING, 3],
             [T, OUTER_RING, 2],
             [T, OUTER_RING, 3],
@@ -253,7 +258,7 @@ interface WaveRow {
   hqEnd: number;
   killed: number;
   lost: number;
-  /** Count and total levels, as "count/levels". */
+  /** Count and total levels, as "count/levels"; walls add "+spans". */
   turrets: string;
   walls: string;
   /** Scavenger depots and mines standing, as "depots/mines". */
@@ -364,7 +369,7 @@ async function play(
     row.killed += s.killed - lastKilled;
     row.lost += s.structuresDestroyed - lastLost;
     row.turrets = levels(me, UnitType.DefensePost);
-    row.walls = levels(me, UnitType.Wall);
+    row.walls = `${levels(me, UnitType.Wall)}+${s.spans}`;
     row.other = `${me.units(UnitType.Depot).length}/${me.units(UnitType.Mine).length}`;
     row.tiles = me.numTilesOwned();
     row.gold = Number(me.gold());

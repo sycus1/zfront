@@ -7,13 +7,16 @@
  * elites as pulsing markers, an arrow at each place the announced wave
  * comes ashore, pointing at the HQ, and tracers from each turret that is
  * shooting to what it hit. It also finds each blob's zombie count
- * (`hordeBlobs`) for the renderer to write inside the blob.
+ * (`hordeBlobs`) for the renderer to write inside the blob. While a horde
+ * building is being placed it also draws the build grid round the cursor
+ * and the wall spans the new post would link up with.
  *
  * Spike instrumentation: transfer latency, worker encode time and upload
  * time are accumulated on `globalThis.__zfrontHorde` for measurement.
  */
 
 import { HordeFrame } from "@openfront/engine-api/game/GameUpdates";
+import type { GhostPreviewData } from "../../types";
 import hordeFragSrc from "../shaders/horde/horde.frag.glsl?raw";
 import hordeVertSrc from "../shaders/horde/horde.vert.glsl?raw";
 import {
@@ -72,6 +75,32 @@ function newStats(): HordeRenderStats {
 
 /** Arrows drawn at most; the default wave has 8 landings. */
 export const MAX_ARROWS = 8;
+
+/** Wall links previewed at most (a new post makes up to two). */
+export const MAX_LINKS = 2;
+
+/**
+ * The build grid's centre (the ghost's coarse cell, at its middle) and the
+ * previewed links as coarse-cell centres x0, y0, x1, y1, or null when no
+ * horde building is being placed.
+ */
+export function buildOverlay(
+  ghost: GhostPreviewData | null,
+): { cursor: [number, number]; links: Float32Array } | null {
+  if (ghost === null || !ghost.buildGrid) return null;
+  // Tile coordinates follow the shader's convention (+0.5 is the centre).
+  const cell = (t: number) => Math.floor((t + 0.5) / 2) + 0.5;
+  const links = new Float32Array(MAX_LINKS * 4);
+  const runs = ghost.wallLinks ?? [];
+  let n = 0;
+  for (let k = 0; k + 3 < runs.length && n < MAX_LINKS; k += 4, n++) {
+    links.set(runs.slice(k, k + 4).map(cell), n * 4);
+  }
+  return {
+    cursor: [cell(ghost.tileX), cell(ghost.tileY)],
+    links: links.subarray(0, n * 4),
+  };
+}
 
 /**
  * Arrows for the announced wave: per arrow, its landing cell's centre and
@@ -227,6 +256,12 @@ export class HordePass {
   private uShotCount: WebGLUniformLocation;
   private shots = new Float32Array(MAX_SHOTS * 4);
   private shotCount = 0;
+  private uCursor: WebGLUniformLocation;
+  private uLinks: WebGLUniformLocation;
+  private uLinkCount: WebGLUniformLocation;
+  private cursor: [number, number] = [-1, -1];
+  private links = new Float32Array(MAX_LINKS * 4);
+  private linkCount = 0;
   private arrows = new Float32Array(MAX_ARROWS * 4);
   private arrowCount = 0;
   private arrowFinal = false;
@@ -242,7 +277,7 @@ export class HordePass {
     this.program = createProgram(
       gl,
       shaderSrc(hordeVertSrc, { MAP_W: mapW, MAP_H: mapH }),
-      shaderSrc(hordeFragSrc, { MAX_ARROWS, MAX_SHOTS }),
+      shaderSrc(hordeFragSrc, { MAX_ARROWS, MAX_SHOTS, MAX_LINKS }),
       "HordePass",
     );
     this.uCamera = gl.getUniformLocation(this.program, "uCamera")!;
@@ -254,6 +289,9 @@ export class HordePass {
     this.uArrowFinal = gl.getUniformLocation(this.program, "uArrowFinal")!;
     this.uShots = gl.getUniformLocation(this.program, "uShots")!;
     this.uShotCount = gl.getUniformLocation(this.program, "uShotCount")!;
+    this.uCursor = gl.getUniformLocation(this.program, "uCursor")!;
+    this.uLinks = gl.getUniformLocation(this.program, "uLinks")!;
+    this.uLinkCount = gl.getUniformLocation(this.program, "uLinkCount")!;
     this.vao = createMapQuad(gl, mapW, mapH);
     const g = globalThis as { __zfrontHorde?: HordeRenderStats };
     this.stats = g.__zfrontHorde ??= newStats();
@@ -323,6 +361,14 @@ export class HordePass {
     s.hqMaxHp = frame.hqMaxHp;
   }
 
+  updateGhostPreview(ghost: GhostPreviewData | null): void {
+    const overlay = buildOverlay(ghost);
+    this.cursor = overlay?.cursor ?? [-1, -1];
+    this.links.fill(0);
+    this.links.set(overlay?.links ?? []);
+    this.linkCount = (overlay?.links.length ?? 0) / 4;
+  }
+
   draw(cam: Float32Array, timeSec: number): void {
     if (this.tex === null || this.stats.hidden) return;
     const gl = this.gl;
@@ -338,6 +384,9 @@ export class HordePass {
     gl.uniform1i(this.uArrowFinal, this.arrowFinal ? 1 : 0);
     gl.uniform4fv(this.uShots, this.shots);
     gl.uniform1i(this.uShotCount, this.shotCount);
+    gl.uniform2f(this.uCursor, this.cursor[0], this.cursor[1]);
+    gl.uniform4fv(this.uLinks, this.links);
+    gl.uniform1i(this.uLinkCount, this.linkCount);
     gl.uniformMatrix3fv(this.uCamera, false, cam);
     gl.bindVertexArray(this.vao);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
