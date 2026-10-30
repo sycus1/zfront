@@ -224,6 +224,15 @@ export const HordeOnly = unitTypeGroup([
   UnitType.Outpost,
 ] as const);
 
+/** zfront: units disabled in horde mode. */
+export const NotInHorde = unitTypeGroup([
+  UnitType.AtomBomb,
+  UnitType.HydrogenBomb,
+  UnitType.MIRV,
+  UnitType.MIRVWarhead,
+  UnitType.SAMLauncher,
+] as const);
+
 export enum TrainType {
   Engine = "Engine",
   TailEngine = "TailEngine",
