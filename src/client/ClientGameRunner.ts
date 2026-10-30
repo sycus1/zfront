@@ -13,6 +13,7 @@ import {
 } from "@openfront/engine-api/game/GameUpdates";
 import { ClientID, GameID } from "@openfront/engine-api/Schemas";
 import { Config } from "@openfront/engine-lib/configuration/Config";
+import { isTownScale } from "@openfront/engine-lib/game/MapScale";
 import { TerrainMapData } from "@openfront/engine-lib/game/TerrainMapLoader";
 import { findClosestBy } from "@openfront/engine-lib/Util";
 import { EventBus } from "@openfront/shared/EventBus";
@@ -737,6 +738,12 @@ async function createClientGame(
   }
 }
 
+/**
+ * zfront: tiles across the shorter side of the screen when the camera moves
+ * in on the HQ on a town map: about 500 m at 3 m a tile.
+ */
+const TOWN_VIEW_TILES = 160;
+
 export class ClientGameRunner {
   private myPlayer: PlayerView | null = null;
   private isActive = false;
@@ -868,7 +875,12 @@ export class ClientGameRunner {
         console.log("starting game! in client game runner");
         this.awaitingStart = false;
 
-        if (this.gameView.config().isRandomSpawn()) {
+        // zfront: on town maps the horde game is played close up, so once
+        // the HQ is down the camera moves in on it.
+        const townHorde =
+          this.gameView.config().horde() &&
+          isTownScale(this.gameView.config().gameConfig().gameMap);
+        if (this.gameView.config().isRandomSpawn() || townHorde) {
           const goToPlayer = () => {
             const myPlayer = this.gameView.myPlayer();
 
@@ -882,6 +894,7 @@ export class ClientGameRunner {
             }
 
             if (!this.gameView.inSpawnPhase() && !myPlayer.hasSpawned()) {
+              if (!this.gameView.config().isRandomSpawn()) return;
               showErrorModal(
                 "spawn_failed",
                 translateText("error_modal.spawn_failed.description"),
@@ -894,7 +907,15 @@ export class ClientGameRunner {
               return;
             }
 
-            this.eventBus.emit(new GoToPlayerEvent(myPlayer, 10));
+            this.eventBus.emit(
+              new GoToPlayerEvent(
+                myPlayer,
+                townHorde
+                  ? Math.min(window.innerWidth, window.innerHeight) /
+                      TOWN_VIEW_TILES
+                  : 10,
+              ),
+            );
           };
 
           goToPlayer();

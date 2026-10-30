@@ -95,6 +95,8 @@ export interface MapInfo {
   customTribes?: CustomTribe[];
   /** Map layers rendered between terrain and territory. */
   layers?: MapLayer[];
+  /** zfront: real-world metres per tile on close-up town maps; unset on continent maps. */
+  metresPerTile?: number;
   /** Default nation count defined in the map's manifest/info. */
   defaultNationCount: number;
 }
@@ -127,6 +129,7 @@ export const maps: readonly MapInfo[] = [
     specialFrequency: -1,
     defaultNationCount: 0,
     layers: [{ id: "roads", placement: "land" }],
+    metresPerTile: 3,
   },
   {
     id: "Britannia",
@@ -151,6 +154,7 @@ export const maps: readonly MapInfo[] = [
     specialFrequency: -1,
     defaultNationCount: 0,
     layers: [{ id: "roads", placement: "land" }],
+    metresPerTile: 3,
   },
   {
     id: "Whitby",
@@ -163,5 +167,6 @@ export const maps: readonly MapInfo[] = [
     specialFrequency: -1,
     defaultNationCount: 0,
     layers: [{ id: "roads", placement: "land" }],
+    metresPerTile: 3,
   },
 ];

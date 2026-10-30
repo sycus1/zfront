@@ -563,6 +563,7 @@ async function generate(key: string, town: Town): Promise<void> {
     multiplayer_frequency: 0,
     layers: [{ id: "roads", placement: "land" }],
     nations: [],
+    metres_per_tile: town.metresPerTile,
   };
   writeFileSync(join(dir, "info.json"), JSON.stringify(info, null, 2) + "\n");
 }

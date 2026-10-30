@@ -1,7 +1,10 @@
 # Real-town maps
 
-Makes a close-up zfront map of a real place: a 4 km square at 3 m per tile
-(1332 × 1332 tiles), where streets are corridors and buildings are walls.
+Makes a close-up zfront map of a real place: a 1.2 km square at 3 m per
+tile (400 × 400 tiles), where streets are corridors and buildings are walls.
+The size is the horde's neighbourhood scale (see "Neighbourhood scale" in
+docs/zfront/spike-plan.md); `metresPerTile` is written to `info.json` so the
+game knows to use the town horde numbers.
 This is the offline spike for postcode or place search; the plan is to move
 the drawing into the client later.
 

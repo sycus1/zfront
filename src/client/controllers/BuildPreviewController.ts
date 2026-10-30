@@ -412,7 +412,10 @@ export class BuildPreviewController implements Controller {
         rangeRadius = this.game.config().trainStationMaxRange();
         break;
       case UnitType.DefensePost:
-        rangeRadius = this.game.config().defensePostRange();
+        // zfront: in horde mode the Defense Post is a turret.
+        rangeRadius = this.game.config().horde()
+          ? this.game.config().hordeTurretRange()
+          : this.game.config().defensePostRange();
         break;
       case UnitType.Outpost:
         // zfront: the land it will claim once built.

@@ -145,7 +145,11 @@ function makeStartedRunner(
     transformHandler: { screenToWorldCoordinates: vi.fn() },
   };
   const gameView = {
-    config: () => ({ isRandomSpawn: () => false, isReplay: () => false }),
+    config: () => ({
+      isRandomSpawn: () => false,
+      isReplay: () => false,
+      horde: () => false,
+    }),
     inSpawnPhase: () => false,
     myPlayer: () => null,
     update: vi.fn(),
