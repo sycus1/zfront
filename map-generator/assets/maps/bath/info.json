@@ -1,0 +1,18 @@
+{
+  "id": "Bath",
+  "name": "Bath",
+  "translation_key": "map.bath",
+  "categories": ["new", "europe"],
+  "multiplayer_frequency": 0,
+  "layers": [
+    {
+      "id": "roads",
+      "placement": "land"
+    },
+    {
+      "id": "buildings",
+      "placement": "land"
+    }
+  ],
+  "nations": []
+}

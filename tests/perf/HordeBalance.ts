@@ -15,6 +15,8 @@
  *   fort     builds one turret, seals the HQ in a ring of barricades, adds
  *            more turrets inside, then upgrades walls and turrets in turn
  *            and adds an outer ring of turrets.
+ *   spans    plays like fort, but with a post every 10 tiles round the
+ *            ring, joined by wall spans, instead of a barricade every 2.
  *   scavenge builds two scavenger depots first, then turrets as above
  *            with a ring of mines (rebuilt as they go off) before the
  *            outer ring.
@@ -23,7 +25,10 @@
  *   npm run balance:horde -- [--strategy none,turrets,fort]
  *                            [--spawn yorkshire,lincolnshire,...]
  *                            [--seed balance] [--set waveInterval=600,...]
- *                            [--zone 20] [--call-early]
+ *                            [--zone 20] [--call-early] [--map Bath]
+ *
+ * --map plays another map; its HQ goes on the open land nearest the
+ * middle (spawn "centre"), since the named spawns are Britannia places.
  *
  * --zone gives the player land within that many tiles of the HQ at the
  * start, standing in for expanding by hand. --zone 0 gives none, so the
@@ -67,6 +72,8 @@ const PROJECT_ROOT = path.resolve(
 
 /** HQ positions in tiles: a spread of inland and coastal starts. */
 const SPAWNS: Record<string, [number, number]> = {
+  // Any map: the open land tile nearest the middle.
+  centre: [-1, -1],
   yorkshire: [1118, 1202],
   lincolnshire: [1271, 1403],
   hampshire: [1148, 1820],
@@ -74,10 +81,11 @@ const SPAWNS: Record<string, [number, number]> = {
   cumbria: [951, 1088],
 };
 
-const STRATEGIES = ["none", "turrets", "fort", "scavenge"] as const;
+const STRATEGIES = ["none", "turrets", "fort", "spans", "scavenge"] as const;
 type Strategy = (typeof STRATEGIES)[number];
 
 interface Options {
+  map: GameMapType;
   /** Horde options to try instead of the defaults. */
   horde: Partial<HordeOptions>;
   strategies: Strategy[];
@@ -90,9 +98,10 @@ interface Options {
 
 function parseArgs(argv: string[]): Options {
   const opts: Options = {
+    map: GameMapType.Britannia,
     horde: {},
     strategies: [...STRATEGIES],
-    spawns: Object.keys(SPAWNS),
+    spawns: Object.keys(SPAWNS).filter((s) => s !== "centre"),
     seed: "balance",
     zone: 20,
     callEarly: false,
@@ -100,6 +109,14 @@ function parseArgs(argv: string[]): Options {
   for (let i = 0; i < argv.length; i++) {
     const next = () => argv[++i];
     switch (argv[i]) {
+      case "--map": {
+        const name = next();
+        if (!(name in GameMapType)) throw new Error(`unknown map ${name}`);
+        opts.map = GameMapType[name as keyof typeof GameMapType];
+        // Britannia's named spawns mean nothing on other maps.
+        if (opts.map !== GameMapType.Britannia) opts.spawns = ["centre"];
+        break;
+      }
       case "--strategy":
         opts.strategies = next().split(",") as Strategy[];
         for (const s of opts.strategies) {
@@ -136,6 +153,22 @@ function parseArgs(argv: string[]): Options {
   return opts;
 }
 
+/** The land tile below mountain height nearest the middle of the map. */
+function openTileNearCentre(game: Game): [number, number] {
+  const cx = Math.floor(game.width() / 2);
+  const cy = Math.floor(game.height() / 2);
+  for (let r = 0; r < Math.max(cx, cy); r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const t = game.ref(cx + dx, cy + dy);
+        if (game.isLand(t) && game.magnitude(t) < 10) return [cx + dx, cy + dy];
+      }
+    }
+  }
+  throw new Error("no open land on the map");
+}
+
 /** Ring of tile offsets at `radius`, `step` tiles apart, clockwise from north. */
 function ring(radius: number, step: number): [number, number][] {
   const out: [number, number][] = [];
@@ -150,6 +183,8 @@ const TURRET_RING = ring(6, 6);
 /** An outer ring for once the inner one is full. */
 const OUTER_RING = ring(14, 7);
 const WALL_RING = ring(10, 2);
+/** Wall posts for the spans strategy: corners and midpoints, 5 cells apart. */
+const POST_RING = ring(10, 10);
 const DEPOTS: [number, number][] = [
   [3, 0],
   [-3, 0],
@@ -178,6 +213,7 @@ function spend(
   // what was built there to its level, before the next step starts.
   const T = UnitType.DefensePost;
   const W = UnitType.Wall;
+  const walls = s === "spans" ? POST_RING : WALL_RING;
   const plan: [UnitType, [number, number][], number][] =
     s === "scavenge"
       ? [
@@ -201,12 +237,12 @@ function spend(
           ]
         : [
             [T, TURRET_RING.slice(0, 1), 1],
-            [W, WALL_RING, 1],
+            [W, walls, 1],
             [T, TURRET_RING, 1],
-            [W, WALL_RING, 2],
+            [W, walls, 2],
             [T, TURRET_RING, 2],
             [T, OUTER_RING, 1],
-            [W, WALL_RING, 3],
+            [W, walls, 3],
             [T, TURRET_RING, 3],
             [T, OUTER_RING, 2],
             [T, OUTER_RING, 3],
@@ -253,7 +289,7 @@ interface WaveRow {
   hqEnd: number;
   killed: number;
   lost: number;
-  /** Count and total levels, as "count/levels". */
+  /** Count and total levels, as "count/levels"; walls add "+spans". */
   turrets: string;
   walls: string;
   /** Scavenger depots and mines standing, as "depots/mines". */
@@ -274,6 +310,7 @@ interface Result {
 }
 
 async function play(
+  map: GameMapType,
   horde: Partial<HordeOptions>,
   zone: number,
   callEarly: boolean,
@@ -282,7 +319,7 @@ async function play(
   strategy: Strategy,
 ): Promise<Result> {
   const gameConfig: GameConfig = {
-    gameMap: GameMapType.Britannia,
+    gameMap: map,
     gameMapSize: GameMapSize.Normal,
     gameMode: GameMode.FFA,
     gameType: GameType.Singleplayer,
@@ -305,6 +342,7 @@ async function play(
     await loadMapFiles(loader, gameConfig.gameMap, gameConfig.gameMapSize),
   );
   const game = createGame([], [], terrain.gameMap, terrain.miniGameMap, config);
+  if (spawn[0] < 0) spawn = openTileNearCentre(game);
   const info = new PlayerInfo("survivor", PlayerType.Human, null, "survivor");
   game.addExecution(
     new SpawnExecution(seed, info, game.ref(spawn[0], spawn[1])),
@@ -364,7 +402,7 @@ async function play(
     row.killed += s.killed - lastKilled;
     row.lost += s.structuresDestroyed - lastLost;
     row.turrets = levels(me, UnitType.DefensePost);
-    row.walls = levels(me, UnitType.Wall);
+    row.walls = `${levels(me, UnitType.Wall)}+${s.spans}`;
     row.other = `${me.units(UnitType.Depot).length}/${me.units(UnitType.Mine).length}`;
     row.tiles = me.numTilesOwned();
     row.gold = Number(me.gold());
@@ -399,6 +437,7 @@ async function main(): Promise<void> {
   for (const strategy of opts.strategies) {
     for (const name of opts.spawns) {
       const r = await play(
+        opts.map,
         opts.horde,
         opts.zone,
         opts.callEarly,

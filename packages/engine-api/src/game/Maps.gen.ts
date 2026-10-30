@@ -3,7 +3,10 @@
 // Regenerate with `npm run gen-maps`.
 
 export enum GameMapType {
+  Bath = "Bath", // map-generator/assets/maps/bath/info.json
   Britannia = "Britannia", // map-generator/assets/maps/britannia/info.json
+  Sheffield = "Sheffield", // map-generator/assets/maps/sheffield/info.json
+  Whitby = "Whitby", // map-generator/assets/maps/whitby/info.json
 }
 
 export type GameMapName = keyof typeof GameMapType;
@@ -114,6 +117,21 @@ export interface MapLayer {
 
 export const maps: readonly MapInfo[] = [
   {
+    id: "Bath",
+    type: GameMapType.Bath,
+    translationKey: "map.bath",
+    categories: ["new", "europe"],
+    multiplayerFrequency: 0,
+    ffaFrequency: -1,
+    teamFrequency: -1,
+    specialFrequency: -1,
+    defaultNationCount: 0,
+    layers: [
+      { id: "roads", placement: "land" },
+      { id: "buildings", placement: "land" },
+    ],
+  },
+  {
     id: "Britannia",
     type: GameMapType.Britannia,
     translationKey: "map.britannia",
@@ -124,5 +142,35 @@ export const maps: readonly MapInfo[] = [
     specialFrequency: -1,
     defaultNationCount: 20,
     themes: ["europe"],
+  },
+  {
+    id: "Sheffield",
+    type: GameMapType.Sheffield,
+    translationKey: "map.sheffield",
+    categories: ["new", "europe"],
+    multiplayerFrequency: 0,
+    ffaFrequency: -1,
+    teamFrequency: -1,
+    specialFrequency: -1,
+    defaultNationCount: 0,
+    layers: [
+      { id: "roads", placement: "land" },
+      { id: "buildings", placement: "land" },
+    ],
+  },
+  {
+    id: "Whitby",
+    type: GameMapType.Whitby,
+    translationKey: "map.whitby",
+    categories: ["new", "europe"],
+    multiplayerFrequency: 0,
+    ffaFrequency: -1,
+    teamFrequency: -1,
+    specialFrequency: -1,
+    defaultNationCount: 0,
+    layers: [
+      { id: "roads", placement: "land" },
+      { id: "buildings", placement: "land" },
+    ],
   },
 ];

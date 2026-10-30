@@ -201,6 +201,11 @@ export enum UnitType {
   NoiseBeacon = "Noise Beacon",
   /** zfront: earns gold every tick. A horde target like any structure. */
   Depot = "Scavenger Depot",
+  /**
+   * zfront: claims the land around it. The one building that may be placed
+   * a little beyond the player's border. A horde target.
+   */
+  Outpost = "Outpost",
 }
 
 /** zfront: horde-mode units placed exactly where clicked, like walls. */
@@ -216,6 +221,7 @@ export const HordeOnly = unitTypeGroup([
   UnitType.Mine,
   UnitType.NoiseBeacon,
   UnitType.Depot,
+  UnitType.Outpost,
 ] as const);
 
 export enum TrainType {
@@ -250,6 +256,7 @@ export const Structures = unitTypeGroup([
 export const BuildMenus = unitTypeGroup([
   ...Structures.types,
   ...HordePlaced.types,
+  UnitType.Outpost,
   ...BuildableAttacks.types,
 ] as const);
 
@@ -368,6 +375,10 @@ export interface BuildableUnit {
   upgradeCosts?: Gold[];
   overlappingRailroads: TileRef[];
   ghostRailPaths: TileRef[][];
+  // zfront: for a new wall post, pairs of tiles (the post, then the far end)
+  // for each span it would build, and what the spans cost on top.
+  wallLinks?: TileRef[];
+  wallLinkCost?: Gold;
 }
 
 // Total price of buying `amount` of a buildable in one intent. Upgrades use

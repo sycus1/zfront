@@ -32,3 +32,4 @@ map-generator/map-generator.exe
 .tick-records/
 .tick-baseline/
 .wrangler/
+scripts/realmap/cache/

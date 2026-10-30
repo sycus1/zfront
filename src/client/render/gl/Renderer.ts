@@ -139,6 +139,10 @@ export class GPURenderer {
   private namePass: NamePass;
   private fxPass: FxPass;
   private rangeCirclePass: RangeCirclePass;
+  /** zfront: the land settlers fill round the HQ, shown while building. */
+  private settleCirclePass: RangeCirclePass;
+  private settleCircle = { x: 0, y: 0, radius: 0 };
+  private ghostActive = false;
   private samRadiusPass: SAMRadiusPass;
   private crosshairPass: CrosshairPass;
   private railroadPass: RailroadPass;
@@ -561,6 +565,7 @@ export class GPURenderer {
 
     // --- Range circle (ghost preview radius) ---
     this.rangeCirclePass = new RangeCirclePass(gl);
+    this.settleCirclePass = new RangeCirclePass(gl);
 
     // --- SAM radius overlay (dashed green circles during build mode) ---
     this.samRadiusPass = new SAMRadiusPass(gl, mapW, this.settings);
@@ -712,8 +717,28 @@ export class GPURenderer {
     this.territoryPass.applyLiveDelta(tileState, changedTiles);
   }
 
+  /** zfront: the settle circle shows only while a building is being placed. */
+  private showSettleCircle(): void {
+    const c = this.settleCircle;
+    this.settleCirclePass.showCircle(
+      c.x,
+      c.y,
+      this.ghostActive ? c.radius : 0,
+      [0.45, 0.85, 0.45],
+    );
+  }
+
   updateHorde(frame: HordeFrame): void {
     this.hordePass.update(frame);
+    this.settleCircle =
+      frame.hqTile >= 0
+        ? {
+            x: frame.hqTile % this.mapW,
+            y: Math.floor(frame.hqTile / this.mapW),
+            radius: frame.settleRadius,
+          }
+        : { x: 0, y: 0, radius: 0 };
+    this.showSettleCircle();
     this.worldTextPass.setHordeCountLabels(
       this.hordePass.hidden
         ? []
@@ -1085,7 +1110,10 @@ export class GPURenderer {
     this.structurePass.updateGhostPreview(data);
     this.railroadPass.updateGhostPreview(data);
     this.rangeCirclePass.updateGhostPreview(data);
+    this.ghostActive = data !== null;
+    this.showSettleCircle();
     this.crosshairPass.updateGhostPreview(data);
+    this.hordePass.updateGhostPreview(data);
     // The multiplier badge (x5) rides on the cost label but must show even
     // when there is no cost line — e.g. infinite gold (cost 0) or the
     // cursor-cost-label setting turned off.
@@ -1387,6 +1415,7 @@ export class GPURenderer {
     if (pe.falloutBloom) this.bloomPass.draw(cam, this.frameTick);
     this.hordePass.draw(cam, performance.now() / 1000, zoom);
     this.samRadiusPass.draw(cam);
+    this.settleCirclePass.draw(cam);
     this.rangeCirclePass.draw(cam);
     this.nukeTrajectoryPass.draw(cam);
     this.crosshairPass.draw(cam);
@@ -1526,6 +1555,7 @@ export class GPURenderer {
     this.smallPlayerGlowPass.dispose();
     this.railroadPass.dispose();
     this.rangeCirclePass.dispose();
+    this.settleCirclePass.dispose();
     this.samRadiusPass.dispose();
     this.crosshairPass.dispose();
     this.structurePass.dispose();

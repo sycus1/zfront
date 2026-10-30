@@ -22,6 +22,11 @@ uniform int uShotCount;
 uniform int uLayer;
 // Zombies in a cell from which it is drawn as packed (HordeSwarm's cap).
 uniform float uPackedFrom;
+// Build mode (zfront): the ghost's coarse cell centre (x < 0 when off), and
+// the wall links it would make, as cell centres x0, y0, x1, y1.
+uniform vec2 uCursor;
+uniform vec4 uLinks[MAX_LINKS];
+uniform int uLinkCount;
 
 in vec2 vUV;
 out vec4 fragColor;
@@ -108,8 +113,39 @@ vec4 shotAt(vec2 p) {
   return hit;
 }
 
+// Cells round the cursor that show the build grid.
+const float GRID_RADIUS = 9.0;
+
+// Dashed gold lines along the previewed wall links: 1 on a dash, else 0.
+float linkAt(vec2 p) {
+  for (int k = 0; k < MAX_LINKS; k++) {
+    if (k >= uLinkCount) break;
+    vec2 a = uLinks[k].xy;
+    vec2 ab = uLinks[k].zw - a;
+    float len = max(length(ab), 1e-3);
+    float t = clamp(dot(p - a, ab) / (len * len), 0.0, 1.0);
+    if (length(p - (a + ab * t)) > 0.28) continue;
+    if (fract(t * len * 0.8 - uTime * 1.5) < 0.6) return 1.0;
+  }
+  return 0.0;
+}
+
+// Opacity of the build grid's cell edges at p, fading out from the cursor.
+// `px` is fwidth(p), taken in uniform control flow by the caller.
+float gridAt(vec2 p, vec2 px) {
+  if (uCursor.x < 0.0) return 0.0;
+  float r = length(p - uCursor);
+  if (r > GRID_RADIUS) return 0.0;
+  vec2 f = abs(fract(p + 0.5) - 0.5);
+  float line = max(step(f.x, px.x), step(f.y, px.y));
+  // The cursor's own cell gets a brighter outline.
+  bool here = all(equal(floor(p), floor(uCursor)));
+  return line * (here ? 0.9 : 0.35 * (1.0 - r / GRID_RADIUS));
+}
+
 void main() {
   vec2 p = vUV * vec2(uGridSize);
+  float grid = gridAt(p, fwidth(p));
   ivec2 cell = clamp(ivec2(p), ivec2(0), uGridSize - 1);
   int raw = byteAt(cell);
 
@@ -131,6 +167,10 @@ void main() {
     return;
   }
 
+  if (uCursor.x >= 0.0 && linkAt(p) > 0.0) {
+    fragColor = vec4(1.0, 0.82, 0.3, 0.95);
+    return;
+  }
   vec4 shot = shotAt(p);
   if (shot.a > 0.0) {
     fragColor = shot;
@@ -182,5 +222,7 @@ void main() {
     return;
   }
 
-  discard;
+  // Build mode: the grid's cell edges, over the squares.
+  if (grid <= 0.0) discard;
+  fragColor = vec4(vec3(1.0), grid);
 }

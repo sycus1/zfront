@@ -376,6 +376,8 @@ export class EngineConfig extends Config {
         return this.costWrapper(() => 25_000, UnitType.NoiseBeacon);
       case UnitType.Depot:
         return this.costWrapper(() => 30_000, UnitType.Depot);
+      case UnitType.Outpost:
+        return this.costWrapper(() => 20_000, UnitType.Outpost);
       case UnitType.SAMLauncher:
         return this.costWrapper(
           (numUnits: number) => Math.min(3_000_000, (numUnits + 1) * 1_500_000),
