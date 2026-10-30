@@ -39,6 +39,7 @@ import { WarshipExecutionSnapshot } from "../execution/WarshipExecution";
 import { WinCheckExecutionSnapshot } from "../execution/WinCheckExecution";
 import { CallWaveExecutionSnapshot } from "../horde/CallWaveExecution";
 import { HordeExecutionSnapshot } from "../horde/HordeExecution";
+import { LootCrateExecutionSnapshot } from "../horde/LootCrateExecution";
 import type { ExecutionSnapshotType } from "./ExecutionSnapshot";
 
 /**
@@ -52,6 +53,7 @@ export const EXECUTION_SNAPSHOT_TYPES = [
   AttackExecutionSnapshot,
   BoatRetreatExecutionSnapshot,
   CallWaveExecutionSnapshot,
+  LootCrateExecutionSnapshot,
   CityExecutionSnapshot,
   ConstructionExecutionSnapshot,
   DefensePostExecutionSnapshot,

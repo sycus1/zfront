@@ -314,6 +314,27 @@ _Started 2026-10-29._ Dan found there was no way to fight the first wave: the tu
 
 `balance:horde -- --zone 0`: doing nothing now lasts to wave 4 to 6 (was 2 or 3). `turrets` and `scavenge` win from all five starts with the HQ at or near full health. `fort` loses on Lincolnshire on wave 10 at 783 s; it won there with 8,708 HQ left before, so it was already marginal there.
 
+## Supply drops
+
+_Started 2026-10-29._ Dan found the income passive and "solved": the HQ trickle was most of the early income and a depot paid for itself in two waves with no downside. He picked supply drops plus a cut to the passive income from the options page (https://claude.ai/artifact/56Zx1HGPbYtU5DxFXvvG6c).
+
+- **Drops.** Every `crateInterval` ticks (200, 20 s) each human gets a supply crate, `crateMinDistance` to `crateMaxDistance` (8 to 25) tiles past a random border tile, away from their HQ, on open land the horde can walk. At most `crateMax` (3) wait for each player. Drops use their own PRNG (`zfront-crates`), so the waves' draws and landings are unchanged.
+- **Looting.** Clicking within 4 tiles of a crate sends a `loot_crate` intent. Looting takes `crateLootTicks` (50, 5 s), then the looter gets the gold and a "Supply crate looted" message. Any human can loot any crate, first come first served, which will matter for co-op.
+- **Risk.** Any zombie within `crateDangerRadius` (2 coarse cells) destroys a crate, mid-loot or not ("The horde got to your supply crate first"). A crate nobody starts looting is gone after `crateLife` (300 ticks, 30 s).
+- **Value.** `crateBaseGold` + `crateGoldPerWave` × wave (2,000 + 1,500 × N, wave 1 before the first), doubled (`crateLandingBonusPercent` 100) within `crateLandingRadius` (15 coarse cells) of an announced landing arrow.
+- **Passive cut.** `hqIncome` 100 → 50. Depots no longer pay gold (`depotIncome` 20 → 0); each finished depot makes drops come `depotCratePercent` (25%) faster, counting at most `depotCrateMax` (4), so up to twice as often.
+- **Client.** The horde pass draws each crate as a gold box with straps inside a ring: white and running down with its life (blinking in the last quarter), or green and filling while it is looted. Its gold is written above it. Horde snapshot version 11 (older games keep their economy and get no crates); `HordeFrame.crates`.
+
+`balance:horde -- --zone 0` has a new `--loot <percent>` flag: the bot loots that share of its crates 3 seconds after each drops. With the old economy (`--set hqIncome=100,depotIncome=20,crateInterval=0`) `turrets` and `scavenge` won all five starts and `fort` lost Lincolnshire. Now:
+
+| Bot loots   | `turrets`         | `fort`                                | `scavenge`        |
+| ----------- | ----------------- | ------------------------------------- | ----------------- |
+| no crates   | lost Lincolnshire | lost Yorkshire, Lincolnshire, Cumbria | lost Lincolnshire |
+| half        | won all five      | lost Lincolnshire                     | won all five      |
+| every crate | won all five      | lost Lincolnshire                     | won all five      |
+
+So ignoring the crates now costs games, and looting all of them gives about what the old trickle did: 20,000 to 90,000 gold a wave from crates in the turret games. `none` is unchanged (lost on waves 4 to 6).
+
 ## Prerequisites
 
 - npm 12.1 or later. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`. The machine currently has npm 11.19.

@@ -11,11 +11,13 @@ import { Game, Player } from "../game/Game";
  * each human earns:
  *
  * - an HQ trickle every tick while their HQ stands, and more for each
- *   scavenger depot they have built,
+ *   scavenger depot they have built (none by default: depots bring supply
+ *   drops sooner instead, see Crates.ts),
  * - a bounty for every zombie their turrets kill, more for an elite,
  * - a bonus for clearing a wave (all of it spawned and nearly all of it
  *   dead before the next one starts), which grows with the wave number,
- * - a bonus for calling the next wave early, for each tick skipped.
+ * - a bonus for calling the next wave early, for each tick skipped,
+ * - supply crates they loot (Crates.ts).
  *
  * Integers only; gold is a bigint on the player.
  */
