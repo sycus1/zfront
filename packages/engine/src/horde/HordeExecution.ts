@@ -44,6 +44,7 @@ import {
 } from "./Settlement";
 import { chooseLinks, LinkGrid, LinkPost, WallLink } from "./WallLinks";
 import { WaveDirector, WavePlan } from "./WaveDirector";
+import { readyToFire } from "./Weapons";
 
 /**
  * Zombie waves (zfront spike). The mass horde is a density field on the
@@ -1369,7 +1370,7 @@ export class HordeExecution implements Execution {
     const d2 = this.turretReachD2;
     this.hordeTurretShots = [];
     for (const t of this.hordeTurrets) {
-      if (!t.isActive()) continue;
+      if (!readyToFire(t)) continue;
       const c = this.cellOf(t.tile());
       const cx = c % w;
       const cy = (c - cx) / w;
