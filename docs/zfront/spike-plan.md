@@ -338,15 +338,15 @@ _Started 2026-10-29._ Dan found the income passive and "solved": the HQ trickle 
 - **Passive cut.** `hqIncome` 100 → 50. Depots no longer pay gold (`depotIncome` 20 → 0); each finished depot makes drops come `depotCratePercent` (25%) faster, counting at most `depotCrateMax` (4), so up to twice as often.
 - **Client.** The horde pass draws each crate as a gold box with straps inside a ring: white and running down with its life (blinking in the last quarter), or green and filling while it is looted. Its gold is written above it. Horde snapshot version 13 (older games keep their economy and get no crates); `HordeFrame.crates`.
 
-`balance:horde -- --zone 0` has a new `--loot <percent>` flag: the bot loots that share of its crates 3 seconds after each drops. With the old economy (`--set hqIncome=100,depotIncome=20,crateInterval=0`) `turrets` and `scavenge` won all five starts and `fort` lost Lincolnshire. Now:
+`balance:horde -- --zone 0` has a new `--loot <percent>` flag: the bot loots that share of its crates 3 seconds after each drops. On main with wall spans and Outposts, the old economy (`--set hqIncome=100,depotIncome=20,crateInterval=0`) won every start with `turrets`, `fort`, `scavenge` and `spans` (`fort` on Lincolnshire with 15,838 HQ left). Now (every other start won):
 
-| Bot loots   | `turrets`         | `fort`                                | `scavenge`        |
-| ----------- | ----------------- | ------------------------------------- | ----------------- |
-| no crates   | lost Lincolnshire | lost Yorkshire, Lincolnshire, Cumbria | lost Lincolnshire |
-| half        | won all five      | lost Lincolnshire                     | won all five      |
-| every crate | won all five      | lost Lincolnshire                     | won all five      |
+| Bot loots   | `turrets`                | `fort`                                           | `scavenge`              | `spans`                           |
+| ----------- | ------------------------ | ------------------------------------------------ | ----------------------- | --------------------------------- |
+| no crates   | won, Lincolnshire 11,848 | lost Lincolnshire; Yorkshire 4,431, Powys 29,758 | won, Lincolnshire 7,144 | lost Lincolnshire; Cumbria 25,873 |
+| half        | won, all above 47,000    | lost Lincolnshire                                | won, all above 41,000   | won, Lincolnshire 707             |
+| every crate | won, all above 49,000    | lost Lincolnshire                                | won, all above 45,000   | won, all above 48,000             |
 
-So ignoring the crates now costs games, and looting all of them gives about what the old trickle did: 20,000 to 90,000 gold a wave from crates in the turret games. `none` is unchanged (lost on waves 4 to 6).
+So ignoring the crates now costs HQ health and games, and looting all of them gives about what the old trickle did. The exception is `fort` on Lincolnshire, which now loses on wave 10 even looting every crate: it was the closest win before and the bot spends on walls, not turrets, so a lower trickle tips it. `none` is unchanged (lost on waves 4 to 6).
 
 ## Prerequisites
 
