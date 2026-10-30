@@ -17,6 +17,11 @@ uniform bool uArrowFinal;
 // centre of the cell it hit, in coarse cells.
 uniform vec4 uShots[MAX_SHOTS];
 uniform int uShotCount;
+// 0 draws only the packed horde, under the zombie squares (HordeSwarm); 1
+// draws everything else, over them.
+uniform int uLayer;
+// Zombies in a cell from which it is drawn as packed (HordeSwarm's cap).
+uniform float uPackedFrom;
 
 in vec2 vUV;
 out vec4 fragColor;
@@ -33,11 +38,12 @@ int byteAt(ivec2 cell) {
   return int(texelFetch(uHorde, cell, 0).r * 255.0 + 0.5);
 }
 
-// Density only: buildings and elites count as empty, so they don't smear
-// into the horde around them.
+// Zombies in a cell (see engine-lib game/HordeCells): buildings and elites
+// count as empty, so they don't smear into the horde around them.
 float densityAt(ivec2 cell) {
   int b = byteAt(cell);
-  return b >= int(MINE) ? 0.0 : float(b) / 255.0;
+  if (b >= int(MINE)) return 0.0;
+  return b <= EXACT_MAX ? float(b) : float(EXACT_MAX + (b - EXACT_MAX) * DENSITY_STEP);
 }
 
 // 1 inside an arrow (shaft then head, 12 cells long, pointing along the
@@ -107,6 +113,24 @@ void main() {
   ivec2 cell = clamp(ivec2(p), ivec2(0), uGridSize - 1);
   int raw = byteAt(cell);
 
+  if (uLayer == 0) {
+    // Packed horde: a dark mass, filtered by hand into blobs, where cells
+    // hold more zombies than get a square each. Thinner cells are left to
+    // the squares.
+    vec2 q = p - 0.5;
+    ivec2 i0 = ivec2(floor(q));
+    vec2 t = fract(q);
+    float d = mix(
+      mix(densityAt(i0), densityAt(i0 + ivec2(1, 0)), t.x),
+      mix(densityAt(i0 + ivec2(0, 1)), densityAt(i0 + ivec2(1, 1)), t.x),
+      t.y
+    );
+    float s = smoothstep(uPackedFrom, uPackedFrom * 6.0, d);
+    if (s <= 0.0) discard;
+    fragColor = vec4(mix(vec3(0.62, 0.07, 0.05), vec3(0.45, 0.03, 0.03), s), 0.75 + 0.2 * s);
+    return;
+  }
+
   vec4 shot = shotAt(p);
   if (shot.a > 0.0) {
     fragColor = shot;
@@ -158,20 +182,5 @@ void main() {
     return;
   }
 
-  // Mass horde: bilinear filtering by hand softens the coarse grid into
-  // blobs while leaving out walls and elites.
-  vec2 q = p - 0.5;
-  ivec2 i0 = ivec2(floor(q));
-  vec2 t = fract(q);
-  float d = mix(
-    mix(densityAt(i0), densityAt(i0 + ivec2(1, 0)), t.x),
-    mix(densityAt(i0 + ivec2(0, 1)), densityAt(i0 + ivec2(1, 1)), t.x),
-    t.y
-  );
-  if (d < 0.002) discard;
-  // sqrt so a thin trickle of zombies still reads clearly at map zoom.
-  float s = clamp(sqrt(d * 4.0), 0.0, 1.0);
-  vec3 color = mix(vec3(0.8, 0.1, 0.08), vec3(1.0, 0.3, 0.15), s);
-  float alpha = mix(0.7, 0.95, s);
-  fragColor = vec4(color, alpha);
+  discard;
 }

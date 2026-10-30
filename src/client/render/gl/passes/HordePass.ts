@@ -3,10 +3,11 @@
  *
  * The worker sends the horde as one byte per coarse (map4x) cell. The pass
  * uploads it as an R8 texture each time a new frame arrives and draws it on
- * a map-sized quad: density as a red overlay (linearly filtered into blobs),
- * elites as pulsing markers, an arrow at each place the announced wave
+ * a map-sized quad: elites as pulsing markers, an arrow at each place the announced wave
  * comes ashore, pointing at the HQ, and tracers from each turret that is
- * shooting to what it hit. It also finds each blob's zombie count
+ * shooting to what it hit. Zombies are squares, one each (`HordeSwarm`),
+ * walking between cells as the counts change; cells too packed for a square
+ * each also get a dark blob under the squares. It also finds each blob's zombie count
  * (`hordeBlobs`) for the renderer to write inside the blob.
  *
  * Spike instrumentation: transfer latency, worker encode time and upload
@@ -14,8 +15,21 @@
  */
 
 import { HordeFrame } from "@openfront/engine-api/game/GameUpdates";
+import {
+  HORDE_DENSITY_STEP,
+  HORDE_EXACT_MAX,
+  hordeDensityCount,
+} from "@openfront/engine-lib/game/HordeCells";
+import {
+  HordeSwarm,
+  SWARM_DEATH_SEC,
+  SWARM_FLOATS,
+} from "../../horde/HordeSwarm";
+import { DynamicInstanceBuffer } from "../DynamicBuffer";
 import hordeFragSrc from "../shaders/horde/horde.frag.glsl?raw";
 import hordeVertSrc from "../shaders/horde/horde.vert.glsl?raw";
+import swarmFragSrc from "../shaders/horde/swarm.frag.glsl?raw";
+import swarmVertSrc from "../shaders/horde/swarm.vert.glsl?raw";
 import {
   createMapQuad,
   createProgram,
@@ -140,9 +154,9 @@ export interface HordeBlob {
 
 /**
  * The horde's blobs: groups of touching (8-neighbour) density and elite
- * cells, largest first. The frame only carries density in buckets of 8, so
- * each blob gets its share of `frame.alive` by bucket weight, plus its
- * elites. Blobs that round to no zombies are left out.
+ * cells, largest first. The frame only carries exact counts for thin
+ * cells, so each blob gets its share of `frame.alive` by the counts the
+ * cells stand for, plus its elites. Blobs that round to no zombies are left out.
  */
 export function hordeBlobs(frame: HordeFrame): HordeBlob[] {
   const { width: w, height: h, cells } = frame;
@@ -162,9 +176,9 @@ export function hordeBlobs(frame: HordeFrame): HordeBlob[] {
       const c = stack.pop()!;
       const x = c % w;
       const y = (c - x) / w;
-      // An elite cell has no density of its own; weigh it as one bucket so
+      // An elite cell has no density of its own; weigh it as one zombie so
       // the centre still leans towards it.
-      const v = cells[c] === ELITE_BYTE ? 1 : cells[c];
+      const v = cells[c] === ELITE_BYTE ? 1 : hordeDensityCount(cells[c]);
       if (cells[c] === ELITE_BYTE) elites++;
       else weight += v;
       sx += (x + 0.5) * v;
@@ -225,6 +239,20 @@ export class HordePass {
   private uArrowFinal: WebGLUniformLocation;
   private uShots: WebGLUniformLocation;
   private uShotCount: WebGLUniformLocation;
+  private uLayer: WebGLUniformLocation;
+  private uPackedFrom: WebGLUniformLocation;
+  private readonly swarm = new HordeSwarm();
+  private swarmProgram: WebGLProgram;
+  private swarmVao: WebGLVertexArrayObject;
+  private swarmCorners: WebGLBuffer;
+  private swarmBuf: DynamicInstanceBuffer;
+  private swarmCount = 0;
+  private uSwarmCamera: WebGLUniformLocation;
+  private uSwarmNow: WebGLUniformLocation;
+  private uSwarmMoveStart: WebGLUniformLocation;
+  private uSwarmMoveSec: WebGLUniformLocation;
+  private uSwarmSize: WebGLUniformLocation;
+  private uSwarmRim: WebGLUniformLocation;
   private shots = new Float32Array(MAX_SHOTS * 4);
   private shotCount = 0;
   private arrows = new Float32Array(MAX_ARROWS * 4);
@@ -242,7 +270,12 @@ export class HordePass {
     this.program = createProgram(
       gl,
       shaderSrc(hordeVertSrc, { MAP_W: mapW, MAP_H: mapH }),
-      shaderSrc(hordeFragSrc, { MAX_ARROWS, MAX_SHOTS }),
+      shaderSrc(hordeFragSrc, {
+        MAX_ARROWS,
+        MAX_SHOTS,
+        EXACT_MAX: HORDE_EXACT_MAX,
+        DENSITY_STEP: HORDE_DENSITY_STEP,
+      }),
       "HordePass",
     );
     this.uCamera = gl.getUniformLocation(this.program, "uCamera")!;
@@ -254,7 +287,53 @@ export class HordePass {
     this.uArrowFinal = gl.getUniformLocation(this.program, "uArrowFinal")!;
     this.uShots = gl.getUniformLocation(this.program, "uShots")!;
     this.uShotCount = gl.getUniformLocation(this.program, "uShotCount")!;
+    this.uLayer = gl.getUniformLocation(this.program, "uLayer")!;
+    this.uPackedFrom = gl.getUniformLocation(this.program, "uPackedFrom")!;
     this.vao = createMapQuad(gl, mapW, mapH);
+
+    this.swarmProgram = createProgram(
+      gl,
+      shaderSrc(swarmVertSrc, { DEATH_SEC: SWARM_DEATH_SEC }),
+      swarmFragSrc,
+      "HordeSwarm",
+    );
+    const sp = this.swarmProgram;
+    this.uSwarmCamera = gl.getUniformLocation(sp, "uCamera")!;
+    this.uSwarmNow = gl.getUniformLocation(sp, "uNow")!;
+    this.uSwarmMoveStart = gl.getUniformLocation(sp, "uMoveStart")!;
+    this.uSwarmMoveSec = gl.getUniformLocation(sp, "uMoveSec")!;
+    this.uSwarmSize = gl.getUniformLocation(sp, "uSize")!;
+    this.uSwarmRim = gl.getUniformLocation(sp, "uRim")!;
+    this.swarmVao = gl.createVertexArray()!;
+    gl.bindVertexArray(this.swarmVao);
+    // A unit quad, as two triangles of corners in [0, 1].
+    const corners = (this.swarmCorners = gl.createBuffer()!);
+    gl.bindBuffer(gl.ARRAY_BUFFER, corners);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array([0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1]),
+      gl.STATIC_DRAW,
+    );
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    const instances = gl.createBuffer()!;
+    this.swarmBuf = new DynamicInstanceBuffer(
+      gl,
+      instances,
+      4096,
+      SWARM_FLOATS,
+    );
+    gl.bindBuffer(gl.ARRAY_BUFFER, instances);
+    const stride = SWARM_FLOATS * 4;
+    // from x, y, to x, y
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 4, gl.FLOAT, false, stride, 0);
+    gl.vertexAttribDivisor(1, 1);
+    // seed, born at, died at
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 3, gl.FLOAT, false, stride, 16);
+    gl.vertexAttribDivisor(2, 1);
+    gl.bindVertexArray(null);
     const g = globalThis as { __zfrontHorde?: HordeRenderStats };
     this.stats = g.__zfrontHorde ??= newStats();
     this.timerExt = gl.getExtension("EXT_disjoint_timer_query_webgl2");
@@ -307,6 +386,7 @@ export class HordePass {
     const shots = turretTracers(frame);
     this.shots.set(shots);
     this.shotCount = shots.length / 4;
+    this.updateSwarm(frame);
     const upload = performance.now() - start;
 
     const s = this.stats;
@@ -323,10 +403,60 @@ export class HordePass {
     s.hqMaxHp = frame.hqMaxHp;
   }
 
-  draw(cam: Float32Array, timeSec: number): void {
+  /**
+   * Moves the squares to the frame's counts and uploads them, when the
+   * counts have changed.
+   */
+  private updateSwarm(frame: HordeFrame): void {
+    const now = performance.now() / 1000;
+    const swarm = this.swarm;
+    if (!swarm.update(frame.cells, frame.width, frame.height, now)) return;
+    const buf = this.swarmBuf;
+    buf.ensureCapacity(Math.max(1, swarm.maxInstances()));
+    this.swarmCount = swarm.writeInstances(buf.float32, now);
+    const gl = this.gl;
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf.buffer);
+    gl.bufferSubData(
+      gl.ARRAY_BUFFER,
+      0,
+      buf.float32,
+      0,
+      this.swarmCount * SWARM_FLOATS,
+    );
+  }
+
+  /** `zoom` is screen pixels per tile. */
+  draw(cam: Float32Array, timeSec: number, zoom: number): void {
     if (this.tex === null || this.stats.hidden) return;
     const gl = this.gl;
     const timing = this.beginGpuTimer();
+    this.drawLayer(cam, timeSec, 0);
+    this.drawSwarm(cam, timeSec, zoom);
+    this.drawLayer(cam, timeSec, 1);
+    if (timing && this.timerExt) gl.endQuery(this.timerExt.TIME_ELAPSED_EXT);
+  }
+
+  private drawSwarm(cam: Float32Array, timeSec: number, zoom: number): void {
+    if (this.swarmCount === 0) return;
+    const gl = this.gl;
+    const swarm = this.swarm;
+    // A third of a tile, but never under about a pixel and a half.
+    const size = Math.max(0.34, 1.4 / Math.max(zoom, 1e-3));
+    gl.useProgram(this.swarmProgram);
+    gl.uniformMatrix3fv(this.uSwarmCamera, false, cam);
+    gl.uniform1f(this.uSwarmNow, timeSec);
+    gl.uniform1f(this.uSwarmMoveStart, swarm.moveStart);
+    gl.uniform1f(this.uSwarmMoveSec, swarm.moveSec);
+    gl.uniform1f(this.uSwarmSize, size);
+    gl.uniform1f(this.uSwarmRim, size * zoom >= 5 ? 0.18 : 0);
+    gl.bindVertexArray(this.swarmVao);
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, this.swarmCount);
+    gl.bindVertexArray(null);
+  }
+
+  /** Layer 0 is the packed horde under the squares, 1 the rest over them. */
+  private drawLayer(cam: Float32Array, timeSec: number, layer: number): void {
+    const gl = this.gl;
     gl.useProgram(this.program);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
@@ -338,11 +468,12 @@ export class HordePass {
     gl.uniform1i(this.uArrowFinal, this.arrowFinal ? 1 : 0);
     gl.uniform4fv(this.uShots, this.shots);
     gl.uniform1i(this.uShotCount, this.shotCount);
+    gl.uniform1i(this.uLayer, layer);
+    gl.uniform1f(this.uPackedFrom, this.swarm.cap);
     gl.uniformMatrix3fv(this.uCamera, false, cam);
     gl.bindVertexArray(this.vao);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     gl.bindVertexArray(null);
-    if (timing && this.timerExt) gl.endQuery(this.timerExt.TIME_ELAPSED_EXT);
   }
 
   /** Starts a GPU timer unless one is still in flight; collects the last. */
@@ -371,5 +502,9 @@ export class HordePass {
     if (this.tex) gl.deleteTexture(this.tex);
     if (this.query) gl.deleteQuery(this.query);
     gl.deleteVertexArray(this.vao);
+    gl.deleteProgram(this.swarmProgram);
+    gl.deleteVertexArray(this.swarmVao);
+    gl.deleteBuffer(this.swarmCorners);
+    this.swarmBuf.dispose();
   }
 }
