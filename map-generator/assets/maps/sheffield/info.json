@@ -14,5 +14,6 @@
       "placement": "land"
     }
   ],
-  "nations": []
+  "nations": [],
+  "metres_per_tile": 3
 }

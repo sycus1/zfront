@@ -4,7 +4,10 @@ import {
   HordeFrame,
   HordeOutcome,
 } from "@openfront/engine-api/game/GameUpdates";
-import { OUTPOST_CLAIM_RADIUS } from "@openfront/engine-lib/configuration/Config";
+import {
+  HORDE_TURRET_RANGE,
+  OUTPOST_CLAIM_RADIUS,
+} from "@openfront/engine-lib/configuration/Config";
 import { hordeDensityByte } from "@openfront/engine-lib/game/HordeCells";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import {
@@ -95,6 +98,11 @@ export interface HordeOptions
   minSpawnDistance: number;
   /** Nor further than this, where there is coast in between; 0 = no limit. */
   maxSpawnDistance: number;
+  /**
+   * 1 lets waves rise from any open cell, as on town maps where the horde
+   * comes out of the streets; 0 only from the shore and the map edge.
+   */
+  inlandSpawns: number;
   maxElites: number;
   eliteHp: number;
   /**
@@ -112,6 +120,12 @@ export interface HordeOptions
   /** Turret range in coarse cells (one coarse cell is 2x2 tiles). */
   turretRange: number;
   turretKillsPerTick: number;
+  /**
+   * Turrets fire every this many ticks, each volley killing up to
+   * `turretKillsPerTick` (so town maps, with zombies in the hundreds, can
+   * kill fewer than one a tick).
+   */
+  turretFireInterval: number;
   turretEliteDamage: number;
   /** Structure damage per tick is pressure >> pressureShift. */
   pressureShift: number;
@@ -177,6 +191,7 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   wavesPerDirection: 3,
   minSpawnDistance: 30,
   maxSpawnDistance: 60,
+  inlandSpawns: 0,
   maxElites: 500,
   eliteHp: 300,
   shamblerSpeed: 3,
@@ -184,10 +199,11 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   elitePressure: 200,
   blockedMagnitude: 20,
   cellCap: 2_000,
-  turretRange: 8,
+  turretRange: HORDE_TURRET_RANGE,
   turretLevelPercent: 50,
   turretHighGroundBonus: 2,
   turretKillsPerTick: 8,
+  turretFireInterval: 1,
   hqIncome: 50,
   depotIncome: 0,
   killBounty: 4,
@@ -448,11 +464,12 @@ export class HordeExecution implements Execution {
       opts.eliteSpeed,
       opts.elitePressure,
     );
-    this.spawnCells = coastalCells(
+    this.spawnCells = spawnableCells(
       mg,
       this.terrainCost,
       this.width,
       this.height,
+      opts.inlandSpawns !== 0,
     );
     this.turretOffsets = discOffsets(opts.turretRange, this.width).offsets;
     const reach = discOffsets(
@@ -518,7 +535,8 @@ export class HordeExecution implements Execution {
     }
     this.elites.step(this.field, this.hordeFlow.dist);
     this.fireMines();
-    this.fireTurrets();
+    if (ticks % this.opts.turretFireInterval === 0) this.fireTurrets();
+    else this.hordeTurretShots = [];
     this.fireMortars();
     this.applyPressure();
     if (ticks % this.opts.repairInterval === 0) this.repair();
@@ -1783,12 +1801,16 @@ function newProfile() {
   };
 }
 
-/** Land cells on the map edge or next to water: where waves come ashore. */
-function coastalCells(
+/**
+ * Where waves can rise: land cells on the map edge or next to water, where
+ * they come ashore, or with `inland` every open cell.
+ */
+function spawnableCells(
   mg: Game,
   cost: Uint8Array,
   w: number,
   h: number,
+  inland: boolean,
 ): Int32Array {
   const mini = mg.miniMap();
   const cells: number[] = [];
@@ -1796,7 +1818,7 @@ function coastalCells(
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
       if (cost[i] === 0) continue;
-      let coastal = x === 0 || y === 0 || x === w - 1 || y === h - 1;
+      let coastal = inland || x === 0 || y === 0 || x === w - 1 || y === h - 1;
       if (!coastal) {
         coastal =
           !mini.isLand(mini.ref(x - 1, y)) ||
@@ -1849,6 +1871,7 @@ const HordeOptionsSchema = z.object({
   wavesPerDirection: zInt(),
   minSpawnDistance: zInt(),
   maxSpawnDistance: zInt(),
+  inlandSpawns: zInt(),
   maxElites: zInt(),
   eliteHp: zInt(),
   shamblerSpeed: zInt(),
@@ -1860,6 +1883,7 @@ const HordeOptionsSchema = z.object({
   turretLevelPercent: zInt(),
   turretHighGroundBonus: zInt(),
   turretKillsPerTick: zInt(),
+  turretFireInterval: zInt(),
   hqIncome: zInt(),
   killBounty: zInt(),
   eliteBounty: zInt(),
@@ -2046,7 +2070,7 @@ export function hordeOf(game: Game): HordeExecution | null {
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 14,
+  version: 15,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -2270,6 +2294,12 @@ export const HordeExecutionSnapshot = execSnapshotType({
         mortarLevelPercent: 0,
       },
       mortars: null,
+    }),
+    // 14 -> 15: turret volleys and inland spawns. Older games fired every
+    // tick and only spawned on the shore and the map edge.
+    14: (d) => ({
+      ...d,
+      options: { ...d.options, turretFireInterval: 1, inlandSpawns: 0 },
     }),
   },
   cls: () => HordeExecution,

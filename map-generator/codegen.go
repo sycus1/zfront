@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -74,6 +75,9 @@ type mapInfo struct {
 	} `json:"nations"`
 	// Map layers rendered between terrain and territory.
 	Layers []mapLayer `json:"layers"`
+	// zfront: real-world metres per tile on close-up town maps. 0 (or
+	// omitted) means a continent-scale map.
+	MetresPerTile float64 `json:"metres_per_tile"`
 }
 
 // mapLayer represents a single map layer definition from info.json.
@@ -393,6 +397,8 @@ func generateMapsTS(infos []mapInfo) (string, error) {
 	b.WriteString("  customTribes?: CustomTribe[];\n")
 	b.WriteString("  /** Map layers rendered between terrain and territory. */\n")
 	b.WriteString("  layers?: MapLayer[];\n")
+	b.WriteString("  /** zfront: real-world metres per tile on close-up town maps; unset on continent maps. */\n")
+	b.WriteString("  metresPerTile?: number;\n")
 	b.WriteString("  /** Default nation count defined in the map's manifest/info. */\n")
 	b.WriteString("  defaultNationCount: number;\n")
 	b.WriteString("}\n\n")
@@ -506,6 +512,9 @@ func generateMapsTS(infos []mapInfo) (string, error) {
 				b.WriteString(fmt.Sprintf("{id: %q, placement: %q%s}", layer.ID, layer.Placement, nukStr))
 			}
 			b.WriteString("],\n")
+		}
+		if info.MetresPerTile > 0 {
+			b.WriteString(fmt.Sprintf("    metresPerTile: %s,\n", strconv.FormatFloat(info.MetresPerTile, 'f', -1, 64)))
 		}
 		b.WriteString("  },\n")
 	}

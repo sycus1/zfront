@@ -581,6 +581,7 @@ async function generate(key: string, town: Town): Promise<void> {
       { id: "buildings", placement: "land" },
     ],
     nations: [],
+    metres_per_tile: town.metresPerTile,
   };
   writeFileSync(join(dir, "info.json"), JSON.stringify(info, null, 2) + "\n");
 }
