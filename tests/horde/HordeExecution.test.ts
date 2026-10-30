@@ -1,4 +1,9 @@
 import { PlayerType, UnitType } from "@openfront/engine-api/game/GameTypes";
+import {
+  HORDE_EXACT_MAX,
+  hordeDensityByte,
+  hordeDensityCount,
+} from "@openfront/engine-lib/game/HordeCells";
 import { Game } from "@openfront/engine/game/Game";
 import {
   HordeExecution,
@@ -152,6 +157,24 @@ describe("HordeExecution", () => {
     expect(frame.killed).toBe(horde.stats().killed);
     expect(frame.killed).toBeGreaterThan(0);
     expect(frame.outcome).toBe("playing");
+  });
+
+  test("the frame carries exact counts for thin cells", async () => {
+    const { game, horde } = await hordeGame(SMALL_WAVES, [[50, 44]]);
+    run(game, 60);
+    const frame = horde.encodeFrame()!;
+    const density = horde.density();
+    let thin = 0;
+    for (let c = 0; c < density.length; c++) {
+      const b = frame.cells[c];
+      if (b >= 248) continue;
+      expect(b).toBe(hordeDensityByte(density[c]));
+      if (density[c] > 0 && density[c] <= HORDE_EXACT_MAX) {
+        expect(hordeDensityCount(b)).toBe(density[c]);
+        thin++;
+      }
+    }
+    expect(thin).toBeGreaterThan(0);
   });
 
   describe("flow-field debounce", () => {

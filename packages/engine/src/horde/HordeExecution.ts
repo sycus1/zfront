@@ -8,6 +8,7 @@ import {
   HORDE_TURRET_RANGE,
   OUTPOST_CLAIM_RADIUS,
 } from "@openfront/engine-lib/configuration/Config";
+import { hordeDensityByte } from "@openfront/engine-lib/game/HordeCells";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import {
   zInt,
@@ -47,6 +48,7 @@ import {
 } from "./Settlement";
 import { chooseLinks, LinkGrid, LinkPost, WallLink } from "./WallLinks";
 import { WaveDirector, WavePlan } from "./WaveDirector";
+import { readyToFire } from "./Weapons";
 
 /**
  * Zombie waves (zfront spike). The mass horde is a density field on the
@@ -627,7 +629,7 @@ export class HordeExecution implements Execution {
     const cells = new Uint8Array(d.length);
     for (let i = 0; i < d.length; i++) {
       const v = d[i];
-      if (v !== 0) cells[i] = v >= DENSITY_MAX * 8 ? DENSITY_MAX : (v + 7) >> 3;
+      if (v !== 0) cells[i] = hordeDensityByte(v);
     }
     for (const u of this.mg.units(UnitType.Depot)) {
       cells[this.cellOf(u.tile())] = BYTE_DEPOT;
@@ -1387,7 +1389,7 @@ export class HordeExecution implements Execution {
     const d2 = this.turretReachD2;
     this.hordeTurretShots = [];
     for (const t of this.hordeTurrets) {
-      if (!t.isActive()) continue;
+      if (!readyToFire(t)) continue;
       const c = this.cellOf(t.tile());
       const cx = c % w;
       const cy = (c - cx) / w;
@@ -1946,7 +1948,6 @@ const HordeStateSchema = z.object({
 type HordeState = z.infer<typeof HordeStateSchema>;
 
 // Frame bytes above the density range (see HordeFrame.cells).
-const DENSITY_MAX = 247;
 const BYTE_MINE = 248;
 const BYTE_BEACON = 249;
 const BYTE_BEACON_SOUNDING = 250;

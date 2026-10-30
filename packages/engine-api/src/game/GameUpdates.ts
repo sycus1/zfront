@@ -30,7 +30,8 @@ export interface HordeFrame {
   width: number;
   height: number;
   /**
-   * One byte per cell: 0 empty, 1-247 horde density (zombies / 8, clamped),
+   * One byte per cell: 0 empty, 1-247 horde density (the exact count up to
+   * 64 zombies, coarser above; see engine-lib `game/HordeCells`),
    * 248 a mine, 249 a resting noise beacon, 250 a sounding one, 251 a
    * scavenger depot, 252-254 a wall (barricade, stone, reinforced), 255 an
    * elite.
