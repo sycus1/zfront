@@ -4,7 +4,15 @@ import {
   HordeFrame,
   HordeOutcome,
 } from "@openfront/engine-api/game/GameUpdates";
-import { OUTPOST_CLAIM_RADIUS } from "@openfront/engine-lib/configuration/Config";
+import {
+  HORDE_TURRET_RANGE,
+  OUTPOST_CLAIM_RADIUS,
+} from "@openfront/engine-lib/configuration/Config";
+import { hordeDensityByte } from "@openfront/engine-lib/game/HordeCells";
+import {
+  HORDE_BLOCKED_MAGNITUDE,
+  WALL_SNAP_RADIUS,
+} from "@openfront/engine-lib/game/HordeTerrain";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import {
   zInt,
@@ -36,6 +44,7 @@ import {
 import { Elites } from "./Elites";
 import { FlowField, ORTHO_STEP, WALL_COST } from "./FlowField";
 import { buildCostField, HordeField } from "./HordeField";
+import { MortarGun, MortarOptions, Mortars, MortarState } from "./Mortars";
 import {
   passiveRadius,
   settle,
@@ -44,6 +53,7 @@ import {
 } from "./Settlement";
 import { chooseLinks, LinkGrid, LinkPost, WallLink } from "./WallLinks";
 import { WaveDirector, WavePlan } from "./WaveDirector";
+import { readyToFire } from "./Weapons";
 
 /**
  * Zombie waves (zfront spike). The mass horde is a density field on the
@@ -52,8 +62,9 @@ import { WaveDirector, WavePlan } from "./WaveDirector";
  * press on them until they fall. Walls are obstacles too, but not targets:
  * the horde goes round them where it can and breaks through where it must.
  * Each new wall post links to nearby posts and mountains with spans that
- * block like walls (see WallLinks). Defense Posts stand in for turrets. The
- * WaveDirector plans each wave's size and directions.
+ * block like walls (see WallLinks). Defense Posts stand in for turrets and
+ * Missile Silos for mortars (see Mortars). The WaveDirector plans each
+ * wave's size and directions.
  *
  * The player wins by keeping their HQ standing until the wave after
  * `wavesToWin` would arrive, and loses when every human HQ has fallen.
@@ -70,7 +81,8 @@ export interface HordeOptions
     ClaimOptions,
     EconomyOptions,
     BuildingOptions,
-    CrateOptions {
+    CrateOptions,
+    MortarOptions {
   /** Ticks from the end of the spawn phase to the first wave. */
   firstWaveDelay: number;
   waveInterval: number;
@@ -90,6 +102,11 @@ export interface HordeOptions
   minSpawnDistance: number;
   /** Nor further than this, where there is coast in between; 0 = no limit. */
   maxSpawnDistance: number;
+  /**
+   * 1 lets waves rise from any open cell, as on town maps where the horde
+   * comes out of the streets; 0 only from the shore and the map edge.
+   */
+  inlandSpawns: number;
   maxElites: number;
   eliteHp: number;
   /**
@@ -107,6 +124,12 @@ export interface HordeOptions
   /** Turret range in coarse cells (one coarse cell is 2x2 tiles). */
   turretRange: number;
   turretKillsPerTick: number;
+  /**
+   * Turrets fire every this many ticks, each volley killing up to
+   * `turretKillsPerTick` (so town maps, with zombies in the hundreds, can
+   * kill fewer than one a tick).
+   */
+  turretFireInterval: number;
   turretEliteDamage: number;
   /** Structure damage per tick is pressure >> pressureShift. */
   pressureShift: number;
@@ -158,7 +181,8 @@ export interface HordeOptions
 // and shamblers that walk a coarse cell every 3 ticks. Gold comes from the
 // HQ, turret kills, cleared waves and supply crates the player loots (see
 // "Supply drops" in docs/zfront/spike-plan.md). An undefended HQ falls on
-// wave 2 or 3; a ring of upgraded turrets wins.
+// wave 2 or 3; a ring of upgraded turrets wins, and mortars ("Mortars"
+// there) help it win with more HQ left.
 export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   firstWaveDelay: 600,
   waveInterval: 750,
@@ -171,17 +195,19 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   wavesPerDirection: 3,
   minSpawnDistance: 30,
   maxSpawnDistance: 60,
+  inlandSpawns: 0,
   maxElites: 500,
   eliteHp: 300,
   shamblerSpeed: 3,
   eliteSpeed: 2,
   elitePressure: 200,
-  blockedMagnitude: 20,
+  blockedMagnitude: HORDE_BLOCKED_MAGNITUDE,
   cellCap: 2_000,
-  turretRange: 8,
+  turretRange: HORDE_TURRET_RANGE,
   turretLevelPercent: 50,
   turretHighGroundBonus: 2,
   turretKillsPerTick: 8,
+  turretFireInterval: 1,
   hqIncome: 50,
   depotIncome: 0,
   killBounty: 4,
@@ -206,6 +232,15 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   mineTrigger: 40,
   mineKills: 600,
   mineEliteDamage: 300,
+  mortarRange: 20,
+  mortarMinRange: 4,
+  mortarReload: 30,
+  mortarFlight: 15,
+  mortarBlastRadius: 2,
+  mortarKills: 600,
+  mortarEliteDamage: 150,
+  mortarMinTarget: 40,
+  mortarLevelPercent: 50,
   baitPull: 30,
   baitActive: 300,
   baitCooldown: 600,
@@ -215,7 +250,7 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   wallHp: 4_000,
   stoneWallHp: 12_000,
   reinforcedWallHp: 30_000,
-  wallSnapRadius: 8,
+  wallSnapRadius: WALL_SNAP_RADIUS,
   spanCostPerCell: 1_000,
   wallClearRadius: 3,
   repairDelay: 50,
@@ -317,6 +352,8 @@ export interface HordeStats {
   structuresDestroyed: number;
   /** Gold paid out for supply crates. */
   crateGold: number;
+  /** Shamblers killed by mortar shells (also counted in `killed`). */
+  mortarKilled: number;
   /** The first human player's HQ health, or 0 when none is alive. */
   hqHp: number;
   hqsFallen: number;
@@ -351,6 +388,7 @@ export class HordeExecution implements Execution {
   private terrainCost!: Uint8Array;
   private director!: WaveDirector;
   private crates!: Crates;
+  private mortars!: Mortars;
 
   private wave = 0;
   private wavesSurvived = 0;
@@ -373,6 +411,9 @@ export class HordeExecution implements Execution {
   // Cosmetic: [turret cell, target cell] pairs for the turrets that hit
   // something on the last tick. Not part of the simulation state.
   private hordeTurretShots: number[] = [];
+  private hordeMortars: Unit[] = [];
+  // Cosmetic: cells where mortar shells landed on the last tick.
+  private hordeBlasts: number[] = [];
   private hordeHqAt = new Map<number, Player>();
   /** Spans in the order they were built. */
   private spans: WallSpan[] = [];
@@ -439,11 +480,12 @@ export class HordeExecution implements Execution {
       opts.eliteSpeed,
       opts.elitePressure,
     );
-    this.spawnCells = coastalCells(
+    this.spawnCells = spawnableCells(
       mg,
       this.terrainCost,
       this.width,
       this.height,
+      opts.inlandSpawns !== 0,
     );
     this.turretOffsets = discOffsets(opts.turretRange, this.width).offsets;
     const reach = discOffsets(
@@ -460,8 +502,10 @@ export class HordeExecution implements Execution {
       new PseudoRandom(simpleHash("zfront-crates")),
       this.width,
     );
+    this.mortars = new Mortars(opts, this.width, this.height);
     this.hordeStructureAt = new Map();
     this.hordeTurrets = [];
+    this.hordeMortars = [];
     this.hordeHqAt = new Map();
     this.hordeSpanAt = new Map();
     this.damage = new Map();
@@ -507,7 +551,9 @@ export class HordeExecution implements Execution {
     }
     this.elites.step(this.field, this.hordeFlow.dist);
     this.fireMines();
-    this.fireTurrets();
+    if (ticks % this.opts.turretFireInterval === 0) this.fireTurrets();
+    else this.hordeTurretShots = [];
+    this.fireMortars();
     this.applyPressure();
     if (ticks % this.opts.repairInterval === 0) this.repair();
     this.checkCleared();
@@ -551,6 +597,7 @@ export class HordeExecution implements Execution {
       killed: this.killed,
       structuresDestroyed: this.structuresDestroyed,
       crateGold: this.crates?.paid() ?? 0,
+      mortarKilled: this.mortars?.kills() ?? 0,
       hqHp: this.firstHqHp(),
       hqsFallen: this.hqsFallen,
       spans: this.spans.filter((s) => !s.broken).length,
@@ -621,7 +668,7 @@ export class HordeExecution implements Execution {
     const cells = new Uint8Array(d.length);
     for (let i = 0; i < d.length; i++) {
       const v = d[i];
-      if (v !== 0) cells[i] = v >= DENSITY_MAX * 8 ? DENSITY_MAX : (v + 7) >> 3;
+      if (v !== 0) cells[i] = hordeDensityByte(v);
     }
     for (const u of this.mg.units(UnitType.Depot)) {
       cells[this.cellOf(u.tile())] = BYTE_DEPOT;
@@ -674,6 +721,9 @@ export class HordeExecution implements Execution {
       settleRadius: passiveRadius(this.opts, this.wavesSurvived),
       turretShots: Int32Array.from(this.hordeTurretShots),
       structureHp: this.encodeStructureHp(),
+      mortarShells: this.encodeShells(),
+      mortarBlasts: Int32Array.from(this.hordeBlasts),
+      mortarBlastRadius: this.opts.mortarBlastRadius,
       callWaveGold: this.callableTicks() * this.opts.callEarlyGoldPerTick,
       canCallWave: this.callableTicks() > 0,
       crates: this.encodeCrates(),
@@ -714,6 +764,20 @@ export class HordeExecution implements Execution {
       Math.min(map.width() - 1, x * 2),
       Math.min(map.height() - 1, y * 2),
     );
+  }
+
+  /** Four ints per shell: see HordeFrame.mortarShells. */
+  private encodeShells(): Int32Array {
+    const shells = this.mortars.inFlight();
+    const out = new Int32Array(shells.length * 4);
+    const flight = Math.max(1, this.opts.mortarFlight);
+    shells.forEach((s, k) => {
+      out.set(
+        [s.from, s.target, Math.max(0, s.lands - this.ticks), flight],
+        k * 4,
+      );
+    });
+    return out;
   }
 
   /** Five ints per crate: see HordeFrame.crates. */
@@ -786,6 +850,7 @@ export class HordeExecution implements Execution {
       mix(s.broken ? 1 : 0);
     }
     this.crates.hash(mix);
+    this.mortars.hash(mix);
     return h >>> 0;
   }
 
@@ -957,6 +1022,7 @@ export class HordeExecution implements Execution {
     obstacle.fill(0);
     this.hordeStructureAt.clear();
     this.hordeTurrets = [];
+    this.hordeMortars = [];
     const cells: number[] = [];
     for (const u of units) {
       const cell = this.cellOf(u.tile());
@@ -966,6 +1032,7 @@ export class HordeExecution implements Execution {
         this.hordeStructureAt.set(cell, u);
       }
       if (u.type() === UnitType.DefensePost) this.hordeTurrets.push(u);
+      if (u.type() === UnitType.MissileSilo) this.hordeMortars.push(u);
     }
     this.hordeHqAt.clear();
     hqs.forEach((t, k) => {
@@ -1414,7 +1481,7 @@ export class HordeExecution implements Execution {
     const d2 = this.turretReachD2;
     this.hordeTurretShots = [];
     for (const t of this.hordeTurrets) {
-      if (!t.isActive()) continue;
+      if (!readyToFire(t)) continue;
       const c = this.cellOf(t.tile());
       const cx = c % w;
       const cy = (c - cx) / w;
@@ -1457,6 +1524,37 @@ export class HordeExecution implements Execution {
       payBounty(t.owner(), this.opts, shamblers, elites);
     }
     this.killed += this.elites.removeDead();
+  }
+
+  /**
+   * Lands the shells due this tick, paying each mortar's owner for its
+   * kills, then fires every finished mortar that has reloaded.
+   */
+  private fireMortars(): void {
+    const mg = this.mg!;
+    this.hordeBlasts = [];
+    for (const b of this.mortars.land(this.ticks, this.field, this.elites)) {
+      this.killed += b.shamblers;
+      this.hordeBlasts.push(b.cell);
+      const owner = mg.playerBySmallID(b.owner);
+      if (owner.isPlayer()) payBounty(owner, this.opts, b.shamblers, b.elites);
+    }
+    this.killed += this.elites.removeDead();
+    const guns: MortarGun[] = [];
+    for (const u of this.hordeMortars) {
+      if (!readyToFire(u)) continue;
+      guns.push({
+        id: u.id(),
+        cell: this.cellOf(u.tile()),
+        owner: u.owner().smallID(),
+        level: u.level(),
+      });
+    }
+    // Aim where the horde will have walked by the time the shell lands.
+    const lead = Math.floor(
+      this.opts.mortarFlight / Math.max(1, this.opts.shamblerSpeed),
+    );
+    this.mortars.fire(guns, this.ticks, this.field, this.hordeFlow.dist, lead);
   }
 
   private applyPressure(): void {
@@ -1653,6 +1751,7 @@ export class HordeExecution implements Execution {
       nextSpanId: this.nextSpanId,
       linkedWalls: [...this.linkedWalls],
       crates: this.mg !== null ? this.crates.state() : null,
+      mortars: this.mg !== null ? this.mortars.state() : null,
     });
   }
 
@@ -1723,6 +1822,7 @@ export class HordeExecution implements Execution {
       s.beaconIds.map((id, i) => [id, s.beaconSince[i]]),
     );
     if (s.crates !== null) this.crates.restore(s.crates);
+    if (s.mortars !== null) this.mortars.restore(s.mortars);
     if (s.flowCells !== null) {
       this.computeFlow(s.flowCells, s.flowWalls, s.flowBait);
     }
@@ -1750,12 +1850,16 @@ function newProfile() {
   };
 }
 
-/** Land cells on the map edge or next to water: where waves come ashore. */
-function coastalCells(
+/**
+ * Where waves can rise: land cells on the map edge or next to water, where
+ * they come ashore, or with `inland` every open cell.
+ */
+function spawnableCells(
   mg: Game,
   cost: Uint8Array,
   w: number,
   h: number,
+  inland: boolean,
 ): Int32Array {
   const mini = mg.miniMap();
   const cells: number[] = [];
@@ -1763,7 +1867,7 @@ function coastalCells(
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
       if (cost[i] === 0) continue;
-      let coastal = x === 0 || y === 0 || x === w - 1 || y === h - 1;
+      let coastal = inland || x === 0 || y === 0 || x === w - 1 || y === h - 1;
       if (!coastal) {
         coastal =
           !mini.isLand(mini.ref(x - 1, y)) ||
@@ -1816,6 +1920,7 @@ const HordeOptionsSchema = z.object({
   wavesPerDirection: zInt(),
   minSpawnDistance: zInt(),
   maxSpawnDistance: zInt(),
+  inlandSpawns: zInt(),
   maxElites: zInt(),
   eliteHp: zInt(),
   shamblerSpeed: zInt(),
@@ -1827,6 +1932,7 @@ const HordeOptionsSchema = z.object({
   turretLevelPercent: zInt(),
   turretHighGroundBonus: zInt(),
   turretKillsPerTick: zInt(),
+  turretFireInterval: zInt(),
   hqIncome: zInt(),
   killBounty: zInt(),
   eliteBounty: zInt(),
@@ -1883,6 +1989,15 @@ const HordeOptionsSchema = z.object({
   crateLandingBonusPercent: zInt(),
   depotCratePercent: zInt(),
   depotCrateMax: zInt(),
+  mortarRange: zInt(),
+  mortarMinRange: zInt(),
+  mortarReload: zInt(),
+  mortarFlight: zInt(),
+  mortarBlastRadius: zInt(),
+  mortarKills: zInt(),
+  mortarEliteDamage: zInt(),
+  mortarMinTarget: zInt(),
+  mortarLevelPercent: zInt(),
 });
 
 const CrateStateSchema = z.object({
@@ -1903,6 +2018,21 @@ const CrateStateSchema = z.object({
   progress: z.array(zInt()),
   goldPaid: zInt(),
 }) satisfies z.ZodType<CrateState>;
+
+const MortarStateSchema = z.object({
+  readyIds: z.array(zInt()),
+  readyAt: z.array(zInt()),
+  shells: z.array(
+    z.object({
+      owner: zInt(),
+      from: zInt(),
+      target: zInt(),
+      lands: zInt(),
+      power: zInt(),
+    }),
+  ),
+  killed: zInt(),
+}) satisfies z.ZodType<MortarState>;
 
 const WavePlanSchema = z.object({
   wave: zInt(),
@@ -1963,11 +2093,12 @@ const HordeStateSchema = z.object({
   linkedWalls: z.array(zInt()),
   /** Null before init. */
   crates: CrateStateSchema.nullable(),
+  /** Null before init. */
+  mortars: MortarStateSchema.nullable(),
 });
 type HordeState = z.infer<typeof HordeStateSchema>;
 
 // Frame bytes above the density range (see HordeFrame.cells).
-const DENSITY_MAX = 247;
 const BYTE_MINE = 248;
 const BYTE_BEACON = 249;
 const BYTE_BEACON_SOUNDING = 250;
@@ -1988,7 +2119,7 @@ export function hordeOf(game: Game): HordeExecution | null {
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 13,
+  version: 15,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -2194,6 +2325,30 @@ export const HordeExecutionSnapshot = execSnapshotType({
         depotCrateMax: 0,
       },
       crates: null,
+    }),
+    // 13 -> 14: Missile Silos become mortars. In an old game they did
+    // nothing to the horde, so they still don't.
+    13: (d) => ({
+      ...d,
+      options: {
+        ...d.options,
+        mortarRange: 0,
+        mortarMinRange: 0,
+        mortarReload: 0,
+        mortarFlight: 0,
+        mortarBlastRadius: 0,
+        mortarKills: 0,
+        mortarEliteDamage: 0,
+        mortarMinTarget: 0,
+        mortarLevelPercent: 0,
+      },
+      mortars: null,
+    }),
+    // 14 -> 15: turret volleys and inland spawns. Older games fired every
+    // tick and only spawned on the shore and the map edge.
+    14: (d) => ({
+      ...d,
+      options: { ...d.options, turretFireInterval: 1, inlandSpawns: 0 },
     }),
   },
   cls: () => HordeExecution,

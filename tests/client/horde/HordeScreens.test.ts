@@ -15,6 +15,8 @@ import {
   MAX_CRATES,
   MAX_SHOTS,
   turretTracers,
+  mortarShells,
+  MAX_SHELLS,
   waveArrows,
 } from "../../../src/client/render/gl/passes/HordePass";
 import {
@@ -49,6 +51,9 @@ function frame(overrides: Partial<HordeFrame> = {}): HordeFrame {
     settleRadius: 0,
     turretShots: new Int32Array(),
     structureHp: new Int32Array(),
+    mortarShells: new Int32Array(),
+    mortarBlasts: new Int32Array(),
+    mortarBlastRadius: 2,
     canCallWave: false,
     callWaveGold: 0,
     crates: new Int32Array(),
@@ -352,6 +357,30 @@ describe("turret tracers", () => {
     const many = new Int32Array(2 * (MAX_SHOTS + 5));
     expect(turretTracers(frame({ turretShots: many }))).toHaveLength(
       MAX_SHOTS * 4,
+    );
+  });
+});
+
+describe("mortar shells", () => {
+  // Fired from cell 0 (0.5, 0.5) at cell 9 (9.5, 0.5) on a 10-wide grid,
+  // with 5 of its 10 ticks of flight left.
+  const shells = Int32Array.from([0, 9, 5, 10]);
+
+  it("arc over their shadow, which they meet when they land", () => {
+    const mid = mortarShells({ width: 10, mortarShells: shells }, 0);
+    // Half way, at the top of an arc 0.35 of the 9-cell shot high.
+    expect(mid[0]).toBeCloseTo(5);
+    expect(mid[1]).toBeCloseTo(0.5 - 9 * 0.35);
+    expect(Array.from(mid.subarray(2))).toEqual([5, 0.5]);
+    // Half a second (5 ticks) on, it has landed.
+    const landed = mortarShells({ width: 10, mortarShells: shells }, 0.5);
+    expect(Array.from(landed)).toEqual([9.5, 0.5, 9.5, 0.5]);
+  });
+
+  it("are capped", () => {
+    const many = new Int32Array(4 * (MAX_SHELLS + 3));
+    expect(mortarShells({ width: 10, mortarShells: many }, 0)).toHaveLength(
+      MAX_SHELLS * 4,
     );
   });
 });

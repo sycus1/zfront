@@ -17,6 +17,19 @@ uniform bool uArrowFinal;
 // centre of the cell it hit, in coarse cells.
 uniform vec4 uShots[MAX_SHOTS];
 uniform int uShotCount;
+// Mortar shells in the air: xy the shell on its arc, zw its shadow on the
+// ground, in coarse cells.
+uniform vec4 uShells[MAX_SHELLS];
+uniform int uShellCount;
+// Mortar blasts: xy the centre in coarse cells, z its age from 0 to 1, w the
+// radius in coarse cells.
+uniform vec4 uBlasts[MAX_BLASTS];
+uniform int uBlastCount;
+// 0 draws only the packed horde, under the zombie squares (HordeSwarm); 1
+// draws everything else, over them.
+uniform int uLayer;
+// Zombies in a cell from which it is drawn as packed (HordeSwarm's cap).
+uniform float uPackedFrom;
 // Build mode (zfront): the ghost's coarse cell centre (x < 0 when off), and
 // the wall links it would make, as cell centres x0, y0, x1, y1.
 uniform vec2 uCursor;
@@ -42,11 +55,12 @@ int byteAt(ivec2 cell) {
   return int(texelFetch(uHorde, cell, 0).r * 255.0 + 0.5);
 }
 
-// Density only: buildings and elites count as empty, so they don't smear
-// into the horde around them.
+// Zombies in a cell (see engine-lib game/HordeCells): buildings and elites
+// count as empty, so they don't smear into the horde around them.
 float densityAt(ivec2 cell) {
   int b = byteAt(cell);
-  return b >= int(MINE) ? 0.0 : float(b) / 255.0;
+  if (b >= int(MINE)) return 0.0;
+  return b <= EXACT_MAX ? float(b) : float(EXACT_MAX + (b - EXACT_MAX) * DENSITY_STEP);
 }
 
 // 1 inside an arrow (shaft then head, 12 cells long, pointing along the
@@ -109,6 +123,40 @@ vec4 shotAt(vec2 p) {
     }
   }
   return hit;
+}
+
+// A mortar shell at p: a dark round with a hot rim, or the soft shadow on
+// the ground below it, which it meets as it lands. 0 alpha where there is
+// neither; alpha 1 only on the shell itself.
+vec4 shellAt(vec2 p) {
+  vec4 hit = vec4(0.0);
+  for (int k = 0; k < MAX_SHELLS; k++) {
+    if (k >= uShellCount) break;
+    float d = length(p - uShells[k].xy);
+    if (d < 0.5) return d < 0.32 ? vec4(0.12, 0.12, 0.1, 1.0) : vec4(1.0, 0.75, 0.3, 1.0);
+    if (length(p - uShells[k].zw) < 0.35) hit = vec4(0.0, 0.0, 0.0, 0.45);
+  }
+  return hit;
+}
+
+// A mortar blast at p: a fireball that shrinks from white-hot to dark red
+// inside a shock ring that runs out and thins. 0 alpha outside it.
+vec4 blastAt(vec2 p) {
+  for (int k = 0; k < MAX_BLASTS; k++) {
+    if (k >= uBlastCount) break;
+    float age = uBlasts[k].z;
+    float r = uBlasts[k].w;
+    float d = length(p - uBlasts[k].xy);
+    if (d > r * 1.4) continue;
+    float core = r * (1.0 - age) * 0.9;
+    if (d < core) {
+      vec3 hot = mix(vec3(1.0, 0.95, 0.75), vec3(1.0, 0.5, 0.12), clamp(d / core + age, 0.0, 1.0));
+      return vec4(mix(hot, vec3(0.45, 0.08, 0.05), age), 0.95);
+    }
+    float ring = r * (0.5 + 0.8 * age);
+    if (abs(d - ring) < 0.35 * (1.0 - age)) return vec4(1.0, 0.7, 0.3, 0.9 * (1.0 - age * 0.5));
+  }
+  return vec4(0.0);
 }
 
 // A supply crate at p: rgb the colour, a the alpha, 0 where there is none.
@@ -181,8 +229,44 @@ void main() {
   ivec2 cell = clamp(ivec2(p), ivec2(0), uGridSize - 1);
   int raw = byteAt(cell);
 
+  if (uLayer == 0) {
+    // Packed horde: a dark mass, filtered by hand into blobs, where cells
+    // hold more zombies than get a square each. Thinner cells are left to
+    // the squares.
+    vec2 q = p - 0.5;
+    ivec2 i0 = ivec2(floor(q));
+    vec2 t = fract(q);
+    float d = mix(
+      mix(densityAt(i0), densityAt(i0 + ivec2(1, 0)), t.x),
+      mix(densityAt(i0 + ivec2(0, 1)), densityAt(i0 + ivec2(1, 1)), t.x),
+      t.y
+    );
+    float s = smoothstep(uPackedFrom, uPackedFrom * 6.0, d);
+    if (s <= 0.0) discard;
+    fragColor = vec4(mix(vec3(0.62, 0.07, 0.05), vec3(0.45, 0.03, 0.03), s), 0.75 + 0.2 * s);
+    return;
+  }
+
   if (uCursor.x >= 0.0 && linkAt(p) > 0.0) {
     fragColor = vec4(1.0, 0.82, 0.3, 0.95);
+    return;
+  }
+
+  // A shell in the air is over everything; its shadow is under the blasts.
+  vec4 shell = shellAt(p);
+  if (shell.a >= 1.0) {
+    fragColor = shell;
+    return;
+  }
+
+  vec4 blast = blastAt(p);
+  if (blast.a > 0.0) {
+    fragColor = blast;
+    return;
+  }
+
+  if (shell.a > 0.0) {
+    fragColor = shell;
     return;
   }
 
@@ -243,24 +327,7 @@ void main() {
     return;
   }
 
-  // Mass horde: bilinear filtering by hand softens the coarse grid into
-  // blobs while leaving out walls and elites.
-  vec2 q = p - 0.5;
-  ivec2 i0 = ivec2(floor(q));
-  vec2 t = fract(q);
-  float d = mix(
-    mix(densityAt(i0), densityAt(i0 + ivec2(1, 0)), t.x),
-    mix(densityAt(i0 + ivec2(0, 1)), densityAt(i0 + ivec2(1, 1)), t.x),
-    t.y
-  );
-  if (d < 0.002) {
-    if (grid <= 0.0) discard;
-    fragColor = vec4(vec3(1.0), grid);
-    return;
-  }
-  // sqrt so a thin trickle of zombies still reads clearly at map zoom.
-  float s = clamp(sqrt(d * 4.0), 0.0, 1.0);
-  vec3 color = mix(vec3(0.8, 0.1, 0.08), vec3(1.0, 0.3, 0.15), s);
-  float alpha = mix(0.7, 0.95, s);
-  fragColor = vec4(mix(color, vec3(1.0), grid * 0.5), alpha);
+  // Build mode: the grid's cell edges, over the squares.
+  if (grid <= 0.0) discard;
+  fragColor = vec4(vec3(1.0), grid);
 }

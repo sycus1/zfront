@@ -291,6 +291,7 @@ export class GPURenderer {
         mountainColor:
           hexToRgb(this.settings.terrain.mountainColor) ?? undefined,
       },
+      header.hordeGrid,
     );
 
     // --- Terrain bytes R8UI texture (shared by map-layer passes) ---
@@ -1119,6 +1120,7 @@ export class GPURenderer {
   }
 
   updateGhostPreview(data: GhostPreviewData | null): void {
+    this.terrainPass.updateGhostPreview(data);
     this.structurePass.updateGhostPreview(data);
     this.railroadPass.updateGhostPreview(data);
     this.rangeCirclePass.updateGhostPreview(data);
@@ -1425,7 +1427,7 @@ export class GPURenderer {
     if (pe.railroad) this.railroadPass.draw(cam, zoom);
     if (pe.unit) this.unitPass.drawGround(cam);
     if (pe.falloutBloom) this.bloomPass.draw(cam, this.frameTick);
-    this.hordePass.draw(cam, performance.now() / 1000);
+    this.hordePass.draw(cam, performance.now() / 1000, zoom);
     this.samRadiusPass.draw(cam);
     this.settleCirclePass.draw(cam);
     this.rangeCirclePass.draw(cam);

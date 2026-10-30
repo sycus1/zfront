@@ -1,4 +1,5 @@
 import { Cell } from "@openfront/engine-api/game/GameTypes";
+import { isTownScale } from "@openfront/engine-lib/game/MapScale";
 import { EventBus, GameEvent } from "@openfront/shared/EventBus";
 import {
   CenterCameraEvent,
@@ -305,7 +306,7 @@ export class TransformHandler {
     this.scale /= zoomFactor;
 
     // Clamp the scale to prevent extreme zooming
-    this.scale = Math.max(0.2, Math.min(20, this.scale));
+    this.scale = Math.max(this.minScale(), Math.min(20, this.scale));
 
     const canvasCoords = this.screenToCanvasCoordinates(event.x, event.y);
 
@@ -322,6 +323,22 @@ export class TransformHandler {
       zoomPointY - (canvasCoords.y - this.game.height() / 2) / this.scale;
     this.clampOffsets();
     this.changed = true;
+  }
+
+  /**
+   * Furthest the camera zooms out. zfront: horde games on town maps stop
+   * once the whole map is on screen, so the town never shrinks to a stamp.
+   */
+  private minScale(): number {
+    const config = this.game.config();
+    if (!config.horde() || !isTownScale(config.gameConfig().gameMap)) {
+      return 0.2;
+    }
+    const { width, height } = this.boundingRect();
+    return Math.max(
+      0.2,
+      Math.min(width / this.game.width(), height / this.game.height()),
+    );
   }
 
   private clampOffsets() {

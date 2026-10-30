@@ -1,4 +1,5 @@
 import { GameMap } from "@openfront/engine-api/game/GameMap";
+import { hordeMoveCost } from "@openfront/engine-lib/game/HordeTerrain";
 import { MAX_CELL_COST, neighbours8, UNREACHABLE } from "./FlowField";
 
 /**
@@ -10,9 +11,9 @@ import { MAX_CELL_COST, neighbours8, UNREACHABLE } from "./FlowField";
 export const DEFAULT_CELL_CAP = 2000;
 
 /**
- * Movement cost per coarse cell from the terrain: 0 (blocked) for water,
- * impassable and mountain at or above `blockedMagnitude`, otherwise
- * 1 + magnitude / 4, so higher ground is slower and hordes prefer valleys.
+ * Movement cost per coarse cell from the terrain (see `hordeMoveCost`):
+ * 0 (blocked) for water, impassable and mountain at or above
+ * `blockedMagnitude`, otherwise slower on higher ground.
  */
 export function buildCostField(
   map: GameMap,
@@ -23,11 +24,8 @@ export function buildCostField(
   const cost = new Uint8Array(w * h);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const ref = map.ref(x, y);
-      if (!map.isLand(ref) || map.isImpassable(ref)) continue;
-      const mag = map.magnitude(ref);
-      if (mag >= blockedMagnitude) continue;
-      cost[y * w + x] = Math.min(MAX_CELL_COST, 1 + (mag >> 2));
+      const c = hordeMoveCost(map.terrainByte(map.ref(x, y)), blockedMagnitude);
+      cost[y * w + x] = Math.min(MAX_CELL_COST, c);
     }
   }
   return cost;

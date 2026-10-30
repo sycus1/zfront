@@ -1,6 +1,6 @@
 // Turns a real place into a zfront map: the features fetch_overture.py saved
 // for a town, plus AWS Terrain Tiles for height, become the map generator's
-// inputs (image.png, the roads and buildings layers and info.json) in
+// inputs (image.png, the roads layer and info.json) in
 // map-generator/assets/maps/<town>/. Run the Go generator afterwards.
 //
 //   npx tsx scripts/realmap/generate.ts bath [sheffield ...]
@@ -109,15 +109,12 @@ interface Feature {
 class Grid {
   readonly size: number;
   readonly cls: Uint8Array;
-  // Per building tile, which building it is (1-based), for roof shades.
-  readonly buildingId: Uint32Array;
   private readonly cosLat: number;
 
   constructor(readonly town: Town) {
     const tiles = (town.sizeKm * 1000) / town.metresPerTile;
     this.size = Math.floor(tiles / 4) * 4; // the generator crops to 4s
     this.cls = new Uint8Array(this.size * this.size);
-    this.buildingId = new Uint32Array(this.size * this.size);
     this.cosLat = Math.cos((town.lat * Math.PI) / 180);
   }
 
@@ -269,12 +266,9 @@ function paintFeatures(grid: Grid, features: Feature[]): void {
       });
     }
   }
-  let id = 0;
   for (const f of of("building")) {
-    id++;
     grid.fill(f.geometry, (i) => {
       grid.cls[i] = Cls.Building;
-      grid.buildingId[i] = id;
     });
   }
   for (const f of segments) {
@@ -282,7 +276,6 @@ function paintFeatures(grid: Grid, features: Feature[]): void {
     if (subtype !== "road" || PATH_CLASSES.has(cl ?? "")) continue;
     grid.stroke(f.geometry, ROAD_WIDTH[cl ?? ""] ?? 6, (i) => {
       grid.cls[i] = Cls.Road;
-      grid.buildingId[i] = 0;
     });
   }
 }
@@ -447,7 +440,6 @@ function fillPockets(grid: Grid): number {
     for (const t of [i, i + 1, i + s, i + s + 1]) {
       if (blocked(grid.cls[t])) continue;
       grid.cls[t] = Cls.Building;
-      grid.buildingId[t] = 0x80000000 + area[c]; // its own roof shade
       filled++;
     }
   }
@@ -480,57 +472,51 @@ function terrainImage(grid: Grid, h: Float32Array): Uint8Array {
   return out;
 }
 
-function hash(n: number): number {
-  let x = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
-  x ^= x >>> 13;
-  x = Math.imul(x, 0xc2b2ae35);
-  return ((x ^ (x >>> 16)) >>> 0) / 0x100000000;
-}
-
+// Light shades: the horde walks fastest on roads (see the horde palette in
+// src/client/render/gl/utils/HordeTerrainColors.ts).
 const ROAD_COLOURS: Partial<Record<Cls, [number, number, number]>> = {
-  [Cls.Road]: [88, 90, 94],
-  [Cls.Paved]: [150, 150, 146],
-  [Cls.Path]: [176, 160, 128],
-  [Cls.Rail]: [104, 88, 80],
+  [Cls.Road]: [241, 239, 232],
+  [Cls.Paved]: [232, 229, 220],
+  [Cls.Path]: [230, 220, 196],
+  [Cls.Rail]: [207, 200, 188],
 };
 
-/** The roads layer: streets, paths, rail and paved squares. */
+const BLOCKED = new Set<Cls>([Cls.Building, Cls.Cliff, Cls.Steep]);
+const WET = new Set<Cls>([Cls.Water, Cls.Sea]);
+
+/**
+ * Whether the horde's 2x2 cell holding tile (x, y) is blocked. Mirrors the
+ * Go generator's createMiniMap: water anywhere in the cell wins, otherwise
+ * the cell takes its bottom-right tile.
+ */
+function cellBlocked(grid: Grid, x: number, y: number): boolean {
+  const s = grid.size;
+  const x0 = x & ~1;
+  const y0 = y & ~1;
+  if (x0 + 1 >= s || y0 + 1 >= s) return true;
+  for (const [dx, dy] of [
+    [0, 0],
+    [1, 0],
+    [0, 1],
+    [1, 1],
+  ]) {
+    if (WET.has(grid.cls[(y0 + dy) * s + x0 + dx] as Cls)) return true;
+  }
+  return BLOCKED.has(grid.cls[(y0 + 1) * s + x0 + 1] as Cls);
+}
+
+/**
+ * The roads layer: streets, paths, rail and paved squares. Left out where
+ * the horde's cell is blocked, so a road never paints over a building.
+ * Buildings have no layer: the client draws blocked cells itself.
+ */
 function roadsLayer(grid: Grid): Uint8Array {
+  const s = grid.size;
   const out = new Uint8Array(grid.cls.length * 4);
   for (let i = 0; i < grid.cls.length; i++) {
     const rgb = ROAD_COLOURS[grid.cls[i] as Cls];
-    if (rgb) out.set([...rgb, 255], i * 4);
-  }
-  return out;
-}
-
-/** The buildings layer: a roof shade per building, darker at the eaves. */
-function buildingsLayer(grid: Grid): Uint8Array {
-  const s = grid.size;
-  const out = new Uint8Array(grid.cls.length * 4);
-  for (let y = 0; y < s; y++) {
-    for (let x = 0; x < s; x++) {
-      const i = y * s + x;
-      const id = grid.buildingId[i];
-      if (grid.cls[i] !== Cls.Building || id === 0) continue;
-      const edge =
-        x === 0 ||
-        y === 0 ||
-        x === s - 1 ||
-        y === s - 1 ||
-        grid.buildingId[i - 1] !== id ||
-        grid.buildingId[i + 1] !== id ||
-        grid.buildingId[i - s] !== id ||
-        grid.buildingId[i + s] !== id;
-      const r = hash(id);
-      // Slate greys to brick reds, a little lighter or darker per roof.
-      const brick = r < 0.6;
-      const shade = (edge ? 0.72 : 1) * (0.88 + 0.24 * hash(id + 7919));
-      const base = brick ? [150, 92, 72] : [104, 104, 112];
-      out.set(
-        [...base.map((v) => Math.min(255, Math.round(v * shade))), 255],
-        i * 4,
-      );
+    if (rgb && !cellBlocked(grid, i % s, Math.floor(i / s))) {
+      out.set([...rgb, 255], i * 4);
     }
   }
   return out;
@@ -568,7 +554,6 @@ async function generate(key: string, town: Town): Promise<void> {
   const png = (data: Uint8Array) => encodePng(grid.size, grid.size, data);
   writeFileSync(join(dir, "image.png"), png(terrainImage(grid, h)));
   writeFileSync(join(dir, "roads.png"), png(roadsLayer(grid)));
-  writeFileSync(join(dir, "buildings.png"), png(buildingsLayer(grid)));
   const id = town.name.replace(/[^A-Za-z0-9]/g, "");
   const info = {
     id,
@@ -576,11 +561,9 @@ async function generate(key: string, town: Town): Promise<void> {
     translation_key: `map.${key}`,
     categories: ["new", "europe"],
     multiplayer_frequency: 0,
-    layers: [
-      { id: "roads", placement: "land" },
-      { id: "buildings", placement: "land" },
-    ],
+    layers: [{ id: "roads", placement: "land" }],
     nations: [],
+    metres_per_tile: town.metresPerTile,
   };
   writeFileSync(join(dir, "info.json"), JSON.stringify(info, null, 2) + "\n");
 }

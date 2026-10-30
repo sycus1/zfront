@@ -1,4 +1,4 @@
-import { TileRef } from "@openfront/engine-api/game/GameMap";
+import { GameMap, TileRef } from "@openfront/engine-api/game/GameMap";
 import {
   BuildableUnit,
   PlayerType,
@@ -13,6 +13,7 @@ import {
 } from "@openfront/engine-api/game/GameUpdates";
 import { ClientID, GameID } from "@openfront/engine-api/Schemas";
 import { Config } from "@openfront/engine-lib/configuration/Config";
+import { isTownScale } from "@openfront/engine-lib/game/MapScale";
 import { TerrainMapData } from "@openfront/engine-lib/game/TerrainMapLoader";
 import { findClosestBy } from "@openfront/engine-lib/Util";
 import { EventBus } from "@openfront/shared/EventBus";
@@ -52,7 +53,7 @@ import {
   showGLGate,
 } from "./render/gl";
 import { crateAt } from "./render/gl/passes/HordePass";
-import { ALL_UNIT_TYPES, UnitState } from "./render/types";
+import { ALL_UNIT_TYPES, RendererConfig, UnitState } from "./render/types";
 import { audioMixer, initAudioMixer } from "./sound/AudioMixer";
 import { SoundManager } from "./sound/SoundManager";
 import {
@@ -264,6 +265,20 @@ export function joinLobby(
   };
 }
 
+// zfront: the horde moves on the mini map's cells; the terrain is coloured
+// by them.
+function hordeGrid(mini: GameMap): RendererConfig["hordeGrid"] {
+  const cellWidth = mini.width();
+  const cellHeight = mini.height();
+  const cellBytes = new Uint8Array(cellWidth * cellHeight);
+  for (let y = 0; y < cellHeight; y++) {
+    for (let x = 0; x < cellWidth; x++) {
+      cellBytes[y * cellWidth + x] = mini.terrainByte(mini.ref(x, y));
+    }
+  }
+  return { cellBytes, cellWidth, cellHeight };
+}
+
 // Build the WebGL view + its glCanvas. Must run before createRenderer so the
 // controllers can be wired directly to the view.
 function createWebGLView(
@@ -335,6 +350,9 @@ function createWebGLView(
         // but the NamePass / palette / relation matrix all need a static upper
         // bound at construction time.
         maxPlayers: 1024,
+        hordeGrid: config.horde()
+          ? hordeGrid(terrainMap.miniGameMap)
+          : undefined,
       },
       terrainSource,
       palette,
@@ -720,6 +738,12 @@ async function createClientGame(
   }
 }
 
+/**
+ * zfront: tiles across the shorter side of the screen when the camera moves
+ * in on the HQ on a town map: about 500 m at 3 m a tile.
+ */
+const TOWN_VIEW_TILES = 160;
+
 export class ClientGameRunner {
   private myPlayer: PlayerView | null = null;
   private isActive = false;
@@ -851,7 +875,12 @@ export class ClientGameRunner {
         console.log("starting game! in client game runner");
         this.awaitingStart = false;
 
-        if (this.gameView.config().isRandomSpawn()) {
+        // zfront: on town maps the horde game is played close up, so once
+        // the HQ is down the camera moves in on it.
+        const townHorde =
+          this.gameView.config().horde() &&
+          isTownScale(this.gameView.config().gameConfig().gameMap);
+        if (this.gameView.config().isRandomSpawn() || townHorde) {
           const goToPlayer = () => {
             const myPlayer = this.gameView.myPlayer();
 
@@ -865,6 +894,7 @@ export class ClientGameRunner {
             }
 
             if (!this.gameView.inSpawnPhase() && !myPlayer.hasSpawned()) {
+              if (!this.gameView.config().isRandomSpawn()) return;
               showErrorModal(
                 "spawn_failed",
                 translateText("error_modal.spawn_failed.description"),
@@ -877,7 +907,15 @@ export class ClientGameRunner {
               return;
             }
 
-            this.eventBus.emit(new GoToPlayerEvent(myPlayer, 10));
+            this.eventBus.emit(
+              new GoToPlayerEvent(
+                myPlayer,
+                townHorde
+                  ? Math.min(window.innerWidth, window.innerHeight) /
+                      TOWN_VIEW_TILES
+                  : 10,
+              ),
+            );
           };
 
           goToPlayer();

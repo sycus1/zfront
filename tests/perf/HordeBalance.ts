@@ -2,7 +2,7 @@
  * Horde balance harness (zfront).
  *
  * Plays solo games on Britannia headlessly with the real engine and the
- * default horde options, and a scripted player that spends its gold the
+ * default horde options (the town numbers in horde/TownScale.ts on town maps), and a scripted player that spends its gold the
  * same way every time. Prints, for each strategy and HQ position, how each
  * wave went and how the game ended, so a change to the wave or damage
  * numbers can be checked against the targets in docs/zfront/spike-plan.md
@@ -20,6 +20,9 @@
  *   scavenge builds two scavenger depots first, then turrets as above
  *            with a ring of mines (rebuilt as they go off) before the
  *            outer ring.
+ *   mortars  plays like turrets, but half the inner ring comes after two
+ *            mortars (Missile Silos) by the HQ, which are upgraded as the
+ *            turrets are.
  *
  * Usage:
  *   npm run balance:horde -- [--strategy none,turrets,fort]
@@ -64,6 +67,7 @@ import {
   HordeExecution,
   HordeOptions,
 } from "@openfront/engine/horde/HordeExecution";
+import { hordeOptionsForMap } from "@openfront/engine/horde/TownScale";
 import { loadMapFiles } from "@openfront/shared/GameMapLoader";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -85,7 +89,14 @@ const SPAWNS: Record<string, [number, number]> = {
   cumbria: [951, 1088],
 };
 
-const STRATEGIES = ["none", "turrets", "fort", "spans", "scavenge"] as const;
+const STRATEGIES = [
+  "none",
+  "turrets",
+  "fort",
+  "spans",
+  "scavenge",
+  "mortars",
+] as const;
 type Strategy = (typeof STRATEGIES)[number];
 
 interface Options {
@@ -203,6 +214,10 @@ const DEPOTS: [number, number][] = [
   [-3, 0],
 ];
 const MINE_RING = ring(18, 9);
+const MORTARS: [number, number][] = [
+  [-3, -3],
+  [3, 3],
+];
 /** Ticks before an order that came to nothing is tried again. */
 const RETRY = 50;
 
@@ -239,27 +254,40 @@ function spend(
           [T, OUTER_RING, 2],
           [T, OUTER_RING, 3],
         ]
-      : s === "turrets"
+      : s === "mortars"
         ? [
+            [T, TURRET_RING.slice(0, 4), 1],
+            [UnitType.MissileSilo, MORTARS, 1],
             [T, TURRET_RING, 1],
+            [UnitType.MissileSilo, MORTARS, 2],
             [T, TURRET_RING, 2],
+            [UnitType.MissileSilo, MORTARS, 3],
             [T, OUTER_RING, 1],
             [T, TURRET_RING, 3],
             [T, OUTER_RING, 2],
             [T, OUTER_RING, 3],
           ]
-        : [
-            [T, TURRET_RING.slice(0, 1), 1],
-            [W, walls, 1],
-            [T, TURRET_RING, 1],
-            [W, walls, 2],
-            [T, TURRET_RING, 2],
-            [T, OUTER_RING, 1],
-            [W, walls, 3],
-            [T, TURRET_RING, 3],
-            [T, OUTER_RING, 2],
-            [T, OUTER_RING, 3],
-          ];
+        : s === "turrets"
+          ? [
+              [T, TURRET_RING, 1],
+              [T, TURRET_RING, 2],
+              [T, OUTER_RING, 1],
+              [T, TURRET_RING, 3],
+              [T, OUTER_RING, 2],
+              [T, OUTER_RING, 3],
+            ]
+          : [
+              [T, TURRET_RING.slice(0, 1), 1],
+              [W, walls, 1],
+              [T, TURRET_RING, 1],
+              [W, walls, 2],
+              [T, TURRET_RING, 2],
+              [T, OUTER_RING, 1],
+              [W, walls, 3],
+              [T, TURRET_RING, 3],
+              [T, OUTER_RING, 2],
+              [T, OUTER_RING, 3],
+            ];
   for (const [type, offsets, level] of plan) {
     for (const [dx, dy] of offsets) {
       const x = hq[0] + dx;
@@ -305,8 +333,13 @@ interface WaveRow {
   /** Count and total levels, as "count/levels"; walls add "+spans". */
   turrets: string;
   walls: string;
-  /** Scavenger depots and mines standing, as "depots/mines". */
+  /**
+   * Scavenger depots, mines and mortars standing, as
+   * "depots/mines/mortars" (mortars as "count/levels").
+   */
   other: string;
+  /** Shamblers mortar shells killed during the wave. */
+  mortarKilled: number;
   /** Tiles the player holds at the end of the wave. */
   tiles: number;
   /** Gold in the bank at the end of the wave. */
@@ -364,7 +397,8 @@ async function play(
     new SpawnExecution(seed, info, game.ref(spawn[0], spawn[1])),
   );
   while (game.inSpawnPhase()) game.executeNextTick();
-  const exec = new HordeExecution(horde);
+  // Town maps get their neighbourhood-scale numbers, as in a real game.
+  const exec = new HordeExecution({ ...hordeOptionsForMap(map), ...horde });
   game.addExecution(exec);
   const me = game.player("survivor");
   const hq = me.spawnTile()!;
@@ -388,6 +422,7 @@ async function play(
   let lastKilled = 0;
   let lastLost = 0;
   let lastCrates = 0;
+  let lastMortar = 0;
   // Ten waves at the default timings take well under an hour.
   const limit = start + 36_000;
   while (game.ticks() < limit) {
@@ -397,7 +432,10 @@ async function play(
       exec.callWave(me);
     }
     for (const c of exec.supplyCrates()) {
-      const life = horde.crateLife ?? DEFAULT_HORDE_OPTIONS.crateLife;
+      const life =
+        horde.crateLife ??
+        hordeOptionsForMap(map).crateLife ??
+        DEFAULT_HORDE_OPTIONS.crateLife;
       if (
         c.lootEnd < 0 &&
         (c.id * 37) % 100 < loot &&
@@ -423,6 +461,7 @@ async function play(
         tiles: 0,
         gold: 0,
         crates: 0,
+        mortarKilled: 0,
         alive: 0,
       };
     }
@@ -431,7 +470,9 @@ async function play(
     row.lost += s.structuresDestroyed - lastLost;
     row.turrets = levels(me, UnitType.DefensePost);
     row.walls = `${levels(me, UnitType.Wall)}+${s.spans}`;
-    row.other = `${me.units(UnitType.Depot).length}/${me.units(UnitType.Mine).length}`;
+    row.other = `${me.units(UnitType.Depot).length}/${me.units(UnitType.Mine).length}/${levels(me, UnitType.MissileSilo)}`;
+    row.mortarKilled += s.mortarKilled - lastMortar;
+    lastMortar = s.mortarKilled;
     row.tiles = me.numTilesOwned();
     row.gold = Number(me.gold());
     row.alive = s.alive + s.elites;
@@ -488,7 +529,8 @@ async function main(): Promise<void> {
             "lost",
             "turrets",
             "walls",
-            "depots/mines",
+            "depots/mines/mortars",
+            "by mortar",
             "tiles",
             "gold",
             "crates",
@@ -504,6 +546,7 @@ async function main(): Promise<void> {
             w.turrets,
             w.walls,
             w.other,
+            String(w.mortarKilled),
             String(w.tiles),
             String(w.gold),
             String(w.crates),

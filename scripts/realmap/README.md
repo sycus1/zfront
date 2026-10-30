@@ -1,7 +1,10 @@
 # Real-town maps
 
-Makes a close-up zfront map of a real place: a 4 km square at 3 m per tile
-(1332 × 1332 tiles), where streets are corridors and buildings are walls.
+Makes a close-up zfront map of a real place: a 1.2 km square at 3 m per
+tile (400 × 400 tiles), where streets are corridors and buildings are walls.
+The size is the horde's neighbourhood scale (see "Neighbourhood scale" in
+docs/zfront/spike-plan.md); `metresPerTile` is written to `info.json` so the
+game knows to use the town horde numbers.
 This is the offline spike for postcode or place search; the plan is to move
 the drawing into the client later.
 
@@ -17,7 +20,7 @@ the drawing into the client later.
    ```
 
 3. Draw the generator inputs into `map-generator/assets/maps/<town>/`
-   (`image.png`, the `roads` and `buildings` layers, `info.json`). Height
+   (`image.png`, the `roads` layer, `info.json`). Height
    tiles are downloaded on the way. Behind a proxy, add `NODE_USE_ENV_PROXY=1`.
 
    ```bash
@@ -52,9 +55,11 @@ Last, any open ground the horde can't reach (courtyards walled in by
 buildings, checked on the horde's half-size grid) is filled in as
 building, so an HQ can't hide there.
 
-Buildings and roads would otherwise look like mountains and grass, so they
-are also drawn into the `buildings` and `roads` layers, which the client
-paints over the terrain.
+Roads would otherwise look like any open ground, so they are also drawn
+into a `roads` layer, which the client paints over the terrain. Road tiles
+in a horde cell that is blocked are left out of it. Buildings have no layer:
+the client colours every blocked horde cell itself (see
+`src/client/render/gl/utils/HordeTerrainColors.ts`).
 
 ## Data and licences
 

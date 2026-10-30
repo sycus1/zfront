@@ -266,6 +266,26 @@ describe("starting turret", () => {
     expect(shots[1]).not.toBe(shots[0]);
   });
 
+  test("a turret under construction neither kills nor shoots", async () => {
+    const { game, horde } = await defenceGame({
+      ...WAVES,
+      structureHp: 10_000_000,
+      hqHp: 10_000_000,
+    });
+    run(game, 2);
+    const turret = game.player("survivor").units(UnitType.DefensePost)[0];
+    turret.setUnderConstruction(true);
+    for (let k = 0; k < 150; k++) {
+      run(game, 1);
+      expect(horde.encodeFrame()!.turretShots).toHaveLength(0);
+    }
+    expect(horde.stats().killed).toBe(0);
+    // Once finished it fights.
+    turret.setUnderConstruction(false);
+    run(game, 150);
+    expect(horde.stats().killed).toBeGreaterThan(0);
+  });
+
   test("a version 9 snapshot migrates without a starting turret", () => {
     const v9 = { initialized: true, options: { wallHp: 4_000 } };
     const v10 = HordeExecutionSnapshot.migrations[9](v9);

@@ -30,7 +30,8 @@ export interface HordeFrame {
   width: number;
   height: number;
   /**
-   * One byte per cell: 0 empty, 1-247 horde density (zombies / 8, clamped),
+   * One byte per cell: 0 empty, 1-247 horde density (the exact count up to
+   * 64 zombies, coarser above; see engine-lib `game/HordeCells`),
    * 248 a mine, 249 a resting noise beacon, 250 a sounding one, 251 a
    * scavenger depot, 252-254 a wall (barricade, stone, reinforced), 255 an
    * elite.
@@ -80,6 +81,16 @@ export interface HordeFrame {
    * depot), whose tile is then the cell's top-left one.
    */
   structureHp: Int32Array;
+  /**
+   * Cosmetic: mortar shells in the air, four ints each: the coarse cell it
+   * was fired from, the cell it lands on, ticks until it lands, and its
+   * whole flight in ticks.
+   */
+  mortarShells: Int32Array;
+  /** Cosmetic: the coarse cells mortar shells landed on in the last tick. */
+  mortarBlasts: Int32Array;
+  /** Radius of a mortar blast, in coarse cells. */
+  mortarBlastRadius: number;
   /** Whether the announced wave can be called now, and the bonus for it. */
   canCallWave: boolean;
   callWaveGold: number;

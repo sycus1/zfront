@@ -18,11 +18,11 @@
   },
   "terrain": {
     "backgroundColor": "#3c3c3c",
-    "oceanColor": "#4785b5",
-    "sandColor": "#CCCB9E",
-    "plainsColor": "#BEDC8A",
-    "highlandColor": "#DCCB9E",
-    "mountainColor": "#e6e6e6"
+    "oceanColor": "#3b7fc4",
+    "sandColor": "#e3dfd4",
+    "plainsColor": "#e2e6c4",
+    "highlandColor": "#6b5f54",
+    "mountainColor": "#4d4845"
   },
   "falloutBloom": {
     "broilSpeedCold": 0.0018,
