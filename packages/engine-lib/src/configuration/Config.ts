@@ -11,6 +11,7 @@ import { PlayerLike } from "@openfront/engine-api/game/ReadViews";
 import { GameConfig } from "@openfront/engine-api/Schemas";
 import { pow } from "../DetMath";
 import { DoomsdayClockSpeed } from "../game/DoomsdayClock";
+import { isTownScale } from "../game/MapScale";
 import { assertNever } from "../Util";
 
 export interface NukeMagnitude {
@@ -87,6 +88,11 @@ const OVERTIME_DEFAULTS = {
 
 /** zfront: the default radius in tiles an Outpost claims once built. */
 export const OUTPOST_CLAIM_RADIUS = 12;
+/** zfront: the radius on close-up town maps, about a block (60 m). */
+export const TOWN_OUTPOST_CLAIM_RADIUS = 20;
+/** zfront: horde turret range in coarse cells (2x2 tiles), by map scale. */
+export const HORDE_TURRET_RANGE = 8;
+export const TOWN_TURRET_RANGE = 20;
 
 export class Config {
   private unitInfoCache = new Map<UnitType, UnitInfo>();
@@ -173,9 +179,24 @@ export class Config {
     return 30;
   }
 
+  /**
+   * zfront: base range in tiles of a horde-mode turret, for the placement
+   * preview (high ground adds to it in the engine).
+   */
+  hordeTurretRange(): number {
+    return (
+      2 *
+      (isTownScale(this._gameConfig.gameMap)
+        ? TOWN_TURRET_RANGE
+        : HORDE_TURRET_RANGE)
+    );
+  }
+
   /** zfront: radius in tiles an Outpost claims, for the placement preview. */
   outpostClaimRadius(): number {
-    return OUTPOST_CLAIM_RADIUS;
+    return isTownScale(this._gameConfig.gameMap)
+      ? TOWN_OUTPOST_CLAIM_RADIUS
+      : OUTPOST_CLAIM_RADIUS;
   }
 
   /** zfront: zombie waves (packages/engine/src/horde). */

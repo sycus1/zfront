@@ -348,6 +348,25 @@ _Started 2026-10-29._ Dan found the income passive and "solved": the HQ trickle 
 
 So ignoring the crates now costs HQ health and games, and looting all of them gives about what the old trickle did. The exception is `fort` on Lincolnshire, which now loses on wave 10 even looting every crate: it was the closest win before and the bot spends on walls, not turrets, so a lower trickle tips it. `none` is unchanged (lost on waves 4 to 6).
 
+## Neighbourhood scale
+
+_Started 2026-10-30._ Dan found the scale off: on the 4 km Sheffield map the base was a 40 m disc, the fight used about 3% of the map, and a wave was thousands of zombies in a few blobs moving at a sprint. He picked a "neighbourhood scale" reset from the options doc (https://claude.ai/artifact/JtoVzvHo6sYNJrtMLzyNYe). This is step 1, the rescale; step 2 (start big and fall back into enclaves) and step 3 (street barricades, fog) come later.
+
+- **Maps.** Bath, Sheffield and Whitby are regenerated at 1.2 km square (400 × 400 tiles, still 3 m a tile). `info.json` has a new `metres_per_tile`, which the map generator writes into `Maps.gen.ts` as `metresPerTile`. `engine-lib/game/MapScale.ts` reads it: maps at 10 m a tile or less are town scale.
+- **Horde numbers.** On town maps `GameRunner` lays `TOWN_HORDE_OPTIONS` (`horde/TownScale.ts`) over the defaults; continent maps are unchanged. Waves start at 300 and grow 35% (about 4,500 on wave 10). A coarse cell holds at most 12. Shamblers step every 5 ticks. Waves rise out of the streets 40 to 70 cells away (`inlandSpawns`, since a town has no shore). A crowd of 12 presses far less than one of 2,000, so `pressureShift` is 0 and HQ, building and wall health are cut by about ten. Bounties, mines and repair costs are scaled to match.
+- **Turrets.** The range is 20 cells (40 tiles, about 120 m) on town maps, up from 8 (48 m), after Dan said turrets felt short-ranged. Turrets fire volleys of 2 every 6 ticks (`turretFireInterval`, new). The placement circle now shows the horde turret range (`Config.hordeTurretRange`); before, it drew OpenFront's 30 tiles while turrets reached 16.
+- **Land.** The settled disc starts at 40 tiles (120 m) and grows 4 a wave, and costs 20 population a tile instead of 200. Outposts claim 20 tiles (60 m).
+- **Camera.** Once the HQ is placed on a town map, the camera moves in on it with about 160 tiles (500 m) across the shorter side of the screen. You can't zoom out further than the whole map.
+- Horde snapshot version 14 (older games fire every tick and spawn from the shore).
+
+`balance:horde -- --map <town> --zone 0` uses the town numbers:
+
+| Map       | `none`       | `turrets` | `fort`       | `spans` | `scavenge`   |
+| --------- | ------------ | --------- | ------------ | ------- | ------------ |
+| Sheffield | lost, wave 3 | won       | lost, wave 5 | won     | won          |
+| Bath      | lost, wave 3 | won       | won          | won     | won          |
+| Whitby    | lost, wave 3 | won       | won          | won     | lost, wave 3 |
+
 ## Prerequisites
 
 - npm 12.1 or later. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`. The machine currently has npm 11.19.

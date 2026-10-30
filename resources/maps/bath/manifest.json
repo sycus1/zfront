@@ -12,20 +12,21 @@
     }
   ],
   "map": {
-    "height": 1332,
-    "num_land_tiles": 1747997,
-    "width": 1332
+    "height": 400,
+    "num_land_tiles": 152783,
+    "width": 400
   },
   "map16x": {
-    "height": 333,
-    "num_land_tiles": 108410,
-    "width": 333
+    "height": 100,
+    "num_land_tiles": 9341,
+    "width": 100
   },
   "map4x": {
-    "height": 666,
-    "num_land_tiles": 435876,
-    "width": 666
+    "height": 200,
+    "num_land_tiles": 37911,
+    "width": 200
   },
+  "metres_per_tile": 3,
   "multiplayer_frequency": 0,
   "name": "Bath",
   "nations": [],

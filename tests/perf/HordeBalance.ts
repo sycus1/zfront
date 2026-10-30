@@ -2,7 +2,7 @@
  * Horde balance harness (zfront).
  *
  * Plays solo games on Britannia headlessly with the real engine and the
- * default horde options, and a scripted player that spends its gold the
+ * default horde options (the town numbers in horde/TownScale.ts on town maps), and a scripted player that spends its gold the
  * same way every time. Prints, for each strategy and HQ position, how each
  * wave went and how the game ended, so a change to the wave or damage
  * numbers can be checked against the targets in docs/zfront/spike-plan.md
@@ -64,6 +64,7 @@ import {
   HordeExecution,
   HordeOptions,
 } from "@openfront/engine/horde/HordeExecution";
+import { hordeOptionsForMap } from "@openfront/engine/horde/TownScale";
 import { loadMapFiles } from "@openfront/shared/GameMapLoader";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -364,7 +365,8 @@ async function play(
     new SpawnExecution(seed, info, game.ref(spawn[0], spawn[1])),
   );
   while (game.inSpawnPhase()) game.executeNextTick();
-  const exec = new HordeExecution(horde);
+  // Town maps get their neighbourhood-scale numbers, as in a real game.
+  const exec = new HordeExecution({ ...hordeOptionsForMap(map), ...horde });
   game.addExecution(exec);
   const me = game.player("survivor");
   const hq = me.spawnTile()!;
@@ -397,7 +399,10 @@ async function play(
       exec.callWave(me);
     }
     for (const c of exec.supplyCrates()) {
-      const life = horde.crateLife ?? DEFAULT_HORDE_OPTIONS.crateLife;
+      const life =
+        horde.crateLife ??
+        hordeOptionsForMap(map).crateLife ??
+        DEFAULT_HORDE_OPTIONS.crateLife;
       if (
         c.lootEnd < 0 &&
         (c.id * 37) % 100 < loot &&
