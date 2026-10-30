@@ -730,6 +730,7 @@ export class GPURenderer {
 
   updateHorde(frame: HordeFrame): void {
     this.hordePass.update(frame);
+    this.barPass.setStructureHealth(frame.structureHp);
     this.settleCircle =
       frame.hqTile >= 0
         ? {
@@ -1434,7 +1435,7 @@ export class GPURenderer {
     if (pe.structure) this.structureLevelPass.draw(cam, zoom);
     // Small-player glow draws after structures so buildings can't hide it.
     this.smallPlayerGlowPass.draw(cam);
-    if (pe.bar) this.barPass.draw(cam);
+    if (pe.bar) this.barPass.draw(cam, zoom);
     this.updateSelectionBox();
     this.selectionBoxPass.draw(cam, this.frameTick);
     this.moveIndicatorPass.draw(cam, zoom);

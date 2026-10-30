@@ -10,6 +10,7 @@ uniform vec3 uColorYellow;
 uniform vec3 uColorGreen;
 uniform float uSolid;       // 1.0 = veterancy pip: fill solid with uSolidColor
 uniform vec3 uSolidColor;
+uniform vec4 uFillColor;    // a > 0.5: fill in this color, not by thresholds
 
 in vec2 vLocalPos;
 flat in float vProgress;
@@ -38,7 +39,8 @@ void main() {
 
   if (inFill) {
     vec3 color;
-    if (vProgress < uThresholds.x) color = uColorRed;
+    if (uFillColor.a > 0.5) color = uFillColor.rgb;
+    else if (vProgress < uThresholds.x) color = uColorRed;
     else if (vProgress < uThresholds.y) color = uColorOrange;
     else if (vProgress < uThresholds.z) color = uColorYellow;
     else color = uColorGreen;

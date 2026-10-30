@@ -1,14 +1,20 @@
 /**
  * BarPass — instanced health/progress bars and warship veterancy pips.
  *
- * Three draw calls per frame (all share one program + instance buffer):
+ * Up to five draw calls per frame (all share one program + instance buffer):
  *   1. Health bars (11x3 tiles, above warships)
- *   2. Progress bars (14x3 tiles, below structures — construction + missile readiness)
- *   3. Veterancy pips (solid gold rank bars stacked at a warship's bottom-right)
+ *   2. Progress bars (below structure icons — construction + missile
+ *      readiness), filled in one progress color so they never read as health
+ *   3. zfront: structure health bars above the icons of damaged buildings;
+ *      2 and 3 grow and shrink with the icons (the HQ's health is in the HUD)
+ *   4. zfront: small health bars over damaged cell-drawn buildings (wall
+ *      posts, wall spans, mines, beacons, depots), a fixed size on screen
+ *   5. Veterancy pips (solid gold rank bars stacked at a warship's bottom-right)
  *
  * Data flow:
  *   UnitState.health / .missileTimerQueue / .constructionStartTick → CPU progress
  *   → instance VBO (x, y, progress) → GPU colored rectangle
+ *   HordeFrame.structureHp → setStructureHealth → the same
  *   UnitState.veterancy → one instance per level (x, y, slot) → solid gold rect
  */
 
@@ -52,6 +58,7 @@ export class BarPass {
   private uSolid: WebGLUniformLocation;
   private uSolidColor: WebGLUniformLocation;
   private uPipStride: WebGLUniformLocation;
+  private uFillColor: WebGLUniformLocation;
 
   private vao: WebGLVertexArrayObject;
   private instanceBuf: WebGLBuffer;
@@ -62,6 +69,10 @@ export class BarPass {
   private progressCount = 0;
   private veterancyData: Float32Array;
   private veterancyCount = 0;
+  private structureHealthData = new Float32Array(0);
+  private structureHealthCount = 0;
+  private cellHealthData = new Float32Array(0);
+  private cellHealthCount = 0;
 
   private mapW: number;
   private warshipMaxHealth: number;
@@ -93,6 +104,7 @@ export class BarPass {
     this.uSolid = gl.getUniformLocation(this.program, "uSolid")!;
     this.uSolidColor = gl.getUniformLocation(this.program, "uSolidColor")!;
     this.uPipStride = gl.getUniformLocation(this.program, "uPipStride")!;
+    this.uFillColor = gl.getUniformLocation(this.program, "uFillColor")!;
 
     // --- Instance data buffers (CPU-side) ---
     this.healthData = new Float32Array(this.maxBars * FLOATS_PER_INSTANCE);
@@ -167,21 +179,65 @@ export class BarPass {
     }
   }
 
+  /**
+   * zfront: the horde's damaged structures (HordeFrame.structureHp, four
+   * ints each: tile, health, full health, has an icon).
+   */
+  setStructureHealth(hp: Int32Array): void {
+    const n = hp.length >> 2;
+    if (this.structureHealthData.length < n * FLOATS_PER_INSTANCE) {
+      this.structureHealthData = new Float32Array(n * FLOATS_PER_INSTANCE);
+      this.cellHealthData = new Float32Array(n * FLOATS_PER_INSTANCE);
+    }
+    this.structureHealthCount = 0;
+    this.cellHealthCount = 0;
+    for (let k = 0; k + 3 < hp.length; k += 4) {
+      const tile = hp[k];
+      const fraction = hp[k + 2] > 0 ? hp[k + 1] / hp[k + 2] : 0;
+      const icon = hp[k + 3] !== 0;
+      const data = icon ? this.structureHealthData : this.cellHealthData;
+      const off =
+        (icon ? this.structureHealthCount++ : this.cellHealthCount++) *
+        FLOATS_PER_INSTANCE;
+      const x = tile % this.mapW;
+      data[off] = x;
+      data[off + 1] = (tile - x) / this.mapW;
+      data[off + 2] = Math.max(0, Math.min(1, fraction));
+    }
+  }
+
+  /**
+   * How much bigger than at the default zoom a structure icon is drawn, in
+   * world tiles. Mirrors the icon scale in structure.vert.glsl.
+   */
+  private iconScale(zoom: number): number {
+    const s = this.settings.structure;
+    let scale: number;
+    if (zoom <= s.dotsZoomThreshold) scale = s.dotScale;
+    else if (zoom >= s.iconGrowZoom) scale = zoom / s.iconGrowZoom;
+    else scale = Math.min(1, zoom / s.iconScaleFactorZoomedOut);
+    return (scale * s.iconScaleFactorZoomedOut) / zoom;
+  }
+
   /** Render bars. Call once per frame after FX, before names. */
-  draw(cameraMat: Float32Array): void {
+  draw(cameraMat: Float32Array, zoom: number): void {
+    const b = this.settings.bar;
+    const showCells = zoom >= b.cellBarMinZoom;
     if (
       this.healthCount === 0 &&
       this.progressCount === 0 &&
-      this.veterancyCount === 0
+      this.veterancyCount === 0 &&
+      this.structureHealthCount === 0 &&
+      (this.cellHealthCount === 0 || !showCells)
     )
       return;
 
     const gl = this.gl;
-    const b = this.settings.bar;
 
     gl.useProgram(this.program);
     gl.uniformMatrix3fv(this.uCamera, false, cameraMat);
     gl.uniform1f(this.uSolid, 0); // health/progress bars use the colored path
+    gl.uniform4f(this.uFillColor, 0, 0, 0, 0);
     gl.uniform1f(this.uBorderWidth, b.borderWidth);
     gl.uniform3f(this.uThresholds, b.threshold1, b.threshold2, b.threshold3);
     gl.uniform3f(this.uColorRed, b.colorRedR, b.colorRedG, b.colorRedB);
@@ -213,17 +269,55 @@ export class BarPass {
       gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, this.healthCount);
     }
 
-    // Progress bars
-    if (this.progressCount > 0) {
-      gl.uniform2f(this.uBarSize, b.progressBarW, b.progressBarH);
-      gl.uniform2f(this.uBarOffset, -b.progressBarW / 2, b.progressBarOffsetY);
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuf);
-      gl.bufferSubData(
-        gl.ARRAY_BUFFER,
-        0,
-        this.progressData.subarray(0, this.progressCount * FLOATS_PER_INSTANCE),
+    // Structure bars follow their icon's size.
+    const s = this.iconScale(zoom);
+    gl.uniform1f(this.uBorderWidth, b.borderWidth * s);
+
+    // zfront: structure health, above the icon
+    if (this.structureHealthCount > 0) {
+      this.drawBars(
+        this.structureHealthData,
+        Math.min(this.structureHealthCount, this.maxBars),
+        b.progressBarW * s,
+        b.progressBarH * s,
+        -b.progressBarW * s * 0.5,
+        b.structureHealthOffsetY * s,
       );
-      gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, this.progressCount);
+    }
+
+    // Progress bars, below the icon, in their own color
+    if (this.progressCount > 0) {
+      gl.uniform4f(
+        this.uFillColor,
+        b.progressColorR,
+        b.progressColorG,
+        b.progressColorB,
+        1,
+      );
+      this.drawBars(
+        this.progressData,
+        this.progressCount,
+        b.progressBarW * s,
+        b.progressBarH * s,
+        -b.progressBarW * s * 0.5,
+        b.progressBarOffsetY * s,
+      );
+      gl.uniform4f(this.uFillColor, 0, 0, 0, 0);
+    }
+
+    // zfront: cell-drawn buildings, a fixed size on screen over their 2x2
+    // cell (whose top-left tile the instance holds)
+    if (this.cellHealthCount > 0 && showCells) {
+      const px = 1 / zoom;
+      gl.uniform1f(this.uBorderWidth, b.cellBarBorderPx * px);
+      this.drawBars(
+        this.cellHealthData,
+        Math.min(this.cellHealthCount, this.maxBars),
+        b.cellBarWPx * px,
+        b.cellBarHPx * px,
+        0.5 - b.cellBarWPx * px * 0.5,
+        -0.5 - (b.cellBarGapPx + b.cellBarHPx) * px,
+      );
     }
 
     // Veterancy pips (solid gold rank bars, bottom-right of warship sprites)
@@ -250,6 +344,26 @@ export class BarPass {
     }
 
     gl.bindVertexArray(null);
+  }
+
+  private drawBars(
+    data: Float32Array,
+    count: number,
+    w: number,
+    h: number,
+    offsetX: number,
+    offsetY: number,
+  ): void {
+    const gl = this.gl;
+    gl.uniform2f(this.uBarSize, w, h);
+    gl.uniform2f(this.uBarOffset, offsetX, offsetY);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuf);
+    gl.bufferSubData(
+      gl.ARRAY_BUFFER,
+      0,
+      data.subarray(0, count * FLOATS_PER_INSTANCE),
+    );
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, count);
   }
 
   dispose(): void {

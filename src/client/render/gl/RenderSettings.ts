@@ -228,6 +228,22 @@ export interface RenderSettings {
     progressBarW: number;
     progressBarH: number;
     progressBarOffsetY: number;
+    /** Fill of the progress bars (construction, readiness), apart from health. */
+    progressColorR: number;
+    progressColorG: number;
+    progressColorB: number;
+    /**
+     * zfront: top of a damaged structure's health bar, above its icon. It
+     * and the progress bar share progressBarW/H and scale with the icon.
+     */
+    structureHealthOffsetY: number;
+    /** zfront: health bars over cell-drawn buildings (walls, mines...), in px. */
+    cellBarWPx: number;
+    cellBarHPx: number;
+    cellBarGapPx: number;
+    cellBarBorderPx: number;
+    /** Below this zoom the cells are too small for their bars to help. */
+    cellBarMinZoom: number;
     borderWidth: number;
     threshold1: number;
     threshold2: number;

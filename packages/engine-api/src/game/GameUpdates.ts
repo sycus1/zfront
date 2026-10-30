@@ -73,6 +73,13 @@ export interface HordeFrame {
    * the horde on the last tick, for drawing its shots.
    */
   turretShots: Int32Array;
+  /**
+   * Damaged structures, four ints each: tile, health left, full health, and
+   * 1 when it is drawn with an icon (turret, Outpost...) or 0 for a
+   * small one drawn in its coarse cell (wall post, wall span, mine, beacon,
+   * depot), whose tile is then the cell's top-left one.
+   */
+  structureHp: Int32Array;
   /** Whether the announced wave can be called now, and the bonus for it. */
   canCallWave: boolean;
   callWaveGold: number;

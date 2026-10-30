@@ -48,6 +48,7 @@ function frame(overrides: Partial<HordeFrame> = {}): HordeFrame {
     hqTile: -1,
     settleRadius: 0,
     turretShots: new Int32Array(),
+    structureHp: new Int32Array(),
     canCallWave: false,
     callWaveGold: 0,
     crates: new Int32Array(),
