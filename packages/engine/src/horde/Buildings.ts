@@ -10,7 +10,8 @@ import { HordeField } from "./HordeField";
  *   sounds it is a horde target with a head start in the flow field, so the
  *   horde heads for it ahead of anything up to `baitPull` cells nearer. Put
  *   it where your turrets can reach: a kill box.
- * - A scavenger depot pays its owner every tick (Economy.payHqIncome).
+ * - A scavenger depot brings its owner's supply drops sooner (Crates.ts),
+ *   and pays `depotIncome` every tick (Economy.payHqIncome; 0 by default).
  *
  * Integers only.
  */

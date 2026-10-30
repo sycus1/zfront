@@ -40,6 +40,7 @@ export type Intent =
   | TogglePauseIntent
   | UpdateGameConfigIntent
   | CallWaveIntent
+  | LootCrateIntent
   | ToggleGameStartTimer;
 
 export type AttackIntent = z.infer<typeof AttackIntentSchema>;
@@ -64,6 +65,7 @@ export type DeleteUnitIntent = z.infer<typeof DeleteUnitIntentSchema>;
 export type KickPlayerIntent = z.infer<typeof KickPlayerIntentSchema>;
 export type TogglePauseIntent = z.infer<typeof TogglePauseIntentSchema>;
 export type CallWaveIntent = z.infer<typeof CallWaveIntentSchema>;
+export type LootCrateIntent = z.infer<typeof LootCrateIntentSchema>;
 export type UpdateGameConfigIntent = z.infer<
   typeof UpdateGameConfigIntentSchema
 >;
@@ -514,6 +516,12 @@ export const CallWaveIntentSchema = z.object({
   type: z.literal("call_wave"),
 });
 
+// zfront: start looting a horde supply crate.
+export const LootCrateIntentSchema = z.object({
+  type: z.literal("loot_crate"),
+  crate: zb.uint(),
+});
+
 export const IntentSchema = z.discriminatedUnion("type", [
   AttackIntentSchema,
   CancelAttackIntentSchema,
@@ -535,6 +543,7 @@ export const IntentSchema = z.discriminatedUnion("type", [
   UpdateGameConfigIntentSchema,
   ToggleGameStartTimerIntentSchema,
   CallWaveIntentSchema,
+  LootCrateIntentSchema,
 ]);
 
 // StampedIntent = Intent with server-stamped clientID (used in turns and execution)

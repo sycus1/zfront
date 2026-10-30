@@ -26,6 +26,7 @@
  *                            [--spawn yorkshire,lincolnshire,...]
  *                            [--seed balance] [--set waveInterval=600,...]
  *                            [--zone 20] [--call-early] [--map Bath]
+ *                            [--loot 100]
  *
  * --map plays another map; its HQ goes on the open land nearest the
  * middle (spawn "centre"), since the named spawns are Britannia places.
@@ -36,6 +37,9 @@
  *
  * --call-early calls each wave from 2 on as soon as the one before it is
  * cleared, for the early call bonus.
+ *
+ * --loot has the player loot that percent of its supply crates (the same
+ * ones every run), each 3 seconds after it drops. The default 0 loots none.
  */
 import {
   Difficulty,
@@ -94,7 +98,12 @@ interface Options {
   /** Radius in tiles of the land handed to the player at the start. */
   zone: number;
   callEarly: boolean;
+  /** Percent of supply crates the player loots. */
+  loot: number;
 }
+
+/** Ticks after a crate drops that the scripted player starts looting it. */
+const LOOT_DELAY = 30;
 
 function parseArgs(argv: string[]): Options {
   const opts: Options = {
@@ -105,6 +114,7 @@ function parseArgs(argv: string[]): Options {
     seed: "balance",
     zone: 20,
     callEarly: false,
+    loot: 0,
   };
   for (let i = 0; i < argv.length; i++) {
     const next = () => argv[++i];
@@ -142,6 +152,9 @@ function parseArgs(argv: string[]): Options {
         break;
       case "--call-early":
         opts.callEarly = true;
+        break;
+      case "--loot":
+        opts.loot = parseInt(next(), 10);
         break;
       case "--seed":
         opts.seed = next();
@@ -298,6 +311,8 @@ interface WaveRow {
   tiles: number;
   /** Gold in the bank at the end of the wave. */
   gold: number;
+  /** Gold from supply crates during the wave. */
+  crates: number;
   /** Zombies left alive at the end of the wave. */
   alive: number;
 }
@@ -314,6 +329,7 @@ async function play(
   horde: Partial<HordeOptions>,
   zone: number,
   callEarly: boolean,
+  loot: number,
   seed: string,
   spawn: [number, number],
   strategy: Strategy,
@@ -371,6 +387,7 @@ async function play(
   let row: WaveRow | null = null;
   let lastKilled = 0;
   let lastLost = 0;
+  let lastCrates = 0;
   // Ten waves at the default timings take well under an hour.
   const limit = start + 36_000;
   while (game.ticks() < limit) {
@@ -378,6 +395,16 @@ async function play(
     if (game.ticks() % 2 === 0) spend(game, me, hqXY, strategy, ordered);
     if (callEarly && exec.stats().wave >= 1 && exec.callableTicks() > 0) {
       exec.callWave(me);
+    }
+    for (const c of exec.supplyCrates()) {
+      const life = horde.crateLife ?? DEFAULT_HORDE_OPTIONS.crateLife;
+      if (
+        c.lootEnd < 0 &&
+        (c.id * 37) % 100 < loot &&
+        c.expires - game.ticks() <= life - LOOT_DELAY
+      ) {
+        exec.lootCrate(me, c.id);
+      }
     }
     game.executeNextTick();
     const s = exec.stats();
@@ -395,6 +422,7 @@ async function play(
         other: "",
         tiles: 0,
         gold: 0,
+        crates: 0,
         alive: 0,
       };
     }
@@ -409,6 +437,8 @@ async function play(
     row.alive = s.alive + s.elites;
     lastKilled = s.killed;
     lastLost = s.structuresDestroyed;
+    row.crates += s.crateGold - lastCrates;
+    lastCrates = s.crateGold;
     if (s.outcome !== "playing") break;
   }
   if (row !== null) rows.push(row);
@@ -441,6 +471,7 @@ async function main(): Promise<void> {
         opts.horde,
         opts.zone,
         opts.callEarly,
+        opts.loot,
         opts.seed,
         SPAWNS[name],
         strategy,
@@ -460,6 +491,7 @@ async function main(): Promise<void> {
             "depots/mines",
             "tiles",
             "gold",
+            "crates",
             "alive",
           ],
           r.rows.map((w) => [
@@ -474,6 +506,7 @@ async function main(): Promise<void> {
             w.other,
             String(w.tiles),
             String(w.gold),
+            String(w.crates),
             String(w.alive),
           ]),
         ),

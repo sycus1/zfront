@@ -26,6 +26,7 @@ import {
   outpostLimit,
   outposts,
 } from "./Claims";
+import { Crate, CrateOptions, Crates, CrateState } from "./Crates";
 import {
   payBounty,
   payCallEarlyBonus,
@@ -65,7 +66,12 @@ import { WaveDirector, WavePlan } from "./WaveDirector";
  */
 
 export interface HordeOptions
-  extends SettleOptions, ClaimOptions, EconomyOptions, BuildingOptions {
+  extends
+    SettleOptions,
+    ClaimOptions,
+    EconomyOptions,
+    BuildingOptions,
+    CrateOptions {
   /** Ticks from the end of the spawn phase to the first wave. */
   firstWaveDelay: number;
   waveInterval: number;
@@ -151,8 +157,9 @@ export interface HordeOptions
 // to build before the first wave of 2,500, a wave every 75 seconds growing
 // by 35% to about 37k on wave 10, coming ashore 30 to 60 coarse cells out,
 // and shamblers that walk a coarse cell every 3 ticks. Gold comes from the
-// HQ, turret kills and cleared waves. An undefended HQ falls on wave 2 or 3;
-// a ring of upgraded turrets wins.
+// HQ, turret kills, cleared waves and supply crates the player loots (see
+// "Supply drops" in docs/zfront/spike-plan.md). An undefended HQ falls on
+// wave 2 or 3; a ring of upgraded turrets wins.
 export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   firstWaveDelay: 600,
   waveInterval: 750,
@@ -176,13 +183,26 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   turretLevelPercent: 50,
   turretHighGroundBonus: 2,
   turretKillsPerTick: 8,
-  hqIncome: 100,
-  depotIncome: 20,
+  hqIncome: 50,
+  depotIncome: 0,
   killBounty: 4,
   eliteBounty: 100,
   clearBonusPerWave: 5_000,
   clearedPercent: 2,
   callEarlyGoldPerTick: 100,
+  crateInterval: 200,
+  crateMax: 3,
+  crateMinDistance: 8,
+  crateMaxDistance: 25,
+  crateLife: 300,
+  crateLootTicks: 50,
+  crateDangerRadius: 2,
+  crateBaseGold: 2_000,
+  crateGoldPerWave: 1_500,
+  crateLandingRadius: 15,
+  crateLandingBonusPercent: 100,
+  depotCratePercent: 25,
+  depotCrateMax: 4,
   mineRadius: 2,
   mineTrigger: 40,
   mineKills: 600,
@@ -284,6 +304,8 @@ export interface HordeStats {
   elites: number;
   killed: number;
   structuresDestroyed: number;
+  /** Gold paid out for supply crates. */
+  crateGold: number;
   /** The first human player's HQ health, or 0 when none is alive. */
   hqHp: number;
   hqsFallen: number;
@@ -317,6 +339,7 @@ export class HordeExecution implements Execution {
   /** Terrain movement cost; the live cost adds structure cells on top. */
   private terrainCost!: Uint8Array;
   private director!: WaveDirector;
+  private crates!: Crates;
 
   private wave = 0;
   private wavesSurvived = 0;
@@ -420,6 +443,12 @@ export class HordeExecution implements Execution {
     this.turretReachD2 = reach.d2;
     this.mineReach = discOffsets(opts.mineRadius, this.width).offsets;
     this.director = new WaveDirector(opts, this.width);
+    // Its own PRNG, so drops don't change the waves' draws.
+    this.crates = new Crates(
+      opts,
+      new PseudoRandom(simpleHash("zfront-crates")),
+      this.width,
+    );
     this.hordeStructureAt = new Map();
     this.hordeTurrets = [];
     this.hordeHqAt = new Map();
@@ -471,11 +500,35 @@ export class HordeExecution implements Execution {
     this.applyPressure();
     if (ticks % this.opts.repairInterval === 0) this.repair();
     this.checkCleared();
+    this.tickCrates(ticks);
     this.mg!.setOutpostLimit(outpostLimit(this.opts, this.wavesSurvived));
     if (ticks % this.opts.settleInterval === 0) {
       this.claimAll();
       this.settleAll();
     }
+  }
+
+  private tickCrates(ticks: number): void {
+    const density = this.field.density;
+    const elites = new Set(this.elites.cell.subarray(0, this.elites.count));
+    this.crates.tick(this.mg!, ticks, {
+      width: this.width,
+      height: this.height,
+      cellOf: (t) => this.cellOf(t),
+      passable: (c) => this.terrainCost[c] !== 0,
+      occupied: (c) => density[c] !== 0 || elites.has(c),
+      landings: this.nextLandings,
+      wave: this.wave,
+    });
+  }
+
+  /**
+   * `player` starts looting supply crate `id` (Crates.loot). Returns false
+   * when it can't.
+   */
+  lootCrate(player: Player, id: number): boolean {
+    if (this.mg === null || this.outcome !== "playing") return false;
+    return this.crates.loot(player, id, this.ticks);
   }
 
   stats(): HordeStats {
@@ -486,6 +539,7 @@ export class HordeExecution implements Execution {
       elites: this.elites?.count ?? 0,
       killed: this.killed,
       structuresDestroyed: this.structuresDestroyed,
+      crateGold: this.crates?.paid() ?? 0,
       hqHp: this.firstHqHp(),
       hqsFallen: this.hqsFallen,
       spans: this.spans.filter((s) => !s.broken).length,
@@ -533,6 +587,11 @@ export class HordeExecution implements Execution {
     payCallEarlyBonus(this.mg!, this.opts, this.nextPlan!.wave, skipped);
     this.nextWaveTick = this.ticks;
     return true;
+  }
+
+  /** The supply crates on the map, for tests and tools. Do not mutate. */
+  supplyCrates(): readonly Crate[] {
+    return this.crates?.all() ?? [];
   }
 
   /** Density per coarse cell, for rendering and tests. Do not mutate. */
@@ -605,9 +664,31 @@ export class HordeExecution implements Execution {
       turretShots: Int32Array.from(this.hordeTurretShots),
       callWaveGold: this.callableTicks() * this.opts.callEarlyGoldPerTick,
       canCallWave: this.callableTicks() > 0,
+      crates: this.encodeCrates(),
+      crateLootTicks: this.opts.crateLootTicks,
+      crateLife: this.opts.crateLife,
       encodeMs: 0,
       sentAt: 0,
     };
+  }
+
+  /** Five ints per crate: see HordeFrame.crates. */
+  private encodeCrates(): Int32Array {
+    const crates = this.crates.all();
+    const out = new Int32Array(crates.length * CRATE_STRIDE);
+    crates.forEach((c, k) => {
+      out.set(
+        [
+          c.id,
+          c.tile,
+          c.gold,
+          Math.max(0, c.expires - this.ticks),
+          c.lootEnd < 0 ? -1 : Math.max(0, c.lootEnd - this.ticks),
+        ],
+        k * CRATE_STRIDE,
+      );
+    });
+    return out;
   }
 
   /** FNV-1a over every piece of horde state that drives the simulation. */
@@ -660,6 +741,7 @@ export class HordeExecution implements Execution {
       mix(s.damage);
       mix(s.broken ? 1 : 0);
     }
+    this.crates.hash(mix);
     return h >>> 0;
   }
 
@@ -1526,6 +1608,7 @@ export class HordeExecution implements Execution {
       spanBroken: this.spans.map((s) => s.broken),
       nextSpanId: this.nextSpanId,
       linkedWalls: [...this.linkedWalls],
+      crates: this.mg !== null ? this.crates.state() : null,
     });
   }
 
@@ -1595,6 +1678,7 @@ export class HordeExecution implements Execution {
     this.beaconSince = new Map(
       s.beaconIds.map((id, i) => [id, s.beaconSince[i]]),
     );
+    if (s.crates !== null) this.crates.restore(s.crates);
     if (s.flowCells !== null) {
       this.computeFlow(s.flowCells, s.flowWalls, s.flowBait);
     }
@@ -1742,7 +1826,39 @@ const HordeOptionsSchema = z.object({
   buildingClaimRadius: zInt(),
   outpostsBase: zInt(),
   wavesPerOutpost: zInt(),
+  crateInterval: zInt(),
+  crateMax: zInt(),
+  crateMinDistance: zInt(),
+  crateMaxDistance: zInt(),
+  crateLife: zInt(),
+  crateLootTicks: zInt(),
+  crateDangerRadius: zInt(),
+  crateBaseGold: zInt(),
+  crateGoldPerWave: zInt(),
+  crateLandingRadius: zInt(),
+  crateLandingBonusPercent: zInt(),
+  depotCratePercent: zInt(),
+  depotCrateMax: zInt(),
 });
+
+const CrateStateSchema = z.object({
+  random: zRandom(),
+  nextId: zInt(),
+  crates: z.array(
+    z.object({
+      id: zInt(),
+      tile: zInt(),
+      owner: zInt(),
+      gold: zInt(),
+      expires: zInt(),
+      lootEnd: zInt(),
+      looter: zInt(),
+    }),
+  ),
+  progressIds: z.array(zInt()),
+  progress: z.array(zInt()),
+  goldPaid: zInt(),
+}) satisfies z.ZodType<CrateState>;
 
 const WavePlanSchema = z.object({
   wave: zInt(),
@@ -1801,6 +1917,8 @@ const HordeStateSchema = z.object({
   spanBroken: z.array(z.boolean()),
   nextSpanId: zInt(),
   linkedWalls: z.array(zInt()),
+  /** Null before init. */
+  crates: CrateStateSchema.nullable(),
 });
 type HordeState = z.infer<typeof HordeStateSchema>;
 
@@ -1809,6 +1927,9 @@ const BYTE_MINE = 248;
 const BYTE_BEACON = 249;
 const BYTE_BEACON_SOUNDING = 250;
 const BYTE_DEPOT = 251;
+
+/** Ints per crate in HordeFrame.crates. */
+const CRATE_STRIDE = 5;
 
 const OUTCOMES: readonly HordeOutcome[] = ["playing", "won", "lost"];
 
@@ -1822,7 +1943,7 @@ export function hordeOf(game: Game): HordeExecution | null {
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 12,
+  version: 13,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -2007,6 +2128,28 @@ export const HordeExecutionSnapshot = execSnapshotType({
         outpostOwners: [],
       };
     },
+    // 12 -> 13: supply drops. An old game keeps its economy (its options
+    // carry its HQ trickle and depot income) and gets no crates.
+    12: (d) => ({
+      ...d,
+      options: {
+        ...d.options,
+        crateInterval: 0,
+        crateMax: 0,
+        crateMinDistance: 0,
+        crateMaxDistance: 0,
+        crateLife: 0,
+        crateLootTicks: 0,
+        crateDangerRadius: 0,
+        crateBaseGold: 0,
+        crateGoldPerWave: 0,
+        crateLandingRadius: 0,
+        crateLandingBonusPercent: 0,
+        depotCratePercent: 0,
+        depotCrateMax: 0,
+      },
+      crates: null,
+    }),
   },
   cls: () => HordeExecution,
 });

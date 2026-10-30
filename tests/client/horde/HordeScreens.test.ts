@@ -10,6 +10,9 @@ import { WinModal } from "../../../src/client/hud/layers/WinModal";
 import {
   hordeBlobs,
   MAX_BLOB_LABELS,
+  crateAt,
+  crateMarkers,
+  MAX_CRATES,
   MAX_SHOTS,
   turretTracers,
   waveArrows,
@@ -47,6 +50,9 @@ function frame(overrides: Partial<HordeFrame> = {}): HordeFrame {
     turretShots: new Int32Array(),
     canCallWave: false,
     callWaveGold: 0,
+    crates: new Int32Array(),
+    crateLootTicks: 50,
+    crateLife: 300,
     encodeMs: 0,
     sentAt: 0,
     ...overrides,
@@ -346,5 +352,41 @@ describe("turret tracers", () => {
     expect(turretTracers(frame({ turretShots: many }))).toHaveLength(
       MAX_SHOTS * 4,
     );
+  });
+});
+
+describe("supply crates", () => {
+  // Map 100 tiles wide: crate 7 on tile (30, 20), half looted; crate 8 on
+  // tile (70, 80), untouched with 150 of its 300 ticks left.
+  const crates = Int32Array.from([
+    7,
+    20 * 100 + 30,
+    3_500,
+    0,
+    25,
+    8,
+    80 * 100 + 70,
+    5_000,
+    150,
+    -1,
+  ]);
+
+  it("carry their tile, gold, loot progress and life left", () => {
+    expect(crateMarkers(frame({ crates }), 100)).toEqual([
+      { id: 7, x: 30, y: 20, gold: 3_500, looted: 0.5, life: 0 },
+      { id: 8, x: 70, y: 80, gold: 5_000, looted: -1, life: 0.5 },
+    ]);
+  });
+
+  it("are capped", () => {
+    const many = new Int32Array(5 * (MAX_CRATES + 3));
+    expect(crateMarkers(frame({ crates: many }), 100)).toHaveLength(MAX_CRATES);
+  });
+
+  it("a click picks the nearest crate within reach, or none", () => {
+    const f = frame({ crates });
+    expect(crateAt(f, 100, 31, 21)).toBe(7);
+    expect(crateAt(f, 100, 70, 84)).toBe(8);
+    expect(crateAt(f, 100, 50, 50)).toBe(-1);
   });
 });

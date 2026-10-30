@@ -8,6 +8,7 @@ import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import { simpleHash } from "@openfront/engine-lib/Util";
 import { Execution, Game } from "../game/Game";
 import { CallWaveExecution } from "../horde/CallWaveExecution";
+import { LootCrateExecution } from "../horde/LootCrateExecution";
 import { settlesOnItsOwn } from "../horde/Settlement";
 import { AttackExecution } from "./AttackExecution";
 import { BoatRetreatExecution } from "./BoatRetreatExecution";
@@ -135,6 +136,8 @@ export class Executor {
         return new PauseExecution(player, intent.paused);
       case "call_wave":
         return new CallWaveExecution(player);
+      case "loot_crate":
+        return new LootCrateExecution(player, intent.crate);
       default:
         throw new Error(`intent type ${intent} not found`);
     }
