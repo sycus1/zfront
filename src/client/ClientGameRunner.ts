@@ -1,4 +1,4 @@
-import { TileRef } from "@openfront/engine-api/game/GameMap";
+import { GameMap, TileRef } from "@openfront/engine-api/game/GameMap";
 import {
   BuildableUnit,
   PlayerType,
@@ -53,7 +53,7 @@ import {
   showGLGate,
 } from "./render/gl";
 import { crateAt } from "./render/gl/passes/HordePass";
-import { ALL_UNIT_TYPES, UnitState } from "./render/types";
+import { ALL_UNIT_TYPES, RendererConfig, UnitState } from "./render/types";
 import { audioMixer, initAudioMixer } from "./sound/AudioMixer";
 import { SoundManager } from "./sound/SoundManager";
 import {
@@ -265,6 +265,20 @@ export function joinLobby(
   };
 }
 
+// zfront: the horde moves on the mini map's cells; the terrain is coloured
+// by them.
+function hordeGrid(mini: GameMap): RendererConfig["hordeGrid"] {
+  const cellWidth = mini.width();
+  const cellHeight = mini.height();
+  const cellBytes = new Uint8Array(cellWidth * cellHeight);
+  for (let y = 0; y < cellHeight; y++) {
+    for (let x = 0; x < cellWidth; x++) {
+      cellBytes[y * cellWidth + x] = mini.terrainByte(mini.ref(x, y));
+    }
+  }
+  return { cellBytes, cellWidth, cellHeight };
+}
+
 // Build the WebGL view + its glCanvas. Must run before createRenderer so the
 // controllers can be wired directly to the view.
 function createWebGLView(
@@ -336,6 +350,9 @@ function createWebGLView(
         // but the NamePass / palette / relation matrix all need a static upper
         // bound at construction time.
         maxPlayers: 1024,
+        hordeGrid: config.horde()
+          ? hordeGrid(terrainMap.miniGameMap)
+          : undefined,
       },
       terrainSource,
       palette,

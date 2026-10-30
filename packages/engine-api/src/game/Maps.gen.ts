@@ -128,10 +128,7 @@ export const maps: readonly MapInfo[] = [
     teamFrequency: -1,
     specialFrequency: -1,
     defaultNationCount: 0,
-    layers: [
-      { id: "roads", placement: "land" },
-      { id: "buildings", placement: "land" },
-    ],
+    layers: [{ id: "roads", placement: "land" }],
     metresPerTile: 3,
   },
   {
@@ -156,10 +153,7 @@ export const maps: readonly MapInfo[] = [
     teamFrequency: -1,
     specialFrequency: -1,
     defaultNationCount: 0,
-    layers: [
-      { id: "roads", placement: "land" },
-      { id: "buildings", placement: "land" },
-    ],
+    layers: [{ id: "roads", placement: "land" }],
     metresPerTile: 3,
   },
   {
@@ -172,10 +166,7 @@ export const maps: readonly MapInfo[] = [
     teamFrequency: -1,
     specialFrequency: -1,
     defaultNationCount: 0,
-    layers: [
-      { id: "roads", placement: "land" },
-      { id: "buildings", placement: "land" },
-    ],
+    layers: [{ id: "roads", placement: "land" }],
     metresPerTile: 3,
   },
 ];
