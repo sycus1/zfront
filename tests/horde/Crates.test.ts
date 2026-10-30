@@ -226,10 +226,10 @@ describe("supply drops", () => {
     await expectSnapshotRoundTrip(game, "plains", 60);
   });
 
-  test("a version 10 snapshot migrates with drops off", () => {
-    const v10 = { initialized: true, options: { hqIncome: 100 }, wave: 1 };
-    const v11 = HordeExecutionSnapshot.migrations[10](v10);
-    expect(v11.options).toMatchObject({ hqIncome: 100, crateInterval: 0 });
-    expect(v11.crates).toBeNull();
+  test("a version 12 snapshot migrates with drops off", () => {
+    const v12 = { initialized: true, options: { hqIncome: 100 }, wave: 1 };
+    const v13 = HordeExecutionSnapshot.migrations[12](v12);
+    expect(v13.options).toMatchObject({ hqIncome: 100, crateInterval: 0 });
+    expect(v13.crates).toBeNull();
   });
 });

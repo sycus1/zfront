@@ -11,6 +11,7 @@
       "mirv": "Huge explosion, only targets selected player",
       "missile_silo": "Used to launch nukes",
       "noise_beacon": "Draws the horde for 30 seconds, then rests for a minute, over and over. Build it where your turrets can reach",
+      "outpost": "Claims the land around it once built. Can go a little beyond your border; you get more as you survive waves. Lose it and that land goes wild",
       "port": "Sends trade ships to generate gold",
       "sam_launcher": "Defends against incoming nukes",
       "wall": "Blocks the horde. Zombies go round walls, or break through when there's no other way. Upgrade a barricade to stone, then reinforced. Walls repair for gold when left alone",
@@ -680,11 +681,14 @@
   },
   "map": {
     "all": "All",
+    "bath": "Bath",
     "britannia": "Britannia",
     "favorites": "Favourites",
     "featured": "Featured",
     "map": "Map",
-    "random": "Random"
+    "random": "Random",
+    "sheffield": "Sheffield",
+    "whitby": "Whitby"
   },
   "map_categories": {
     "africa": "Africa",
@@ -717,9 +721,11 @@
   },
   "map_layers": {
     "brland": "brland",
+    "buildings": "Buildings",
     "eyeland": "eyeland",
     "eyewater": "eyewater",
-    "label": "label"
+    "label": "label",
+    "roads": "Roads"
   },
   "mode_selector": {
     "teams_count": "{teamCount} teams",
@@ -982,6 +988,7 @@
     "mirv": "MIRV",
     "missile_silo": "Missile Silo",
     "noise_beacon": "Noise Beacon",
+    "outpost": "Outpost",
     "port": "Port",
     "sam_launcher": "SAM Launcher",
     "wall": "Wall",

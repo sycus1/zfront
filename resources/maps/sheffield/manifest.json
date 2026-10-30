@@ -1,0 +1,33 @@
+{
+  "categories": ["new", "europe"],
+  "id": "Sheffield",
+  "layers": [
+    {
+      "id": "roads",
+      "placement": "land"
+    },
+    {
+      "id": "buildings",
+      "placement": "land"
+    }
+  ],
+  "map": {
+    "height": 1332,
+    "num_land_tiles": 1751060,
+    "width": 1332
+  },
+  "map16x": {
+    "height": 333,
+    "num_land_tiles": 108548,
+    "width": 333
+  },
+  "map4x": {
+    "height": 666,
+    "num_land_tiles": 436568,
+    "width": 666
+  },
+  "multiplayer_frequency": 0,
+  "name": "Sheffield",
+  "nations": [],
+  "translation_key": "map.sheffield"
+}

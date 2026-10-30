@@ -17,6 +17,11 @@ uniform bool uArrowFinal;
 // centre of the cell it hit, in coarse cells.
 uniform vec4 uShots[MAX_SHOTS];
 uniform int uShotCount;
+// Build mode (zfront): the ghost's coarse cell centre (x < 0 when off), and
+// the wall links it would make, as cell centres x0, y0, x1, y1.
+uniform vec2 uCursor;
+uniform vec4 uLinks[MAX_LINKS];
+uniform int uLinkCount;
 // Supply crates: xy the centre in coarse cells, z the share of looting done
 // (-1 when nobody is looting), w the share of its life left.
 uniform vec4 uCrates[MAX_CRATES];
@@ -140,10 +145,46 @@ vec4 crateAt(vec2 p) {
   return vec4(0.0);
 }
 
+// Cells round the cursor that show the build grid.
+const float GRID_RADIUS = 9.0;
+
+// Dashed gold lines along the previewed wall links: 1 on a dash, else 0.
+float linkAt(vec2 p) {
+  for (int k = 0; k < MAX_LINKS; k++) {
+    if (k >= uLinkCount) break;
+    vec2 a = uLinks[k].xy;
+    vec2 ab = uLinks[k].zw - a;
+    float len = max(length(ab), 1e-3);
+    float t = clamp(dot(p - a, ab) / (len * len), 0.0, 1.0);
+    if (length(p - (a + ab * t)) > 0.28) continue;
+    if (fract(t * len * 0.8 - uTime * 1.5) < 0.6) return 1.0;
+  }
+  return 0.0;
+}
+
+// Opacity of the build grid's cell edges at p, fading out from the cursor.
+// `px` is fwidth(p), taken in uniform control flow by the caller.
+float gridAt(vec2 p, vec2 px) {
+  if (uCursor.x < 0.0) return 0.0;
+  float r = length(p - uCursor);
+  if (r > GRID_RADIUS) return 0.0;
+  vec2 f = abs(fract(p + 0.5) - 0.5);
+  float line = max(step(f.x, px.x), step(f.y, px.y));
+  // The cursor's own cell gets a brighter outline.
+  bool here = all(equal(floor(p), floor(uCursor)));
+  return line * (here ? 0.9 : 0.35 * (1.0 - r / GRID_RADIUS));
+}
+
 void main() {
   vec2 p = vUV * vec2(uGridSize);
+  float grid = gridAt(p, fwidth(p));
   ivec2 cell = clamp(ivec2(p), ivec2(0), uGridSize - 1);
   int raw = byteAt(cell);
+
+  if (uCursor.x >= 0.0 && linkAt(p) > 0.0) {
+    fragColor = vec4(1.0, 0.82, 0.3, 0.95);
+    return;
+  }
 
   vec4 crate = crateAt(p);
   if (crate.a > 0.0) {
@@ -212,10 +253,14 @@ void main() {
     mix(densityAt(i0 + ivec2(0, 1)), densityAt(i0 + ivec2(1, 1)), t.x),
     t.y
   );
-  if (d < 0.002) discard;
+  if (d < 0.002) {
+    if (grid <= 0.0) discard;
+    fragColor = vec4(vec3(1.0), grid);
+    return;
+  }
   // sqrt so a thin trickle of zombies still reads clearly at map zoom.
   float s = clamp(sqrt(d * 4.0), 0.0, 1.0);
   vec3 color = mix(vec3(0.8, 0.1, 0.08), vec3(1.0, 0.3, 0.15), s);
   float alpha = mix(0.7, 0.95, s);
-  fragColor = vec4(color, alpha);
+  fragColor = vec4(mix(color, vec3(1.0), grid * 0.5), alpha);
 }

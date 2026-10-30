@@ -838,6 +838,16 @@ export class GameImpl implements Game {
     });
   }
 
+  private _outpostLimit = 1;
+
+  public outpostLimit(): number {
+    return this._outpostLimit;
+  }
+
+  public setOutpostLimit(limit: number): void {
+    this._outpostLimit = limit;
+  }
+
   public isSpawnImmunityActive(): boolean {
     return (
       this.inSpawnPhase() ||

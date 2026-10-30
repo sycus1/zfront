@@ -12,6 +12,13 @@ See [Contributors](https://github.com/openfrontio/OpenFrontIO/graphs/contributor
 © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright)  
 Licensed under ODbL
 
+### Real-town maps (Bath, Sheffield, Whitby)
+
+Built by `scripts/realmap` from:
+
+- [Overture Maps](https://overturemaps.org/) release 2026-10-21.0: buildings, roads, water and land use from © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright) (ODbL), and land cover from [ESA WorldCover](https://esa-worldcover.org/) © ESA WorldCover project (CC BY 4.0). The generated map files are a derived database and are available under the [ODbL](https://opendatacommons.org/licenses/odbl/).
+- Height from [Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) on AWS. In England these come from Environment Agency LIDAR: contains public sector information licensed under the [Open Government Licence v3.0](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
+
 ### Natural Earth
 
 [Natural Earth](https://www.naturalearthdata.com/)  

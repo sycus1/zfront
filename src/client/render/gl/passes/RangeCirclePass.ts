@@ -27,6 +27,7 @@ export class RangeCirclePass {
   private centerY = 0;
   private radius = 0;
   private warning = false;
+  private color: readonly [number, number, number] | null = null;
 
   constructor(gl: WebGL2RenderingContext) {
     this.gl = gl;
@@ -64,6 +65,22 @@ export class RangeCirclePass {
     }
   }
 
+  /**
+   * zfront: shows a fixed circle in `color` instead of following the ghost
+   * (radius 0 hides it). Used for the land settlers fill round the HQ.
+   */
+  showCircle(
+    x: number,
+    y: number,
+    radius: number,
+    color: readonly [number, number, number],
+  ): void {
+    this.centerX = x;
+    this.centerY = y;
+    this.radius = radius;
+    this.color = color;
+  }
+
   draw(cameraMatrix: Float32Array): void {
     if (this.radius <= 0) return;
 
@@ -74,7 +91,9 @@ export class RangeCirclePass {
 
     gl.uniform2f(this.uCenter, this.centerX, this.centerY);
     gl.uniform1f(this.uRadius, this.radius);
-    if (this.warning) {
+    if (this.color !== null) {
+      gl.uniform3f(this.uColor, ...this.color);
+    } else if (this.warning) {
       gl.uniform3f(this.uColor, 1.0, 0.2, 0.2);
     } else {
       gl.uniform3f(this.uColor, 1.0, 1.0, 1.0);

@@ -1,0 +1,18 @@
+{
+  "id": "Sheffield",
+  "name": "Sheffield",
+  "translation_key": "map.sheffield",
+  "categories": ["new", "europe"],
+  "multiplayer_frequency": 0,
+  "layers": [
+    {
+      "id": "roads",
+      "placement": "land"
+    },
+    {
+      "id": "buildings",
+      "placement": "land"
+    }
+  ],
+  "nations": []
+}

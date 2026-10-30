@@ -54,7 +54,10 @@ import {
   within,
 } from "@openfront/engine-lib/Util";
 import { z } from "zod";
+import { outpostSpawn } from "../horde/Claims";
+import { hordeOf } from "../horde/HordeExecution";
 import { settlesOnItsOwn } from "../horde/Settlement";
+import { snapToCell } from "../horde/WallLinks";
 import {
   newPlayerInfo,
   playerInfoData,
@@ -1262,12 +1265,20 @@ export class PlayerImpl implements Player {
         }
       }
 
+      // zfront: what a new wall post would link up with, and the spans' price.
+      const links =
+        buildNew && u === UnitType.Wall
+          ? hordeOf(mg)?.previewWallLinks(this, canBuild as TileRef)
+          : undefined;
+
       result[i] = {
         type: u,
         canBuild,
         canUpgrade,
         cost,
         upgradeCosts,
+        wallLinks: links?.lines,
+        wallLinkCost: links?.cost,
         overlappingRailroads: buildNew
           ? rail.overlappingRailroads(u, canBuild as TileRef)
           : [],
@@ -1321,8 +1332,11 @@ export class PlayerImpl implements Player {
         return this.tradeShipSpawn(targetTile);
       case UnitType.Train:
         return this.landBasedUnitSpawn(targetTile);
-      case UnitType.MissileSilo:
       case UnitType.DefensePost:
+        return this.mg.config().horde()
+          ? this.turretSpawn(targetTile, validTiles)
+          : this.landBasedStructureSpawn(targetTile, validTiles);
+      case UnitType.MissileSilo:
       case UnitType.SAMLauncher:
       case UnitType.City:
       case UnitType.Factory:
@@ -1331,7 +1345,9 @@ export class PlayerImpl implements Player {
       case UnitType.Mine:
       case UnitType.NoiseBeacon:
       case UnitType.Depot:
-        return this.wallSpawn(targetTile);
+        return this.wallSpawn(targetTile, unitType);
+      case UnitType.Outpost:
+        return outpostSpawn(this.mg, this, targetTile);
       default:
         assertNever(unitType);
     }
@@ -1447,16 +1463,41 @@ export class PlayerImpl implements Player {
   }
 
   /**
-   * zfront: a wall (or a mine, beacon or depot) goes exactly where it is
-   * placed, on the player's own land, at least two tiles from any other of
-   * them or any structure. That keeps one per 2x2 horde cell, so walls two
-   * tiles apart make a solid line.
+   * zfront: a turret goes where an ordinary structure would, snapped to the
+   * build grid (the top-left tile of its 2x2 horde cell).
    */
-  wallSpawn(tile: TileRef): TileRef | false {
+  private turretSpawn(
+    tile: TileRef,
+    validTiles: TileRef[] | null,
+  ): TileRef | false {
+    const spawn = this.landBasedStructureSpawn(tile, validTiles);
+    if (spawn === false) return false;
+    const snapped = snapToCell(this.mg.map(), spawn);
     const mg = this.mg;
+    return mg.owner(snapped) === this &&
+      mg.isLand(snapped) &&
+      !mg.isImpassable(snapped)
+      ? snapped
+      : spawn;
+  }
+
+  /**
+   * zfront: a wall (or a mine, beacon or depot) goes in the build-grid cell
+   * it is placed in (on its top-left tile), on the player's own land, clear
+   * of wall spans (walls also clear of the horde) and at least two tiles
+   * from any other of them or any structure. That keeps one per 2x2 horde cell, so walls in neighbouring
+   * cells make a solid line.
+   */
+  wallSpawn(target: TileRef, type?: UnitType): TileRef | false {
+    const mg = this.mg;
+    const tile = snapToCell(mg.map(), target);
     if (mg.owner(tile) !== this || !mg.isLand(tile) || mg.isImpassable(tile)) {
       return false;
     }
+    const horde = hordeOf(mg);
+    if (horde?.isSpanCell(tile)) return false;
+    // Nor can a wall go up in the face of the horde.
+    if (type === UnitType.Wall && horde?.hordeNear(tile)) return false;
     // Range 1.5 takes in the eight neighbouring tiles; units still under
     // construction count, as they do for structure spacing.
     const crowded = mg.anyUnitNearby(

@@ -41,6 +41,7 @@ const wallIcon = assetUrl("images/WallIconWhite.svg");
 const mineIcon = assetUrl("images/MineIconWhite.svg");
 const beaconIcon = assetUrl("images/BeaconIconWhite.svg");
 const depotIcon = assetUrl("images/DepotIconWhite.svg");
+const outpostIcon = assetUrl("images/OutpostIconWhite.svg");
 
 export interface BuildItemDisplay {
   unitType: PlayerBuildableUnitType;
@@ -134,6 +135,13 @@ export const buildTable: BuildItemDisplay[][] = [
       icon: depotIcon,
       description: "build_menu.desc.depot",
       key: "unit_type.depot",
+      countable: true,
+    },
+    {
+      unitType: UnitType.Outpost,
+      icon: outpostIcon,
+      description: "build_menu.desc.outpost",
+      key: "unit_type.outpost",
       countable: true,
     },
     {

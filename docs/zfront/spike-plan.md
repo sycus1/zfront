@@ -314,6 +314,19 @@ _Started 2026-10-29._ Dan found there was no way to fight the first wave: the tu
 
 `balance:horde -- --zone 0`: doing nothing now lasts to wave 4 to 6 (was 2 or 3). `turrets` and `scavenge` win from all five starts with the HQ at or near full health. `fort` loses on Lincolnshire on wave 10 at 783 s; it won there with 8,708 HQ left before, so it was already marginal there.
 
+## Walls: build grid and spans
+
+_Started 2026-10-29._ Dan asked for wall posts that join up to block the gap between them, a square grid for them to line up on, and mountains to count as walls so a pass can be closed. Proposal agreed with Dan: https://claude.ai/artifact/3xcf9fCSUxcD8LYBsLXCE8.
+
+- **Build grid.** Walls, mines, beacons, depots and (in horde mode) turrets snap to the top-left tile of their 2x2-tile cell, the cell the horde moves on, so a wall blocks exactly what it covers. The build ghost sits on the snapped cell and the horde pass draws the grid round it.
+- **Links.** A new post links to the nearest of its owner's posts, or mountain cells, within `wallSnapRadius` (8) cells, then to the nearest one roughly opposite that (at least 135 degrees away), at most two links (`horde/WallLinks.ts`). The proposal said 90 degrees; 135 keeps a post added to the end of a line from also cutting across the base. Every cell on the straight line must be the owner's own land or mountain, with no building, HQ or other span on it. Links are made once, when the post appears, and never rewired.
+- **Spans.** The cells between become wall cells (WALL_COST, obstacles). They cost `spanCostPerCell` (1,000) each. A span has its own health at the tier of its weaker post (4k, 12k, 30k), so a breach opens one stretch. A broken span is rebuilt automatically at its build price once the horde has moved off, after the usual `repairDelay`, and damaged spans repair like structures. A span the owner can't afford yet starts unbuilt and goes up once they can. Spans fall with either post. The frame draws them as wall cells; the build preview draws the links as dashed gold lines and adds their price to the cost label.
+- **Not in the face of the horde.** Dan, 2026-10-29: builders can't get through an incoming push. No wall post can be placed, and no span built or rebuilt, within `wallClearRadius` (3) cells of any zombie or elite. Mines, beacons and depots still can.
+- **Mountains** (terrain the horde can't climb) are anchors and cost nothing to span over. Water edges are not anchors.
+- Horde snapshot version 11 (older games: no snapping, so no spans).
+
+`balance:horde` has a new `spans` strategy: `fort` with a post every 10 tiles round the ring instead of a barricade every 2. It wins from all five starts with the HQ at full health; `fort` still wins everywhere, at 15,838 HQ left on Lincolnshire. Upgrading two posts lifts a whole span, so a spanned ring is far cheaper to bring to stone or reinforced than a solid one; watch that in play.
+
 ## Supply drops
 
 _Started 2026-10-29._ Dan found the income passive and "solved": the HQ trickle was most of the early income and a depot paid for itself in two waves with no downside. He picked supply drops plus a cut to the passive income from the options page (https://claude.ai/artifact/56Zx1HGPbYtU5DxFXvvG6c).
@@ -323,7 +336,7 @@ _Started 2026-10-29._ Dan found the income passive and "solved": the HQ trickle 
 - **Risk.** Any zombie within `crateDangerRadius` (2 coarse cells) destroys a crate, mid-loot or not ("The horde got to your supply crate first"). A crate nobody starts looting is gone after `crateLife` (300 ticks, 30 s).
 - **Value.** `crateBaseGold` + `crateGoldPerWave` × wave (2,000 + 1,500 × N, wave 1 before the first), doubled (`crateLandingBonusPercent` 100) within `crateLandingRadius` (15 coarse cells) of an announced landing arrow.
 - **Passive cut.** `hqIncome` 100 → 50. Depots no longer pay gold (`depotIncome` 20 → 0); each finished depot makes drops come `depotCratePercent` (25%) faster, counting at most `depotCrateMax` (4), so up to twice as often.
-- **Client.** The horde pass draws each crate as a gold box with straps inside a ring: white and running down with its life (blinking in the last quarter), or green and filling while it is looted. Its gold is written above it. Horde snapshot version 11 (older games keep their economy and get no crates); `HordeFrame.crates`.
+- **Client.** The horde pass draws each crate as a gold box with straps inside a ring: white and running down with its life (blinking in the last quarter), or green and filling while it is looted. Its gold is written above it. Horde snapshot version 13 (older games keep their economy and get no crates); `HordeFrame.crates`.
 
 `balance:horde -- --zone 0` has a new `--loot <percent>` flag: the bot loots that share of its crates 3 seconds after each drops. With the old economy (`--set hqIncome=100,depotIncome=20,crateInterval=0`) `turrets` and `scavenge` won all five starts and `fort` lost Lincolnshire. Now:
 

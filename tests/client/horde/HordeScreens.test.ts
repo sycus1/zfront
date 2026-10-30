@@ -45,6 +45,8 @@ function frame(overrides: Partial<HordeFrame> = {}): HordeFrame {
     nextWaveFinal: false,
     nextWaveLandings: new Int32Array(),
     hqCell: -1,
+    hqTile: -1,
+    settleRadius: 0,
     turretShots: new Int32Array(),
     canCallWave: false,
     callWaveGold: 0,

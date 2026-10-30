@@ -118,6 +118,8 @@ export interface UnitParamsMap {
   [UnitType.NoiseBeacon]: Record<string, never>;
 
   [UnitType.Depot]: Record<string, never>;
+
+  [UnitType.Outpost]: Record<string, never>;
 }
 
 // Type helper to get params type for a specific unit type
@@ -492,6 +494,12 @@ export interface Game extends GameLike {
 
   // Immunity timer
   isSpawnImmunityActive(): boolean;
+  /**
+   * zfront: how many Outposts each player may hold. The horde sets it from
+   * the waves survived every tick (and on restore), so it isn't snapshotted.
+   */
+  outpostLimit(): number;
+  setOutpostLimit(limit: number): void;
   isNationSpawnImmunityActive(): boolean;
   elapsedGameSeconds(): number;
 

@@ -11,6 +11,7 @@ import { TileRef } from "@openfront/engine-api/game/GameMap";
 import {
   BuildableUnit,
   bulkCost,
+  HordePlaced,
   PlayerBuildableUnitType,
   Structures,
   UnitType,
@@ -373,13 +374,17 @@ export class BuildPreviewController implements Controller {
     if (!myPlayer) return null;
 
     const u = this.ghostUnit.buildableUnit;
+    // zfront: horde buildings snap to the 2x2-tile build grid, always.
+    const onGrid =
+      (HordePlaced.has(u.type) || u.type === UnitType.DefensePost) &&
+      this.game.config().horde();
     // With snapping on, a new structure's preview sits on the tile it will
     // actually be built on (the sim moves it off nearby buildings) instead of
     // under the cursor.
     const placementTile =
-      this.userSettings.snapBuildPreview() &&
+      (onGrid || this.userSettings.snapBuildPreview()) &&
       u.canUpgrade === false &&
-      Structures.has(u.type) &&
+      (onGrid || Structures.has(u.type)) &&
       u.canBuild !== false
         ? u.canBuild
         : tileRef;
@@ -409,6 +414,10 @@ export class BuildPreviewController implements Controller {
       case UnitType.DefensePost:
         rangeRadius = this.game.config().defensePostRange();
         break;
+      case UnitType.Outpost:
+        // zfront: the land it will claim once built.
+        rangeRadius = this.game.config().outpostClaimRadius();
+        break;
     }
     let radiusTileX = this.game.x(placementTile);
     let radiusTileY = this.game.y(placementTile);
@@ -426,18 +435,24 @@ export class BuildPreviewController implements Controller {
       u.canUpgrade !== false || isNuke
         ? (this.uiState.upgradeMultiplier ?? 1)
         : 1;
-    const cost = bulkCost(u, multiplier);
+    // A new wall post also pays for the spans it links up with.
+    const cost = bulkCost(u, multiplier) + (u.wallLinkCost ?? 0n);
     // Drives the red cost label: gold short of the bulk total, or (for
     // bombs) fewer loaded silo tubes than the selected amount.
     let canAfford = myPlayer.gold() >= cost;
     if (isNuke) {
       canAfford &&= myPlayer.readyMissileCount() >= multiplier;
     }
+    const wallLinks: number[] = [];
+    for (const t of u.wallLinks ?? []) {
+      wallLinks.push(this.game.x(t), this.game.y(t));
+    }
     return {
       ghostType: u.type,
       tileX: this.game.x(placementTile),
       tileY: this.game.y(placementTile),
-      snapToPlacement: placementTile !== tileRef,
+      snapToPlacement:
+        placementTile !== tileRef || (onGrid && u.canBuild !== false),
       radiusTileX,
       radiusTileY,
       canBuild: u.canBuild !== false,
@@ -452,6 +467,8 @@ export class BuildPreviewController implements Controller {
       upgradeTargetTile,
       rangeRadius,
       rangeWarning: false,
+      buildGrid: onGrid,
+      wallLinks,
     };
   }
 

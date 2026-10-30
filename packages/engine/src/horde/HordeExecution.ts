@@ -4,6 +4,7 @@ import {
   HordeFrame,
   HordeOutcome,
 } from "@openfront/engine-api/game/GameUpdates";
+import { OUTPOST_CLAIM_RADIUS } from "@openfront/engine-lib/configuration/Config";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import {
   zInt,
@@ -17,6 +18,13 @@ import { Execution, Game, Player, Unit } from "../game/Game";
 import { execSnapshotType } from "../snapshot/ExecutionSnapshot";
 import type { ExecRecord, SnapshotReader } from "../snapshot/SnapshotContext";
 import { BuildingOptions, beaconSounding, detonate } from "./Buildings";
+import {
+  applyClaims,
+  ClaimOptions,
+  lapseOutpost,
+  outpostLimit,
+  outposts,
+} from "./Claims";
 import { Crate, CrateOptions, Crates, CrateState } from "./Crates";
 import {
   payBounty,
@@ -28,7 +36,13 @@ import {
 import { Elites } from "./Elites";
 import { FlowField, ORTHO_STEP, WALL_COST } from "./FlowField";
 import { buildCostField, HordeField } from "./HordeField";
-import { settle, SettleOptions, welcomeRefugees } from "./Settlement";
+import {
+  passiveRadius,
+  settle,
+  SettleOptions,
+  welcomeRefugees,
+} from "./Settlement";
+import { chooseLinks, LinkGrid, LinkPost, WallLink } from "./WallLinks";
 import { WaveDirector, WavePlan } from "./WaveDirector";
 
 /**
@@ -37,8 +51,9 @@ import { WaveDirector, WavePlan } from "./WaveDirector";
  * agents on the same flow field. Structures are obstacles: blocked zombies
  * press on them until they fall. Walls are obstacles too, but not targets:
  * the horde goes round them where it can and breaks through where it must.
- * Defense Posts stand in for turrets. The WaveDirector plans each wave's
- * size and directions.
+ * Each new wall post links to nearby posts and mountains with spans that
+ * block like walls (see WallLinks). Defense Posts stand in for turrets. The
+ * WaveDirector plans each wave's size and directions.
  *
  * The player wins by keeping their HQ standing until the wave after
  * `wavesToWin` would arrive, and loses when every human HQ has fallen.
@@ -50,7 +65,12 @@ import { WaveDirector, WavePlan } from "./WaveDirector";
  */
 
 export interface HordeOptions
-  extends SettleOptions, EconomyOptions, BuildingOptions, CrateOptions {
+  extends
+    SettleOptions,
+    ClaimOptions,
+    EconomyOptions,
+    BuildingOptions,
+    CrateOptions {
   /** Ticks from the end of the spawn phase to the first wave. */
   firstWaveDelay: number;
   waveInterval: number;
@@ -95,6 +115,15 @@ export interface HordeOptions
   wallHp: number;
   stoneWallHp: number;
   reinforcedWallHp: number;
+  /** How far, in coarse cells, a new wall post reaches to link up. */
+  wallSnapRadius: number;
+  /** Gold per cell a span fills, paid when it is built or rebuilt. */
+  spanCostPerCell: number;
+  /**
+   * No wall post goes up, and no span is built, within this many coarse
+   * cells of the horde: builders can't get through a push.
+   */
+  wallClearRadius: number;
   /** Each turret level above 1 adds this percent of the base kill rate. */
   turretLevelPercent: number;
   /** Extra turret range, in coarse cells, per 10 points of terrain height. */
@@ -186,6 +215,9 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   wallHp: 4_000,
   stoneWallHp: 12_000,
   reinforcedWallHp: 30_000,
+  wallSnapRadius: 8,
+  spanCostPerCell: 1_000,
+  wallClearRadius: 3,
   repairDelay: 50,
   repairInterval: 10,
   repairHp: 100,
@@ -199,9 +231,13 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   settlePercent: 50,
   settleTiles: 20,
   settleCost: 200,
-  zoneBaseTiles: 1_500,
-  zoneTilesPerWave: 1_000,
+  settleRadius: 14,
+  settleRadiusPerWave: 2,
   refugeesPerWave: 10_000,
+  outpostRadius: OUTPOST_CLAIM_RADIUS,
+  buildingClaimRadius: 3,
+  outpostsBase: 1,
+  wavesPerOutpost: 2,
 };
 
 /** Tile offsets from the HQ tried, in order, for the free turrets. */
@@ -224,7 +260,40 @@ const TARGET_TYPES: readonly UnitType[] = [
   UnitType.SAMLauncher,
   UnitType.Factory,
   UnitType.Depot,
+  UnitType.Outpost,
 ];
+
+/** Horde buildings that take up their cell, so no span runs through them. */
+const OCCUPYING_TYPES: readonly UnitType[] = [
+  ...TARGET_TYPES,
+  UnitType.Wall,
+  UnitType.Mine,
+  UnitType.NoiseBeacon,
+];
+
+/**
+ * A wall span between two posts, or a post and a mountain. It blocks like a
+ * wall and has its own health; when that runs out it is broken (open) until
+ * its owner rebuilds it, and it is gone for good once a post at either end
+ * falls. One its owner could not yet pay for counts as broken.
+ */
+interface WallSpan {
+  id: number;
+  /** The post it was built from, and the post at the far end (-1: mountain). */
+  a: number;
+  b: number;
+  cells: number[];
+  damage: number;
+  lastHit: number;
+  broken: boolean;
+}
+
+/** What placing a wall post on a tile would link to, for the build preview. */
+export interface WallLinkPreview {
+  /** Pairs of tiles: the new post, then the far end of each link. */
+  lines: TileRef[];
+  cost: bigint;
+}
 
 export interface HordeStats {
   wave: number;
@@ -239,6 +308,9 @@ export interface HordeStats {
   /** The first human player's HQ health, or 0 when none is alive. */
   hqHp: number;
   hqsFallen: number;
+  /** Wall spans standing, and broken open waiting to be rebuilt. */
+  spans: number;
+  spansBroken: number;
   outcome: HordeOutcome;
   recomputes: number;
   lastRecomputeMs: number;
@@ -270,6 +342,9 @@ export class HordeExecution implements Execution {
 
   private wave = 0;
   private wavesSurvived = 0;
+  /** Outposts (tile and owner smallID) at the last claim pass. */
+  private outpostTiles: TileRef[] = [];
+  private outpostOwners: number[] = [];
   /** The wave under way (or last started), and the one announced next. */
   private currentPlan: WavePlan | null = null;
   private nextPlan: WavePlan | null = null;
@@ -287,6 +362,13 @@ export class HordeExecution implements Execution {
   // something on the last tick. Not part of the simulation state.
   private hordeTurretShots: number[] = [];
   private hordeHqAt = new Map<number, Player>();
+  /** Spans in the order they were built. */
+  private spans: WallSpan[] = [];
+  private nextSpanId = 1;
+  /** Wall posts (by unit id) that have made their links. */
+  private linkedWalls = new Set<number>();
+  /** Standing span cells from the latest scan. */
+  private hordeSpanAt = new Map<number, WallSpan>();
   /** Damage taken by unit id, and the tick each was last attacked. */
   private damage = new Map<number, number>();
   private lastHit = new Map<number, number>();
@@ -369,6 +451,7 @@ export class HordeExecution implements Execution {
     this.hordeStructureAt = new Map();
     this.hordeTurrets = [];
     this.hordeHqAt = new Map();
+    this.hordeSpanAt = new Map();
     this.damage = new Map();
     this.lastHit = new Map();
     this.beaconSince = new Map();
@@ -417,7 +500,11 @@ export class HordeExecution implements Execution {
     if (ticks % this.opts.repairInterval === 0) this.repair();
     this.checkCleared();
     this.tickCrates(ticks);
-    if (ticks % this.opts.settleInterval === 0) this.settleAll();
+    this.mg!.setOutpostLimit(outpostLimit(this.opts, this.wavesSurvived));
+    if (ticks % this.opts.settleInterval === 0) {
+      this.claimAll();
+      this.settleAll();
+    }
   }
 
   private tickCrates(ticks: number): void {
@@ -454,6 +541,8 @@ export class HordeExecution implements Execution {
       crateGold: this.crates?.paid() ?? 0,
       hqHp: this.firstHqHp(),
       hqsFallen: this.hqsFallen,
+      spans: this.spans.filter((s) => !s.broken).length,
+      spansBroken: this.spans.filter((s) => s.broken).length,
       outcome: this.outcome,
       ...this.hordeProfile,
     };
@@ -534,7 +623,11 @@ export class HordeExecution implements Execution {
       cells[c] = sounding.has(c) ? BYTE_BEACON_SOUNDING : BYTE_BEACON;
     }
     for (const c of this.hordeWallCells) {
-      const level = this.hordeStructureAt.get(c)?.level() ?? 1;
+      const span = this.hordeSpanAt.get(c);
+      const level =
+        span !== undefined
+          ? this.spanTier(span)
+          : (this.hordeStructureAt.get(c)?.level() ?? 1);
       cells[c] = 251 + Math.min(3, Math.max(1, level));
     }
     for (let k = 0; k < this.elites.count; k++) {
@@ -565,6 +658,8 @@ export class HordeExecution implements Execution {
       nextWaveFinal: next?.final ?? false,
       nextWaveLandings: Int32Array.from(this.nextLandings),
       hqCell: this.firstHqCell(),
+      hqTile: this.firstHqTile(),
+      settleRadius: passiveRadius(this.opts, this.wavesSurvived),
       turretShots: Int32Array.from(this.hordeTurretShots),
       callWaveGold: this.callableTicks() * this.opts.callEarlyGoldPerTick,
       canCallWave: this.callableTicks() > 0,
@@ -637,6 +732,14 @@ export class HordeExecution implements Execution {
       mix(id);
       mix(since);
     }
+    for (const s of this.spans) {
+      mix(s.id);
+      mix(s.a);
+      mix(s.b);
+      mix(s.cells.length);
+      mix(s.damage);
+      mix(s.broken ? 1 : 0);
+    }
     this.crates.hash(mix);
     return h >>> 0;
   }
@@ -644,6 +747,11 @@ export class HordeExecution implements Execution {
   /** The first human HQ's coarse cell, or -1. */
   private firstHqCell(): number {
     for (const cell of this.hordeHqAt.keys()) return cell;
+    return -1;
+  }
+
+  private firstHqTile(): number {
+    for (const p of this.hordeHqAt.values()) return p.spawnTile() ?? -1;
     return -1;
   }
 
@@ -712,6 +820,7 @@ export class HordeExecution implements Execution {
   private scanStructures(ticks: number): void {
     const units = this.mg!.units(TARGET_TYPES);
     const walls = this.mg!.units(UnitType.Wall);
+    this.linkWalls(walls);
     const bait = this.soundingBeacons(ticks);
     // Each human player's spawn tile is their HQ: always a target, and an
     // obstacle the horde presses on. When it falls the player loses.
@@ -739,7 +848,11 @@ export class HordeExecution implements Execution {
     for (const u of bait) {
       sig = Math.imul(sig ^ u.tile(), 16777619);
     }
-    sig = Math.imul(sig ^ bait.length, 16777619) >>> 0;
+    sig = Math.imul(sig ^ bait.length, 16777619);
+    for (const s of this.spans) {
+      sig = Math.imul(sig ^ (s.broken ? -s.id : s.id), 16777619);
+    }
+    sig = Math.imul(sig ^ this.spans.length, 16777619) >>> 0;
     const changed = sig !== this.hordeStructureSig;
     if (changed || this.hordeObstaclesStale) {
       this.rebuildObstacles(units, walls, bait, hqs, hqOwners);
@@ -838,7 +951,182 @@ export class HordeExecution implements Execution {
       wallCells.push(cell);
       this.hordeStructureAt.set(cell, u);
     }
+    // Then the spans between them.
+    this.hordeSpanAt.clear();
+    for (const s of this.spans) {
+      if (s.broken) continue;
+      for (const cell of s.cells) {
+        if (obstacle[cell] !== 0) continue;
+        obstacle[cell] = 1;
+        wallCells.push(cell);
+        this.hordeSpanAt.set(cell, s);
+      }
+    }
     this.hordeWallCells = wallCells;
+  }
+
+  /**
+   * Drops the spans of posts that are gone, then links each new post, in
+   * unit order. A span the owner can't afford yet, or with the horde too
+   * close, starts out unbuilt, like a broken one, and goes up as soon as it
+   * can (see repairSpans).
+   */
+  private linkWalls(walls: readonly Unit[]): void {
+    const alive = new Set<number>();
+    for (const u of walls) alive.add(u.id());
+    this.spans = this.spans.filter(
+      (s) => alive.has(s.a) && (s.b < 0 || alive.has(s.b)),
+    );
+    for (const id of [...this.linkedWalls]) {
+      if (!alive.has(id)) this.linkedWalls.delete(id);
+    }
+    for (const u of walls) {
+      if (this.linkedWalls.has(u.id())) continue;
+      this.linkedWalls.add(u.id());
+      const owner = u.owner();
+      for (const link of this.planLinks(owner, u.tile(), walls)) {
+        const cost = BigInt(link.cells.length * this.opts.spanCostPerCell);
+        const paid = owner.gold() >= cost && !this.hordeNearCells(link.cells);
+        if (paid) owner.removeGold(cost);
+        this.spans.push({
+          id: this.nextSpanId++,
+          a: u.id(),
+          b: link.post,
+          cells: link.cells,
+          damage: 0,
+          lastHit: paid ? this.ticks : this.ticks - this.opts.repairDelay,
+          broken: !paid,
+        });
+      }
+    }
+  }
+
+  /** The links a post of `owner`'s on `tile` would make to `walls`. */
+  private planLinks(
+    owner: Player,
+    tile: TileRef,
+    walls: readonly Unit[],
+  ): WallLink[] {
+    const mg = this.mg!;
+    const map = mg.map();
+    const mini = mg.miniMap();
+    const w = this.width;
+    const cell = this.cellOf(tile);
+    const posts: LinkPost[] = [];
+    for (const u of walls) {
+      if (u.owner() !== owner || u.tile() === tile) continue;
+      posts.push({ cell: this.cellOf(u.tile()), id: u.id() });
+    }
+    const occupied = new Set<number>();
+    for (const u of mg.units(OCCUPYING_TYPES))
+      occupied.add(this.cellOf(u.tile()));
+    for (const p of mg.players()) {
+      const spawn = p.spawnTile();
+      if (p.type() === PlayerType.Human && spawn !== undefined) {
+        occupied.add(this.cellOf(spawn));
+      }
+    }
+    for (const s of this.spans) for (const c of s.cells) occupied.add(c);
+    const terrain = this.terrainCost;
+    const grid: LinkGrid = {
+      width: w,
+      height: this.height,
+      isMountain: (c) => {
+        if (terrain[c] !== 0 || occupied.has(c)) return false;
+        const x = c % w;
+        return mini.isLand(mini.ref(x, (c - x) / w));
+      },
+      spannable: (c) => {
+        if (terrain[c] === 0 || occupied.has(c)) return false;
+        const x = c % w;
+        const t = map.ref(
+          Math.min(map.width() - 1, x * 2),
+          Math.min(map.height() - 1, ((c - x) / w) * 2),
+        );
+        return mg.owner(t) === owner;
+      },
+    };
+    return chooseLinks(cell, posts, grid, this.opts.wallSnapRadius);
+  }
+
+  /**
+   * What a new wall post of `owner`'s on `tile` would link to now, and what
+   * the spans would cost, for the build preview.
+   */
+  previewWallLinks(owner: Player, tile: TileRef): WallLinkPreview {
+    const lines: TileRef[] = [];
+    let cells = 0;
+    if (this.mg === null) return { lines, cost: 0n };
+    const map = this.mg.map();
+    const w = this.width;
+    for (const link of this.planLinks(
+      owner,
+      tile,
+      this.mg.units(UnitType.Wall),
+    )) {
+      const x = link.anchor % w;
+      lines.push(
+        tile,
+        map.ref(
+          Math.min(map.width() - 1, x * 2),
+          Math.min(map.height() - 1, ((link.anchor - x) / w) * 2),
+        ),
+      );
+      cells += link.cells.length;
+    }
+    return { lines, cost: BigInt(cells * this.opts.spanCostPerCell) };
+  }
+
+  /**
+   * Whether any of the horde (or an elite) is within `wallClearRadius`
+   * coarse cells of `tile`'s cell, so no wall can go up there.
+   */
+  hordeNear(tile: TileRef): boolean {
+    if (this.mg === null) return false;
+    return this.hordeNearCells([this.cellOf(tile)]);
+  }
+
+  private hordeNearCells(cells: readonly number[]): boolean {
+    const r = Math.max(0, this.opts.wallClearRadius);
+    const w = this.width;
+    const h = this.height;
+    const density = this.field.density;
+    for (const c of cells) {
+      const cx = c % w;
+      const cy = (c - cx) / w;
+      for (let y = Math.max(0, cy - r); y <= Math.min(h - 1, cy + r); y++) {
+        for (let x = Math.max(0, cx - r); x <= Math.min(w - 1, cx + r); x++) {
+          if (density[y * w + x] !== 0) return true;
+        }
+      }
+      for (let k = 0; k < this.elites.count; k++) {
+        const e = this.elites.cell[k];
+        const ex = e % w;
+        if (Math.abs(ex - cx) <= r && Math.abs((e - ex) / w - cy) <= r) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /** Whether a span (standing or broken) runs through `tile`'s cell. */
+  isSpanCell(tile: TileRef): boolean {
+    if (this.mg === null) return false;
+    const cell = this.cellOf(tile);
+    return this.spans.some((s) => s.cells.includes(cell));
+  }
+
+  /** A span's tier: that of the weaker post at its ends. */
+  private spanTier(s: WallSpan): number {
+    const level = (id: number) => this.mg!.unit(id)?.level() ?? 1;
+    const tier = s.b < 0 ? level(s.a) : Math.min(level(s.a), level(s.b));
+    return Math.min(3, Math.max(1, tier));
+  }
+
+  private spanMaxHp(s: WallSpan): number {
+    const o = this.opts;
+    return [o.wallHp, o.stoneWallHp, o.reinforcedWallHp][this.spanTier(s) - 1];
   }
 
   /**
@@ -962,6 +1250,44 @@ export class HordeExecution implements Execution {
     if (wave <= this.wavesSurvived) return;
     this.wavesSurvived = wave;
     welcomeRefugees(this.mg!, this.opts, wave);
+  }
+
+  /**
+   * Buildings claim land for each human, in player order, after the land of
+   * any Outpost lost since the last pass has lapsed.
+   */
+  private claimAll(): void {
+    const mg = this.mg!;
+    const live = new Set<TileRef>();
+    const humans = mg
+      .players()
+      .filter((p) => p.type() === PlayerType.Human && p.isAlive());
+    for (const p of humans) {
+      for (const u of outposts(p)) live.add(u.tile());
+    }
+    for (let k = 0; k < this.outpostTiles.length; k++) {
+      const tile = this.outpostTiles[k];
+      if (live.has(tile)) continue;
+      const owner = humans.find((p) => p.smallID() === this.outpostOwners[k]);
+      if (owner === undefined) continue;
+      lapseOutpost(
+        mg,
+        owner,
+        this.opts,
+        tile,
+        owner.spawnTile(),
+        passiveRadius(this.opts, this.wavesSurvived),
+      );
+    }
+    this.outpostTiles = [];
+    this.outpostOwners = [];
+    for (const p of humans) {
+      applyClaims(mg, p, this.opts);
+      for (const u of outposts(p)) {
+        this.outpostTiles.push(u.tile());
+        this.outpostOwners.push(p.smallID());
+      }
+    }
   }
 
   /** Settlers claim free land for each human, in player order. */
@@ -1090,6 +1416,11 @@ export class HordeExecution implements Execution {
 
   private applyPressure(): void {
     this.field.drainPressure((cell, pressure) => {
+      const span = this.hordeSpanAt.get(cell);
+      if (span !== undefined) {
+        this.damageSpan(span, pressure);
+        return;
+      }
       const u = this.hordeStructureAt.get(cell);
       if (u === undefined || !u.isActive()) {
         const owner = this.hordeHqAt.get(cell);
@@ -1109,6 +1440,16 @@ export class HordeExecution implements Execution {
       u.delete(false);
       this.structuresDestroyed++;
     });
+  }
+
+  /** A span that runs out of health breaks open; the next scan clears it. */
+  private damageSpan(s: WallSpan, pressure: number): void {
+    if (s.broken) return;
+    s.damage += pressure >> this.opts.pressureShift;
+    s.lastHit = this.ticks;
+    if (s.damage < this.spanMaxHp(s)) return;
+    s.damage = 0;
+    s.broken = true;
   }
 
   /** Full health of a structure: walls by tier, everything else the same. */
@@ -1131,6 +1472,7 @@ export class HordeExecution implements Execution {
   private repair(): void {
     const o = this.opts;
     if (o.repairHp <= 0) return;
+    this.repairSpans();
     for (const [id, damage] of this.damage) {
       const u = this.mg!.unit(id);
       if (u === undefined || !u.isActive()) {
@@ -1152,6 +1494,35 @@ export class HordeExecution implements Execution {
       } else {
         this.damage.set(id, damage - heal);
       }
+    }
+  }
+
+  /**
+   * Spans repair like structures. A broken one is rebuilt whole, at its
+   * build price, once the horde is `wallClearRadius` cells clear of it.
+   */
+  private repairSpans(): void {
+    const o = this.opts;
+    for (const s of this.spans) {
+      if (this.ticks - s.lastHit < o.repairDelay) continue;
+      const owner = this.mg!.unit(s.a)?.owner();
+      if (owner === undefined) continue;
+      if (s.broken) {
+        const cost = BigInt(s.cells.length * o.spanCostPerCell);
+        if (owner.gold() < cost || this.hordeNearCells(s.cells)) continue;
+        owner.removeGold(cost);
+        s.broken = false;
+        continue;
+      }
+      if (s.damage === 0) continue;
+      let heal = Math.min(s.damage, o.repairHp);
+      if (o.repairGoldPerHp > 0) {
+        const affordable = owner.gold() / BigInt(o.repairGoldPerHp);
+        if (affordable < BigInt(heal)) heal = Number(affordable);
+        if (heal <= 0) continue;
+        owner.removeGold(BigInt(heal * o.repairGoldPerHp));
+      }
+      s.damage -= heal;
     }
   }
 
@@ -1194,6 +1565,8 @@ export class HordeExecution implements Execution {
       random: this.random.getState(),
       wave: this.wave,
       wavesSurvived: this.wavesSurvived,
+      outpostTiles: [...this.outpostTiles],
+      outpostOwners: [...this.outpostOwners],
       currentPlan: this.currentPlan,
       nextPlan: this.nextPlan,
       nextWaveTick: this.nextWaveTick,
@@ -1224,6 +1597,16 @@ export class HordeExecution implements Execution {
       firstPendingTick: this.firstPendingTick,
       killed: this.killed,
       structuresDestroyed: this.structuresDestroyed,
+      spanIds: this.spans.map((s) => s.id),
+      spanA: this.spans.map((s) => s.a),
+      spanB: this.spans.map((s) => s.b),
+      spanCellCounts: this.spans.map((s) => s.cells.length),
+      spanCells: this.spans.flatMap((s) => s.cells),
+      spanDamage: this.spans.map((s) => s.damage),
+      spanLastHit: this.spans.map((s) => s.lastHit),
+      spanBroken: this.spans.map((s) => s.broken),
+      nextSpanId: this.nextSpanId,
+      linkedWalls: [...this.linkedWalls],
       crates: this.mg !== null ? this.crates.state() : null,
     });
   }
@@ -1234,6 +1617,9 @@ export class HordeExecution implements Execution {
     this.mg = null;
     this.wave = s.wave;
     this.wavesSurvived = s.wavesSurvived;
+    this.outpostTiles = s.outpostTiles.map((t) => t as TileRef);
+    this.outpostOwners = [...s.outpostOwners];
+    r.game.setOutpostLimit(outpostLimit(opts, s.wavesSurvived));
     this.currentPlan = s.currentPlan;
     this.nextPlan = s.nextPlan;
     this.nextWaveTick = s.nextWaveTick;
@@ -1247,6 +1633,22 @@ export class HordeExecution implements Execution {
     this.hordeTargetCells = [];
     this.hordeWallCells = [];
     this.hordeBaitCells = [];
+    let at = 0;
+    this.spans = s.spanIds.map((id, k) => {
+      const n = s.spanCellCounts[k];
+      at += n;
+      return {
+        id,
+        a: s.spanA[k],
+        b: s.spanB[k],
+        cells: s.spanCells.slice(at - n, at),
+        damage: s.spanDamage[k],
+        lastHit: s.spanLastHit[k],
+        broken: s.spanBroken[k],
+      };
+    });
+    this.nextSpanId = s.nextSpanId;
+    this.linkedWalls = new Set(s.linkedWalls);
     this.flowCells = null;
     this.flowWalls = [];
     this.flowBait = [];
@@ -1400,6 +1802,9 @@ const HordeOptionsSchema = z.object({
   wallHp: zInt(),
   stoneWallHp: zInt(),
   reinforcedWallHp: zInt(),
+  wallSnapRadius: zInt(),
+  spanCostPerCell: zInt(),
+  wallClearRadius: zInt(),
   repairDelay: zInt(),
   repairInterval: zInt(),
   repairHp: zInt(),
@@ -1413,9 +1818,13 @@ const HordeOptionsSchema = z.object({
   settlePercent: zInt(),
   settleTiles: zInt(),
   settleCost: zInt(),
-  zoneBaseTiles: zInt(),
-  zoneTilesPerWave: zInt(),
+  settleRadius: zInt(),
+  settleRadiusPerWave: zInt(),
   refugeesPerWave: zInt(),
+  outpostRadius: zInt(),
+  buildingClaimRadius: zInt(),
+  outpostsBase: zInt(),
+  wavesPerOutpost: zInt(),
   crateInterval: zInt(),
   crateMax: zInt(),
   crateMinDistance: zInt(),
@@ -1465,6 +1874,8 @@ const HordeStateSchema = z.object({
   random: zRandom(),
   wave: zInt(),
   wavesSurvived: zInt(),
+  outpostTiles: z.array(zInt()),
+  outpostOwners: z.array(zInt()),
   currentPlan: WavePlanSchema.nullable(),
   nextPlan: WavePlanSchema.nullable(),
   nextWaveTick: zInt(),
@@ -1495,6 +1906,16 @@ const HordeStateSchema = z.object({
   firstPendingTick: zInt(),
   killed: zInt(),
   structuresDestroyed: zInt(),
+  spanIds: z.array(zInt()),
+  spanA: z.array(zInt()),
+  spanB: z.array(zInt()),
+  spanCellCounts: z.array(zInt()),
+  spanCells: z.array(zInt()),
+  spanDamage: z.array(zInt()),
+  spanLastHit: z.array(zInt()),
+  spanBroken: z.array(z.boolean()),
+  nextSpanId: zInt(),
+  linkedWalls: z.array(zInt()),
   /** Null before init. */
   crates: CrateStateSchema.nullable(),
 });
@@ -1522,7 +1943,7 @@ export function hordeOf(game: Game): HordeExecution | null {
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 11,
+  version: 13,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -1664,9 +2085,52 @@ export const HordeExecutionSnapshot = execSnapshotType({
       ...d,
       options: { ...d.options, startingTurrets: 0 },
     }),
-    // 10 -> 11: supply drops. An old game keeps its economy (its options
-    // carry its HQ trickle and depot income) and gets no crates.
+    // 10 -> 11: wall spans. A restored game keeps its walls as they were:
+    // no snapping, so no spans.
     10: (d) => ({
+      ...d,
+      options: {
+        ...d.options,
+        wallSnapRadius: 0,
+        spanCostPerCell: 0,
+        wallClearRadius: 0,
+      },
+      spanIds: [],
+      spanA: [],
+      spanB: [],
+      spanCellCounts: [],
+      spanCells: [],
+      spanDamage: [],
+      spanLastHit: [],
+      spanBroken: [],
+      nextSpanId: 1,
+      linkedWalls: [],
+    }),
+    // 11 -> 12: Outposts and building claims. Settlers fill a disc round the
+    // HQ instead of a tile count; buildings in an old game start claiming
+    // land on the next pass.
+    11: (d) => {
+      const options = { ...d.options };
+      delete options.zoneBaseTiles;
+      delete options.zoneTilesPerWave;
+      return {
+        ...d,
+        options: {
+          ...options,
+          settleRadius: 14,
+          settleRadiusPerWave: 2,
+          outpostRadius: 12,
+          buildingClaimRadius: 3,
+          outpostsBase: 1,
+          wavesPerOutpost: 2,
+        },
+        outpostTiles: [],
+        outpostOwners: [],
+      };
+    },
+    // 12 -> 13: supply drops. An old game keeps its economy (its options
+    // carry its HQ trickle and depot income) and gets no crates.
+    12: (d) => ({
       ...d,
       options: {
         ...d.options,

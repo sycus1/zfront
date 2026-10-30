@@ -171,6 +171,7 @@ export const DERIVED_FIELDS = new Set<string>([
   // field from the saved flow cells; plus perf-harness timings
   "hordeFlow",
   "hordeStructureAt",
+  "hordeSpanAt",
   "hordeTurrets",
   "hordeHqAt",
   "hordeTargetCells",
