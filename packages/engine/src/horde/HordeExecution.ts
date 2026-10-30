@@ -37,6 +37,7 @@ import {
 import { Elites } from "./Elites";
 import { FlowField, ORTHO_STEP, WALL_COST } from "./FlowField";
 import { buildCostField, HordeField } from "./HordeField";
+import { MortarGun, MortarOptions, Mortars, MortarState } from "./Mortars";
 import {
   passiveRadius,
   settle,
@@ -54,8 +55,9 @@ import { readyToFire } from "./Weapons";
  * press on them until they fall. Walls are obstacles too, but not targets:
  * the horde goes round them where it can and breaks through where it must.
  * Each new wall post links to nearby posts and mountains with spans that
- * block like walls (see WallLinks). Defense Posts stand in for turrets. The
- * WaveDirector plans each wave's size and directions.
+ * block like walls (see WallLinks). Defense Posts stand in for turrets and
+ * Missile Silos for mortars (see Mortars). The WaveDirector plans each
+ * wave's size and directions.
  *
  * The player wins by keeping their HQ standing until the wave after
  * `wavesToWin` would arrive, and loses when every human HQ has fallen.
@@ -72,7 +74,8 @@ export interface HordeOptions
     ClaimOptions,
     EconomyOptions,
     BuildingOptions,
-    CrateOptions {
+    CrateOptions,
+    MortarOptions {
   /** Ticks from the end of the spawn phase to the first wave. */
   firstWaveDelay: number;
   waveInterval: number;
@@ -160,7 +163,8 @@ export interface HordeOptions
 // and shamblers that walk a coarse cell every 3 ticks. Gold comes from the
 // HQ, turret kills, cleared waves and supply crates the player loots (see
 // "Supply drops" in docs/zfront/spike-plan.md). An undefended HQ falls on
-// wave 2 or 3; a ring of upgraded turrets wins.
+// wave 2 or 3; a ring of upgraded turrets wins, and mortars ("Mortars"
+// there) help it win with more HQ left.
 export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   firstWaveDelay: 600,
   waveInterval: 750,
@@ -208,6 +212,15 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   mineTrigger: 40,
   mineKills: 600,
   mineEliteDamage: 300,
+  mortarRange: 20,
+  mortarMinRange: 4,
+  mortarReload: 30,
+  mortarFlight: 15,
+  mortarBlastRadius: 2,
+  mortarKills: 600,
+  mortarEliteDamage: 150,
+  mortarMinTarget: 40,
+  mortarLevelPercent: 50,
   baitPull: 30,
   baitActive: 300,
   baitCooldown: 600,
@@ -307,6 +320,8 @@ export interface HordeStats {
   structuresDestroyed: number;
   /** Gold paid out for supply crates. */
   crateGold: number;
+  /** Shamblers killed by mortar shells (also counted in `killed`). */
+  mortarKilled: number;
   /** The first human player's HQ health, or 0 when none is alive. */
   hqHp: number;
   hqsFallen: number;
@@ -341,6 +356,7 @@ export class HordeExecution implements Execution {
   private terrainCost!: Uint8Array;
   private director!: WaveDirector;
   private crates!: Crates;
+  private mortars!: Mortars;
 
   private wave = 0;
   private wavesSurvived = 0;
@@ -363,6 +379,9 @@ export class HordeExecution implements Execution {
   // Cosmetic: [turret cell, target cell] pairs for the turrets that hit
   // something on the last tick. Not part of the simulation state.
   private hordeTurretShots: number[] = [];
+  private hordeMortars: Unit[] = [];
+  // Cosmetic: cells where mortar shells landed on the last tick.
+  private hordeBlasts: number[] = [];
   private hordeHqAt = new Map<number, Player>();
   /** Spans in the order they were built. */
   private spans: WallSpan[] = [];
@@ -450,8 +469,10 @@ export class HordeExecution implements Execution {
       new PseudoRandom(simpleHash("zfront-crates")),
       this.width,
     );
+    this.mortars = new Mortars(opts, this.width, this.height);
     this.hordeStructureAt = new Map();
     this.hordeTurrets = [];
+    this.hordeMortars = [];
     this.hordeHqAt = new Map();
     this.hordeSpanAt = new Map();
     this.damage = new Map();
@@ -498,6 +519,7 @@ export class HordeExecution implements Execution {
     this.elites.step(this.field, this.hordeFlow.dist);
     this.fireMines();
     this.fireTurrets();
+    this.fireMortars();
     this.applyPressure();
     if (ticks % this.opts.repairInterval === 0) this.repair();
     this.checkCleared();
@@ -541,6 +563,7 @@ export class HordeExecution implements Execution {
       killed: this.killed,
       structuresDestroyed: this.structuresDestroyed,
       crateGold: this.crates?.paid() ?? 0,
+      mortarKilled: this.mortars?.kills() ?? 0,
       hqHp: this.firstHqHp(),
       hqsFallen: this.hqsFallen,
       spans: this.spans.filter((s) => !s.broken).length,
@@ -663,6 +686,9 @@ export class HordeExecution implements Execution {
       hqTile: this.firstHqTile(),
       settleRadius: passiveRadius(this.opts, this.wavesSurvived),
       turretShots: Int32Array.from(this.hordeTurretShots),
+      mortarShells: this.encodeShells(),
+      mortarBlasts: Int32Array.from(this.hordeBlasts),
+      mortarBlastRadius: this.opts.mortarBlastRadius,
       callWaveGold: this.callableTicks() * this.opts.callEarlyGoldPerTick,
       canCallWave: this.callableTicks() > 0,
       crates: this.encodeCrates(),
@@ -671,6 +697,20 @@ export class HordeExecution implements Execution {
       encodeMs: 0,
       sentAt: 0,
     };
+  }
+
+  /** Four ints per shell: see HordeFrame.mortarShells. */
+  private encodeShells(): Int32Array {
+    const shells = this.mortars.inFlight();
+    const out = new Int32Array(shells.length * 4);
+    const flight = Math.max(1, this.opts.mortarFlight);
+    shells.forEach((s, k) => {
+      out.set(
+        [s.from, s.target, Math.max(0, s.lands - this.ticks), flight],
+        k * 4,
+      );
+    });
+    return out;
   }
 
   /** Five ints per crate: see HordeFrame.crates. */
@@ -743,6 +783,7 @@ export class HordeExecution implements Execution {
       mix(s.broken ? 1 : 0);
     }
     this.crates.hash(mix);
+    this.mortars.hash(mix);
     return h >>> 0;
   }
 
@@ -914,6 +955,7 @@ export class HordeExecution implements Execution {
     obstacle.fill(0);
     this.hordeStructureAt.clear();
     this.hordeTurrets = [];
+    this.hordeMortars = [];
     const cells: number[] = [];
     for (const u of units) {
       const cell = this.cellOf(u.tile());
@@ -923,6 +965,7 @@ export class HordeExecution implements Execution {
         this.hordeStructureAt.set(cell, u);
       }
       if (u.type() === UnitType.DefensePost) this.hordeTurrets.push(u);
+      if (u.type() === UnitType.MissileSilo) this.hordeMortars.push(u);
     }
     this.hordeHqAt.clear();
     hqs.forEach((t, k) => {
@@ -1416,6 +1459,37 @@ export class HordeExecution implements Execution {
     this.killed += this.elites.removeDead();
   }
 
+  /**
+   * Lands the shells due this tick, paying each mortar's owner for its
+   * kills, then fires every finished mortar that has reloaded.
+   */
+  private fireMortars(): void {
+    const mg = this.mg!;
+    this.hordeBlasts = [];
+    for (const b of this.mortars.land(this.ticks, this.field, this.elites)) {
+      this.killed += b.shamblers;
+      this.hordeBlasts.push(b.cell);
+      const owner = mg.playerBySmallID(b.owner);
+      if (owner.isPlayer()) payBounty(owner, this.opts, b.shamblers, b.elites);
+    }
+    this.killed += this.elites.removeDead();
+    const guns: MortarGun[] = [];
+    for (const u of this.hordeMortars) {
+      if (!readyToFire(u)) continue;
+      guns.push({
+        id: u.id(),
+        cell: this.cellOf(u.tile()),
+        owner: u.owner().smallID(),
+        level: u.level(),
+      });
+    }
+    // Aim where the horde will have walked by the time the shell lands.
+    const lead = Math.floor(
+      this.opts.mortarFlight / Math.max(1, this.opts.shamblerSpeed),
+    );
+    this.mortars.fire(guns, this.ticks, this.field, this.hordeFlow.dist, lead);
+  }
+
   private applyPressure(): void {
     this.field.drainPressure((cell, pressure) => {
       const span = this.hordeSpanAt.get(cell);
@@ -1610,6 +1684,7 @@ export class HordeExecution implements Execution {
       nextSpanId: this.nextSpanId,
       linkedWalls: [...this.linkedWalls],
       crates: this.mg !== null ? this.crates.state() : null,
+      mortars: this.mg !== null ? this.mortars.state() : null,
     });
   }
 
@@ -1680,6 +1755,7 @@ export class HordeExecution implements Execution {
       s.beaconIds.map((id, i) => [id, s.beaconSince[i]]),
     );
     if (s.crates !== null) this.crates.restore(s.crates);
+    if (s.mortars !== null) this.mortars.restore(s.mortars);
     if (s.flowCells !== null) {
       this.computeFlow(s.flowCells, s.flowWalls, s.flowBait);
     }
@@ -1840,6 +1916,15 @@ const HordeOptionsSchema = z.object({
   crateLandingBonusPercent: zInt(),
   depotCratePercent: zInt(),
   depotCrateMax: zInt(),
+  mortarRange: zInt(),
+  mortarMinRange: zInt(),
+  mortarReload: zInt(),
+  mortarFlight: zInt(),
+  mortarBlastRadius: zInt(),
+  mortarKills: zInt(),
+  mortarEliteDamage: zInt(),
+  mortarMinTarget: zInt(),
+  mortarLevelPercent: zInt(),
 });
 
 const CrateStateSchema = z.object({
@@ -1860,6 +1945,21 @@ const CrateStateSchema = z.object({
   progress: z.array(zInt()),
   goldPaid: zInt(),
 }) satisfies z.ZodType<CrateState>;
+
+const MortarStateSchema = z.object({
+  readyIds: z.array(zInt()),
+  readyAt: z.array(zInt()),
+  shells: z.array(
+    z.object({
+      owner: zInt(),
+      from: zInt(),
+      target: zInt(),
+      lands: zInt(),
+      power: zInt(),
+    }),
+  ),
+  killed: zInt(),
+}) satisfies z.ZodType<MortarState>;
 
 const WavePlanSchema = z.object({
   wave: zInt(),
@@ -1920,6 +2020,8 @@ const HordeStateSchema = z.object({
   linkedWalls: z.array(zInt()),
   /** Null before init. */
   crates: CrateStateSchema.nullable(),
+  /** Null before init. */
+  mortars: MortarStateSchema.nullable(),
 });
 type HordeState = z.infer<typeof HordeStateSchema>;
 
@@ -1944,7 +2046,7 @@ export function hordeOf(game: Game): HordeExecution | null {
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 13,
+  version: 14,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -2150,6 +2252,24 @@ export const HordeExecutionSnapshot = execSnapshotType({
         depotCrateMax: 0,
       },
       crates: null,
+    }),
+    // 13 -> 14: Missile Silos become mortars. In an old game they did
+    // nothing to the horde, so they still don't.
+    13: (d) => ({
+      ...d,
+      options: {
+        ...d.options,
+        mortarRange: 0,
+        mortarMinRange: 0,
+        mortarReload: 0,
+        mortarFlight: 0,
+        mortarBlastRadius: 0,
+        mortarKills: 0,
+        mortarEliteDamage: 0,
+        mortarMinTarget: 0,
+        mortarLevelPercent: 0,
+      },
+      mortars: null,
     }),
   },
   cls: () => HordeExecution,

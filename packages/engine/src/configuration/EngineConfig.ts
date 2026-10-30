@@ -356,7 +356,11 @@ export class EngineConfig extends Config {
           return 25_000_000n + BigInt(game.mirvsLaunched()) * 15_000_000n;
         };
       case UnitType.MissileSilo:
-        return this.costWrapper(() => 1_000_000, UnitType.MissileSilo);
+        // zfront: in horde mode the Missile Silo is the mortar.
+        return this.costWrapper(
+          () => (this.horde() ? 100_000 : 1_000_000),
+          UnitType.MissileSilo,
+        );
       case UnitType.DefensePost:
         // zfront: in horde mode the Defense Post is the turret, at a flat
         // price for each one and each level.
