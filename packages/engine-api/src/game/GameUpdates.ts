@@ -76,6 +76,14 @@ export interface HordeFrame {
   /** Whether the announced wave can be called now, and the bonus for it. */
   canCallWave: boolean;
   callWaveGold: number;
+  /**
+   * Supply crates, five ints each: id, tile, gold, ticks until it is gone
+   * if nobody loots it, and ticks of looting left (-1 when nobody is).
+   */
+  crates: Int32Array;
+  /** Ticks looting takes, and an unlooted crate's whole life. */
+  crateLootTicks: number;
+  crateLife: number;
   /** Spike instrumentation: worker encode time and send time (epoch ms). */
   encodeMs: number;
   sentAt: number;

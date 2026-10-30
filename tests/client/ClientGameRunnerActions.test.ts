@@ -103,6 +103,7 @@ function makeRunner(overrides: {
     config: () => ({ isRandomSpawn: () => false, isReplay: () => false }),
     inSpawnPhase: () => overrides.inSpawnPhase ?? false,
     myPlayer: () => null,
+    hordeStatus: () => null,
     isValidCoord: () => true,
     ref: () => TILE,
     isLand: () => true,

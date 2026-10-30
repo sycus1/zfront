@@ -291,6 +291,8 @@
     "attack_cancelled_retreat": "Attack cancelled, {troops} soldiers killed during retreat",
     "attack_request": "{name} requests you attack {target}",
     "conquered_no_gold": "Conquered {name} (didn't play, no gold awarded)",
+    "crate_looted": "Supply crate looted: +{gold} gold",
+    "crate_lost": "The horde got to your supply crate first",
     "hydrogen_bomb_detonated": "{name} - hydrogen bomb detonated",
     "hydrogen_bomb_inbound": "{name} - hydrogen bomb inbound",
     "mirv_inbound": "⚠️⚠️⚠️ {name} - MIRV INBOUND ⚠️⚠️⚠️",

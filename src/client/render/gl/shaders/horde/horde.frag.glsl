@@ -22,6 +22,10 @@ uniform int uShotCount;
 uniform vec2 uCursor;
 uniform vec4 uLinks[MAX_LINKS];
 uniform int uLinkCount;
+// Supply crates: xy the centre in coarse cells, z the share of looting done
+// (-1 when nobody is looting), w the share of its life left.
+uniform vec4 uCrates[MAX_CRATES];
+uniform int uCrateCount;
 
 in vec2 vUV;
 out vec4 fragColor;
@@ -107,6 +111,40 @@ vec4 shotAt(vec2 p) {
   return hit;
 }
 
+// A supply crate at p: rgb the colour, a the alpha, 0 where there is none.
+// A gold box with dark straps, inside a ring: green and filling clockwise
+// while it is looted, otherwise white and running down as its life does,
+// blinking near the end.
+vec4 crateAt(vec2 p) {
+  for (int k = 0; k < MAX_CRATES; k++) {
+    if (k >= uCrateCount) break;
+    vec2 r = p - uCrates[k].xy;
+    if (abs(r.x) > 2.2 || abs(r.y) > 2.2) continue;
+    float looted = uCrates[k].z;
+    float life = uCrates[k].w;
+    float box = max(abs(r.x), abs(r.y));
+    if (box < 0.9) {
+      bool strap = abs(r.x) < 0.14 || abs(r.y) < 0.14 || box > 0.76;
+      return vec4(strap ? vec3(0.42, 0.27, 0.08) : vec3(1.0, 0.76, 0.22), 1.0);
+    }
+    float d = length(r);
+    if (d > 1.45 && d < 1.9) {
+      // 0 at the top, going clockwise (y grows downwards).
+      float a = fract(atan(r.x, -r.y) / 6.2831853 + 1.0);
+      if (looted >= 0.0) {
+        return a <= looted
+          ? vec4(0.35, 0.95, 0.4, 1.0)
+          : vec4(0.1, 0.25, 0.1, 0.7);
+      }
+      float blink = life < 0.25 ? step(0.5, fract(uTime * 3.0)) : 1.0;
+      return a <= life
+        ? vec4(1.0, 0.95, 0.8, 0.9 * blink)
+        : vec4(0.0, 0.0, 0.0, 0.35);
+    }
+  }
+  return vec4(0.0);
+}
+
 // Cells round the cursor that show the build grid.
 const float GRID_RADIUS = 9.0;
 
@@ -147,6 +185,13 @@ void main() {
     fragColor = vec4(1.0, 0.82, 0.3, 0.95);
     return;
   }
+
+  vec4 crate = crateAt(p);
+  if (crate.a > 0.0) {
+    fragColor = crate;
+    return;
+  }
+
   vec4 shot = shotAt(p);
   if (shot.a > 0.0) {
     fragColor = shot;

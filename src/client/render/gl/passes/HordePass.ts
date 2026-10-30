@@ -5,11 +5,12 @@
  * uploads it as an R8 texture each time a new frame arrives and draws it on
  * a map-sized quad: density as a red overlay (linearly filtered into blobs),
  * elites as pulsing markers, an arrow at each place the announced wave
- * comes ashore, pointing at the HQ, and tracers from each turret that is
- * shooting to what it hit. It also finds each blob's zombie count
- * (`hordeBlobs`) for the renderer to write inside the blob. While a horde
- * building is being placed it also draws the build grid round the cursor
- * and the wall spans the new post would link up with.
+ * comes ashore, pointing at the HQ, tracers from each turret that is
+ * shooting to what it hit, and supply crates with a ring showing the time
+ * they have left or how far looting has got. It also finds each blob's
+ * zombie count (`hordeBlobs`) for the renderer to write inside the blob.
+ * While a horde building is being placed it also draws the build grid
+ * round the cursor and the wall spans the new post would link up with.
  *
  * Spike instrumentation: transfer latency, worker encode time and upload
  * time are accumulated on `globalThis.__zfrontHorde` for measurement.
@@ -156,6 +157,69 @@ export function turretTracers(frame: HordeFrame): Float32Array {
   return out;
 }
 
+/** Crates drawn at most; the default drops at most 3 per player. */
+export const MAX_CRATES = 16;
+/** Ints per crate in HordeFrame.crates. */
+const CRATE_STRIDE = 5;
+
+export interface CrateMarker {
+  id: number;
+  /** The crate's tile. */
+  x: number;
+  y: number;
+  gold: number;
+  /** Share of looting done, 0 to 1, or -1 when nobody is looting it. */
+  looted: number;
+  /** Share of its life left, 0 to 1. */
+  life: number;
+}
+
+/** The frame's crates, at most MAX_CRATES. `mapWidth` is in tiles. */
+export function crateMarkers(
+  frame: HordeFrame,
+  mapWidth: number,
+): CrateMarker[] {
+  const c = frame.crates;
+  const out: CrateMarker[] = [];
+  for (let k = 0; k + CRATE_STRIDE <= c.length; k += CRATE_STRIDE) {
+    if (out.length >= MAX_CRATES) break;
+    const tile = c[k + 1];
+    const lootLeft = c[k + 4];
+    const lootTicks = Math.max(1, frame.crateLootTicks);
+    out.push({
+      id: c[k],
+      x: tile % mapWidth,
+      y: Math.floor(tile / mapWidth),
+      gold: c[k + 2],
+      looted: lootLeft < 0 ? -1 : 1 - Math.min(lootTicks, lootLeft) / lootTicks,
+      life: Math.min(1, c[k + 3] / Math.max(1, frame.crateLife)),
+    });
+  }
+  return out;
+}
+
+/** Tiles from a crate that a click still picks it. */
+export const CRATE_CLICK_RADIUS = 4;
+
+/** The id of the crate nearest tile (x, y) within reach of a click, or -1. */
+export function crateAt(
+  frame: HordeFrame,
+  mapWidth: number,
+  x: number,
+  y: number,
+): number {
+  let best = -1;
+  let bestD2 = CRATE_CLICK_RADIUS * CRATE_CLICK_RADIUS;
+  for (const m of crateMarkers(frame, mapWidth)) {
+    const d2 = (m.x - x) ** 2 + (m.y - y) ** 2;
+    if (d2 <= bestD2) {
+      best = m.id;
+      bestD2 = d2;
+    }
+  }
+  return best;
+}
+
 /** Blobs labelled at most, largest first, so a scattered horde stays legible. */
 export const MAX_BLOB_LABELS = 64;
 
@@ -254,6 +318,10 @@ export class HordePass {
   private uArrowFinal: WebGLUniformLocation;
   private uShots: WebGLUniformLocation;
   private uShotCount: WebGLUniformLocation;
+  private uCrates: WebGLUniformLocation;
+  private uCrateCount: WebGLUniformLocation;
+  private crates = new Float32Array(MAX_CRATES * 4);
+  private crateCount = 0;
   private shots = new Float32Array(MAX_SHOTS * 4);
   private shotCount = 0;
   private uCursor: WebGLUniformLocation;
@@ -271,13 +339,18 @@ export class HordePass {
 
   constructor(
     private gl: WebGL2RenderingContext,
-    mapW: number,
+    private mapW: number,
     mapH: number,
   ) {
     this.program = createProgram(
       gl,
       shaderSrc(hordeVertSrc, { MAP_W: mapW, MAP_H: mapH }),
-      shaderSrc(hordeFragSrc, { MAX_ARROWS, MAX_SHOTS, MAX_LINKS }),
+      shaderSrc(hordeFragSrc, {
+        MAX_ARROWS,
+        MAX_SHOTS,
+        MAX_LINKS,
+        MAX_CRATES,
+      }),
       "HordePass",
     );
     this.uCamera = gl.getUniformLocation(this.program, "uCamera")!;
@@ -292,6 +365,8 @@ export class HordePass {
     this.uCursor = gl.getUniformLocation(this.program, "uCursor")!;
     this.uLinks = gl.getUniformLocation(this.program, "uLinks")!;
     this.uLinkCount = gl.getUniformLocation(this.program, "uLinkCount")!;
+    this.uCrates = gl.getUniformLocation(this.program, "uCrates")!;
+    this.uCrateCount = gl.getUniformLocation(this.program, "uCrateCount")!;
     this.vao = createMapQuad(gl, mapW, mapH);
     const g = globalThis as { __zfrontHorde?: HordeRenderStats };
     this.stats = g.__zfrontHorde ??= newStats();
@@ -345,6 +420,15 @@ export class HordePass {
     const shots = turretTracers(frame);
     this.shots.set(shots);
     this.shotCount = shots.length / 4;
+    const crates = crateMarkers(frame, this.mapW);
+    // Coarse cells are 2x2 tiles: a tile's centre is at (x + 0.5) / 2.
+    crates.forEach((m, k) => {
+      this.crates.set(
+        [(m.x + 0.5) / 2, (m.y + 0.5) / 2, m.looted, m.life],
+        k * 4,
+      );
+    });
+    this.crateCount = crates.length;
     const upload = performance.now() - start;
 
     const s = this.stats;
@@ -387,6 +471,8 @@ export class HordePass {
     gl.uniform2f(this.uCursor, this.cursor[0], this.cursor[1]);
     gl.uniform4fv(this.uLinks, this.links);
     gl.uniform1i(this.uLinkCount, this.linkCount);
+    gl.uniform4fv(this.uCrates, this.crates);
+    gl.uniform1i(this.uCrateCount, this.crateCount);
     gl.uniformMatrix3fv(this.uCamera, false, cam);
     gl.bindVertexArray(this.vao);
     gl.drawArrays(gl.TRIANGLES, 0, 6);

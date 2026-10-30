@@ -327,6 +327,27 @@ _Started 2026-10-29._ Dan asked for wall posts that join up to block the gap bet
 
 `balance:horde` has a new `spans` strategy: `fort` with a post every 10 tiles round the ring instead of a barricade every 2. It wins from all five starts with the HQ at full health; `fort` still wins everywhere, at 15,838 HQ left on Lincolnshire. Upgrading two posts lifts a whole span, so a spanned ring is far cheaper to bring to stone or reinforced than a solid one; watch that in play.
 
+## Supply drops
+
+_Started 2026-10-29._ Dan found the income passive and "solved": the HQ trickle was most of the early income and a depot paid for itself in two waves with no downside. He picked supply drops plus a cut to the passive income from the options page (https://claude.ai/artifact/56Zx1HGPbYtU5DxFXvvG6c).
+
+- **Drops.** Every `crateInterval` ticks (200, 20 s) each human gets a supply crate, `crateMinDistance` to `crateMaxDistance` (8 to 25) tiles past a random border tile, away from their HQ, on open land the horde can walk. At most `crateMax` (3) wait for each player. Drops use their own PRNG (`zfront-crates`), so the waves' draws and landings are unchanged.
+- **Looting.** Clicking within 4 tiles of a crate sends a `loot_crate` intent. Looting takes `crateLootTicks` (50, 5 s), then the looter gets the gold and a "Supply crate looted" message. Any human can loot any crate, first come first served, which will matter for co-op.
+- **Risk.** Any zombie within `crateDangerRadius` (2 coarse cells) destroys a crate, mid-loot or not ("The horde got to your supply crate first"). A crate nobody starts looting is gone after `crateLife` (300 ticks, 30 s).
+- **Value.** `crateBaseGold` + `crateGoldPerWave` × wave (2,000 + 1,500 × N, wave 1 before the first), doubled (`crateLandingBonusPercent` 100) within `crateLandingRadius` (15 coarse cells) of an announced landing arrow.
+- **Passive cut.** `hqIncome` 100 → 50. Depots no longer pay gold (`depotIncome` 20 → 0); each finished depot makes drops come `depotCratePercent` (25%) faster, counting at most `depotCrateMax` (4), so up to twice as often.
+- **Client.** The horde pass draws each crate as a gold box with straps inside a ring: white and running down with its life (blinking in the last quarter), or green and filling while it is looted. Its gold is written above it. Horde snapshot version 13 (older games keep their economy and get no crates); `HordeFrame.crates`.
+
+`balance:horde -- --zone 0` has a new `--loot <percent>` flag: the bot loots that share of its crates 3 seconds after each drops. On main with wall spans and Outposts, the old economy (`--set hqIncome=100,depotIncome=20,crateInterval=0`) won every start with `turrets`, `fort`, `scavenge` and `spans` (`fort` on Lincolnshire with 15,838 HQ left). Now (every other start won):
+
+| Bot loots   | `turrets`                | `fort`                                           | `scavenge`              | `spans`                           |
+| ----------- | ------------------------ | ------------------------------------------------ | ----------------------- | --------------------------------- |
+| no crates   | won, Lincolnshire 11,848 | lost Lincolnshire; Yorkshire 4,431, Powys 29,758 | won, Lincolnshire 7,144 | lost Lincolnshire; Cumbria 25,873 |
+| half        | won, all above 47,000    | lost Lincolnshire                                | won, all above 41,000   | won, Lincolnshire 707             |
+| every crate | won, all above 49,000    | lost Lincolnshire                                | won, all above 45,000   | won, all above 48,000             |
+
+So ignoring the crates now costs HQ health and games, and looting all of them gives about what the old trickle did. The exception is `fort` on Lincolnshire, which now loses on wave 10 even looting every crate: it was the closest win before and the bot spends on walls, not turrets, so a lower trickle tips it. `none` is unchanged (lost on waves 4 to 6).
+
 ## Prerequisites
 
 - npm 12.1 or later. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`. The machine currently has npm 11.19.

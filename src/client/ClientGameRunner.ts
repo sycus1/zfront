@@ -51,6 +51,7 @@ import {
   type RenderSettings,
   showGLGate,
 } from "./render/gl";
+import { crateAt } from "./render/gl/passes/HordePass";
 import { ALL_UNIT_TYPES, UnitState } from "./render/types";
 import { audioMixer, initAudioMixer } from "./sound/AudioMixer";
 import { SoundManager } from "./sound/SoundManager";
@@ -66,6 +67,7 @@ import {
   SendAttackIntentEvent,
   SendBoatAttackIntentEvent,
   SendHashEvent,
+  SendLootCrateIntentEvent,
   SendSpawnIntentEvent,
   SendTargetPlayerIntentEvent,
   SendUpgradeStructureIntentEvent,
@@ -1018,6 +1020,15 @@ export class ClientGameRunner {
     }
     if (this.gameView.inSpawnPhase()) {
       return;
+    }
+    // zfront: a click on (or next to) a supply crate loots it.
+    const horde = this.gameView.hordeStatus();
+    if (horde !== null) {
+      const crate = crateAt(horde, this.gameView.width(), cell.x, cell.y);
+      if (crate >= 0) {
+        this.eventBus.emit(new SendLootCrateIntentEvent(crate));
+        return;
+      }
     }
     if (this.myPlayer === null) {
       if (!this.clientID) return;

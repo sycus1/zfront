@@ -37,6 +37,11 @@ import { PlayerView } from "./view";
 /** zfront: call the announced horde wave now. */
 export class SendCallWaveIntentEvent implements GameEvent {}
 
+/** zfront: start looting a horde supply crate. */
+export class SendLootCrateIntentEvent implements GameEvent {
+  constructor(public readonly crate: number) {}
+}
+
 export class PauseGameIntentEvent implements GameEvent {
   constructor(public readonly paused: boolean) {}
 }
@@ -217,6 +222,9 @@ export class Transport {
     this.subscribe(PauseGameIntentEvent, (e) => this.onPauseGameIntent(e));
     this.subscribe(SendCallWaveIntentEvent, () =>
       this.sendIntent({ type: "call_wave" }),
+    );
+    this.subscribe(SendLootCrateIntentEvent, (e) =>
+      this.sendIntent({ type: "loot_crate", crate: e.crate }),
     );
     this.subscribe(SendWinnerEvent, (e) => this.onSendWinnerEvent(e));
     this.subscribe(SendLiveStatsEvent, (e) => this.onSendLiveStatsEvent(e));
