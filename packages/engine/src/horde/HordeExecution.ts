@@ -5,6 +5,10 @@ import {
   HordeOutcome,
 } from "@openfront/engine-api/game/GameUpdates";
 import { OUTPOST_CLAIM_RADIUS } from "@openfront/engine-lib/configuration/Config";
+import {
+  HORDE_BLOCKED_MAGNITUDE,
+  WALL_SNAP_RADIUS,
+} from "@openfront/engine-lib/game/HordeTerrain";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import {
   zInt,
@@ -176,7 +180,7 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   shamblerSpeed: 3,
   eliteSpeed: 2,
   elitePressure: 200,
-  blockedMagnitude: 20,
+  blockedMagnitude: HORDE_BLOCKED_MAGNITUDE,
   cellCap: 2_000,
   turretRange: 8,
   turretLevelPercent: 50,
@@ -215,7 +219,7 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   wallHp: 4_000,
   stoneWallHp: 12_000,
   reinforcedWallHp: 30_000,
-  wallSnapRadius: 8,
+  wallSnapRadius: WALL_SNAP_RADIUS,
   spanCostPerCell: 1_000,
   wallClearRadius: 3,
   repairDelay: 50,

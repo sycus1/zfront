@@ -6,9 +6,14 @@
  * live. Vertex shader transforms the map quad by the camera mat3; fragment
  * shader samples the RGBA8 terrain texture with nearest-neighbour filtering
  * so each terrain cell stays pixel-crisp at every zoom level.
+ *
+ * zfront: with the horde's coarse grid it bakes the horde palette instead
+ * (HordeTerrainColors), and while a wall post is being placed it lights up
+ * the solid faces in snap range of the cursor.
  */
 
-import type { TerrainRect } from "../../types";
+import { WALL_SNAP_RADIUS } from "@openfront/engine-lib/game/HordeTerrain";
+import type { GhostPreviewData, TerrainRect } from "../../types";
 import terrainFragSrc from "../shaders/terrain/terrain.frag.glsl?raw";
 import terrainVertSrc from "../shaders/terrain/terrain.vert.glsl?raw";
 import {
@@ -22,6 +27,10 @@ import {
   createTexture2D,
   shaderSrc,
 } from "../utils/GlUtils";
+import {
+  buildHordeTerrainRGBA,
+  HordeTerrainGrid,
+} from "../utils/HordeTerrainColors";
 
 // ---------------------------------------------------------------------------
 // TerrainPass
@@ -32,6 +41,10 @@ export class TerrainPass {
   private tex: WebGLTexture;
   private vao: WebGLVertexArrayObject;
   private uCamera: WebGLUniformLocation;
+  private uSnapCursor: WebGLUniformLocation;
+  private uSnapRadius: WebGLUniformLocation;
+  // The wall post's coarse cell centre while one is being placed, else off.
+  private snapCursor: [number, number] = [-1, -1];
   private mapW: number;
   private mapH: number;
   // Base ocean (deep water) color; reused by applyTerrainRects and rebuilds.
@@ -51,6 +64,9 @@ export class TerrainPass {
     mapW: number,
     mapH: number,
     terrainColors?: TerrainColorOverrides,
+    // zfront: the horde's coarse grid; terrain is coloured by what it means
+    // to the horde.
+    private hordeGrid?: HordeTerrainGrid,
   ) {
     this.mapW = mapW;
     this.mapH = mapH;
@@ -58,10 +74,12 @@ export class TerrainPass {
     this.program = createProgram(
       gl,
       shaderSrc(terrainVertSrc, { MAP_W: mapW, MAP_H: mapH }),
-      terrainFragSrc,
+      shaderSrc(terrainFragSrc, { MAP_W: mapW, MAP_H: mapH }),
       "TerrainPass",
     );
     this.uCamera = gl.getUniformLocation(this.program, "uCamera")!;
+    this.uSnapCursor = gl.getUniformLocation(this.program, "uSnapCursor")!;
+    this.uSnapRadius = gl.getUniformLocation(this.program, "uSnapRadius")!;
 
     this.tex = createTexture2D(gl, {
       width: mapW,
@@ -69,7 +87,7 @@ export class TerrainPass {
       internalFormat: gl.RGBA8,
       format: gl.RGBA,
       type: gl.UNSIGNED_BYTE,
-      data: buildTerrainRGBA(terrainBytes, mapW, mapH, terrainColors),
+      data: this.bake(terrainBytes, terrainColors),
       filter: gl.NEAREST, // pixel-crisp at all zoom levels
     });
 
@@ -94,13 +112,37 @@ export class TerrainPass {
       this.mapH,
       gl.RGBA,
       gl.UNSIGNED_BYTE,
-      buildTerrainRGBA(
-        this.terrainSource(),
-        this.mapW,
-        this.mapH,
-        terrainColors,
-      ),
+      this.bake(this.terrainSource(), terrainColors),
     );
+  }
+
+  private bake(
+    terrainBytes: Uint8Array,
+    colors: TerrainColorOverrides | undefined,
+  ): Uint8Array {
+    return this.hordeGrid
+      ? buildHordeTerrainRGBA(
+          terrainBytes,
+          this.mapW,
+          this.mapH,
+          this.hordeGrid,
+          colors,
+        )
+      : buildTerrainRGBA(terrainBytes, this.mapW, this.mapH, colors);
+  }
+
+  /**
+   * zfront: while a wall post is being placed, light up the solid faces it
+   * could snap to.
+   */
+  updateGhostPreview(ghost: GhostPreviewData | null): void {
+    if (ghost === null || !ghost.buildGrid || ghost.ghostType !== "Wall") {
+      this.snapCursor = [-1, -1];
+      return;
+    }
+    // Tile coordinates follow the shader's convention (+0.5 is the centre).
+    const cell = (t: number) => Math.floor((t + 0.5) / 2) + 0.5;
+    this.snapCursor = [cell(ghost.tileX), cell(ghost.tileY)];
   }
 
   /**
@@ -113,6 +155,12 @@ export class TerrainPass {
    */
   applyTerrainRects(rects: readonly TerrainRect[], bytes: Uint8Array): void {
     if (rects.length === 0) return;
+    // The horde palette shades tiles by their neighbours and cells, so a
+    // change re-bakes the whole map (water nukes are rare in horde games).
+    if (this.hordeGrid) {
+      this.setTerrainColors(this.terrainColors);
+      return;
+    }
     const gl = this.gl;
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
@@ -151,6 +199,8 @@ export class TerrainPass {
     const gl = this.gl;
     gl.useProgram(this.program);
     gl.uniformMatrix3fv(this.uCamera, false, cameraMatrix);
+    gl.uniform2f(this.uSnapCursor, this.snapCursor[0], this.snapCursor[1]);
+    gl.uniform1f(this.uSnapRadius, WALL_SNAP_RADIUS);
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.tex);

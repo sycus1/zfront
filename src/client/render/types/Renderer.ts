@@ -291,4 +291,13 @@ export interface RendererConfig {
    * arrive after construction (e.g. bots are created on tick 1).
    */
   maxPlayers?: number;
+  /**
+   * zfront: the horde's coarse grid (the mini map's terrain bytes). When set,
+   * terrain is coloured by what it means to the horde.
+   */
+  hordeGrid?: {
+    cellBytes: Uint8Array;
+    cellWidth: number;
+    cellHeight: number;
+  };
 }
