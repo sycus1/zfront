@@ -5,6 +5,7 @@ import {
   HordeOutcome,
 } from "@openfront/engine-api/game/GameUpdates";
 import { OUTPOST_CLAIM_RADIUS } from "@openfront/engine-lib/configuration/Config";
+import { hordeDensityByte } from "@openfront/engine-lib/game/HordeCells";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import {
   zInt,
@@ -609,7 +610,7 @@ export class HordeExecution implements Execution {
     const cells = new Uint8Array(d.length);
     for (let i = 0; i < d.length; i++) {
       const v = d[i];
-      if (v !== 0) cells[i] = v >= DENSITY_MAX * 8 ? DENSITY_MAX : (v + 7) >> 3;
+      if (v !== 0) cells[i] = hordeDensityByte(v);
     }
     for (const u of this.mg.units(UnitType.Depot)) {
       cells[this.cellOf(u.tile())] = BYTE_DEPOT;
@@ -1922,7 +1923,6 @@ const HordeStateSchema = z.object({
 type HordeState = z.infer<typeof HordeStateSchema>;
 
 // Frame bytes above the density range (see HordeFrame.cells).
-const DENSITY_MAX = 247;
 const BYTE_MINE = 248;
 const BYTE_BEACON = 249;
 const BYTE_BEACON_SOUNDING = 250;

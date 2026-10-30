@@ -1424,7 +1424,7 @@ export class GPURenderer {
     if (pe.railroad) this.railroadPass.draw(cam, zoom);
     if (pe.unit) this.unitPass.drawGround(cam);
     if (pe.falloutBloom) this.bloomPass.draw(cam, this.frameTick);
-    this.hordePass.draw(cam, performance.now() / 1000);
+    this.hordePass.draw(cam, performance.now() / 1000, zoom);
     this.samRadiusPass.draw(cam);
     this.settleCirclePass.draw(cam);
     this.rangeCirclePass.draw(cam);
