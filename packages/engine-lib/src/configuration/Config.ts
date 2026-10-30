@@ -2,6 +2,7 @@ import {
   Difficulty,
   GameType,
   HordeOnly,
+  NotInHorde,
   PlayerType,
   Tick,
   UnitInfo,
@@ -206,13 +207,14 @@ export class Config {
 
   /**
    * Highest level a unit can be upgraded to. zfront: walls have three tiers
-   * (barricade, stone, reinforced) and turrets three levels.
+   * (barricade, stone, reinforced), and turrets and mortars three levels.
    */
   maxUnitLevel(type: UnitType): number {
     switch (type) {
       case UnitType.Wall:
         return 3;
       case UnitType.DefensePost:
+      case UnitType.MissileSilo:
         return this.horde() ? 3 : Number.MAX_SAFE_INTEGER;
       default:
         return Number.MAX_SAFE_INTEGER;
@@ -222,6 +224,9 @@ export class Config {
   isUnitDisabled(unitType: UnitType): boolean {
     // zfront: mines, beacons and depots only mean something to the horde.
     if (!this.horde() && HordeOnly.has(unitType)) return true;
+    // Nor nukes (and SAMs, which only shoot nukes) inside it: the Missile
+    // Silo is a mortar there.
+    if (this.horde() && NotInHorde.has(unitType)) return true;
     return this._gameConfig.disabledUnits?.includes(unitType) ?? false;
   }
   instantBuild(): boolean {

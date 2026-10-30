@@ -34,6 +34,16 @@ export const TOWN_HORDE_OPTIONS: Partial<HordeOptions> = {
   turretKillsPerTick: 2,
   turretFireInterval: 6,
   turretEliteDamage: 80,
+  // Mortars out-range turrets (210 m) and a shell lands on a crowd of at
+  // most a hundred or so, so it kills a few dozen, not hundreds.
+  mortarRange: 35,
+  mortarMinRange: 6,
+  mortarReload: 50,
+  mortarFlight: 15,
+  mortarBlastRadius: 2,
+  mortarKills: 25,
+  mortarEliteDamage: 120,
+  mortarMinTarget: 8,
   pressureShift: 0,
   // A crowd of a dozen presses far less than one of two thousand, so
   // health comes down by about ten to keep the same fights.

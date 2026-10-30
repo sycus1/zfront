@@ -176,10 +176,10 @@ describe("Town scale", () => {
     await expectSnapshotRoundTrip(game, "plains", 30);
   });
 
-  test("a version 13 snapshot migrates firing every tick from the shore", () => {
-    const v13 = { initialized: true, options: { hqIncome: 50 }, wave: 1 };
-    const v14 = HordeExecutionSnapshot.migrations[13](v13);
-    expect(v14.options).toMatchObject({
+  test("a version 14 snapshot migrates firing every tick from the shore", () => {
+    const v14 = { initialized: true, options: { hqIncome: 50 }, wave: 1 };
+    const v15 = HordeExecutionSnapshot.migrations[14](v14);
+    expect(v15.options).toMatchObject({
       hqIncome: 50,
       turretFireInterval: 1,
       inlandSpawns: 0,

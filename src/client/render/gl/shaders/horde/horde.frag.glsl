@@ -17,6 +17,14 @@ uniform bool uArrowFinal;
 // centre of the cell it hit, in coarse cells.
 uniform vec4 uShots[MAX_SHOTS];
 uniform int uShotCount;
+// Mortar shells in the air: xy the shell on its arc, zw its shadow on the
+// ground, in coarse cells.
+uniform vec4 uShells[MAX_SHELLS];
+uniform int uShellCount;
+// Mortar blasts: xy the centre in coarse cells, z its age from 0 to 1, w the
+// radius in coarse cells.
+uniform vec4 uBlasts[MAX_BLASTS];
+uniform int uBlastCount;
 // 0 draws only the packed horde, under the zombie squares (HordeSwarm); 1
 // draws everything else, over them.
 uniform int uLayer;
@@ -117,6 +125,40 @@ vec4 shotAt(vec2 p) {
   return hit;
 }
 
+// A mortar shell at p: a dark round with a hot rim, or the soft shadow on
+// the ground below it, which it meets as it lands. 0 alpha where there is
+// neither; alpha 1 only on the shell itself.
+vec4 shellAt(vec2 p) {
+  vec4 hit = vec4(0.0);
+  for (int k = 0; k < MAX_SHELLS; k++) {
+    if (k >= uShellCount) break;
+    float d = length(p - uShells[k].xy);
+    if (d < 0.5) return d < 0.32 ? vec4(0.12, 0.12, 0.1, 1.0) : vec4(1.0, 0.75, 0.3, 1.0);
+    if (length(p - uShells[k].zw) < 0.35) hit = vec4(0.0, 0.0, 0.0, 0.45);
+  }
+  return hit;
+}
+
+// A mortar blast at p: a fireball that shrinks from white-hot to dark red
+// inside a shock ring that runs out and thins. 0 alpha outside it.
+vec4 blastAt(vec2 p) {
+  for (int k = 0; k < MAX_BLASTS; k++) {
+    if (k >= uBlastCount) break;
+    float age = uBlasts[k].z;
+    float r = uBlasts[k].w;
+    float d = length(p - uBlasts[k].xy);
+    if (d > r * 1.4) continue;
+    float core = r * (1.0 - age) * 0.9;
+    if (d < core) {
+      vec3 hot = mix(vec3(1.0, 0.95, 0.75), vec3(1.0, 0.5, 0.12), clamp(d / core + age, 0.0, 1.0));
+      return vec4(mix(hot, vec3(0.45, 0.08, 0.05), age), 0.95);
+    }
+    float ring = r * (0.5 + 0.8 * age);
+    if (abs(d - ring) < 0.35 * (1.0 - age)) return vec4(1.0, 0.7, 0.3, 0.9 * (1.0 - age * 0.5));
+  }
+  return vec4(0.0);
+}
+
 // A supply crate at p: rgb the colour, a the alpha, 0 where there is none.
 // A gold box with dark straps, inside a ring: green and filling clockwise
 // while it is looted, otherwise white and running down as its life does,
@@ -207,6 +249,24 @@ void main() {
 
   if (uCursor.x >= 0.0 && linkAt(p) > 0.0) {
     fragColor = vec4(1.0, 0.82, 0.3, 0.95);
+    return;
+  }
+
+  // A shell in the air is over everything; its shadow is under the blasts.
+  vec4 shell = shellAt(p);
+  if (shell.a >= 1.0) {
+    fragColor = shell;
+    return;
+  }
+
+  vec4 blast = blastAt(p);
+  if (blast.a > 0.0) {
+    fragColor = blast;
+    return;
+  }
+
+  if (shell.a > 0.0) {
+    fragColor = shell;
     return;
   }
 

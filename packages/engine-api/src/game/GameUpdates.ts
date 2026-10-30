@@ -74,6 +74,16 @@ export interface HordeFrame {
    * the horde on the last tick, for drawing its shots.
    */
   turretShots: Int32Array;
+  /**
+   * Cosmetic: mortar shells in the air, four ints each: the coarse cell it
+   * was fired from, the cell it lands on, ticks until it lands, and its
+   * whole flight in ticks.
+   */
+  mortarShells: Int32Array;
+  /** Cosmetic: the coarse cells mortar shells landed on in the last tick. */
+  mortarBlasts: Int32Array;
+  /** Radius of a mortar blast, in coarse cells. */
+  mortarBlastRadius: number;
   /** Whether the announced wave can be called now, and the bonus for it. */
   canCallWave: boolean;
   callWaveGold: number;

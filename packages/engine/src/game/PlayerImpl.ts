@@ -1333,10 +1333,10 @@ export class PlayerImpl implements Player {
       case UnitType.Train:
         return this.landBasedUnitSpawn(targetTile);
       case UnitType.DefensePost:
+      case UnitType.MissileSilo:
         return this.mg.config().horde()
           ? this.turretSpawn(targetTile, validTiles)
           : this.landBasedStructureSpawn(targetTile, validTiles);
-      case UnitType.MissileSilo:
       case UnitType.SAMLauncher:
       case UnitType.City:
       case UnitType.Factory:
@@ -1463,7 +1463,7 @@ export class PlayerImpl implements Player {
   }
 
   /**
-   * zfront: a turret goes where an ordinary structure would, snapped to the
+   * zfront: a turret (or a mortar) goes where an ordinary structure would, snapped to the
    * build grid (the top-left tile of its 2x2 horde cell).
    */
   private turretSpawn(
