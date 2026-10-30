@@ -75,6 +75,13 @@ export interface HordeFrame {
    */
   turretShots: Int32Array;
   /**
+   * Damaged structures, four ints each: tile, health left, full health, and
+   * 1 when it is drawn with an icon (turret, Outpost...) or 0 for a
+   * small one drawn in its coarse cell (wall post, wall span, mine, beacon,
+   * depot), whose tile is then the cell's top-left one.
+   */
+  structureHp: Int32Array;
+  /**
    * Cosmetic: mortar shells in the air, four ints each: the coarse cell it
    * was fired from, the cell it lands on, ticks until it lands, and its
    * whole flight in ticks.

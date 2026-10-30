@@ -393,3 +393,34 @@ describe("defence defaults and migration", () => {
     expect(v6.lastHitIds).toEqual([]);
   });
 });
+
+describe("structure health in the render frame", () => {
+  test("lists damaged structures with their full health", async () => {
+    const { game, horde } = await defenceGame(QUIET);
+    const survivor = game.player("survivor");
+    // An odd tile, so the wall's bar goes to its cell's top-left tile.
+    const wall = survivor.buildUnit(UnitType.Wall, game.ref(45, 45), {});
+    const turret = survivor.buildUnit(
+      UnitType.DefensePost,
+      game.ref(56, 44),
+      {},
+    );
+    // The horde starts once the spawn phase is over.
+    for (
+      let t = 0;
+      t < 300 && horde.encodeFrame()?.hqTile !== game.ref(50, 52);
+      t++
+    ) {
+      run(game, 1);
+    }
+    expect(horde.encodeFrame()!.structureHp).toHaveLength(0);
+
+    internals(horde).damage.set(wall.id(), 1_000);
+    internals(horde).damage.set(turret.id(), 500);
+    const { wallHp, structureHp } = DEFAULT_HORDE_OPTIONS;
+    expect(Array.from(horde.encodeFrame()!.structureHp)).toEqual([
+      ...[game.ref(44, 44), wallHp - 1_000, wallHp, 0],
+      ...[turret.tile(), structureHp - 500, structureHp, 1],
+    ]);
+  });
+});

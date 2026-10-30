@@ -287,6 +287,18 @@ const STARTING_TURRET_SPOTS: readonly [number, number][] = [
   [3, -3],
 ];
 
+/** Horde buildings drawn in their cell rather than with a structure icon. */
+const CELL_DRAWN_TYPES: ReadonlySet<UnitType> = new Set([
+  UnitType.Wall,
+  UnitType.Mine,
+  UnitType.NoiseBeacon,
+  UnitType.Depot,
+]);
+
+function hasIcon(u: Unit): boolean {
+  return !CELL_DRAWN_TYPES.has(u.type());
+}
+
 const TARGET_TYPES: readonly UnitType[] = [
   UnitType.City,
   UnitType.DefensePost,
@@ -708,6 +720,7 @@ export class HordeExecution implements Execution {
       hqTile: this.firstHqTile(),
       settleRadius: passiveRadius(this.opts, this.wavesSurvived),
       turretShots: Int32Array.from(this.hordeTurretShots),
+      structureHp: this.encodeStructureHp(),
       mortarShells: this.encodeShells(),
       mortarBlasts: Int32Array.from(this.hordeBlasts),
       mortarBlastRadius: this.opts.mortarBlastRadius,
@@ -719,6 +732,38 @@ export class HordeExecution implements Execution {
       encodeMs: 0,
       sentAt: 0,
     };
+  }
+
+  /** Four ints per damaged structure: see HordeFrame.structureHp. */
+  private encodeStructureHp(): Int32Array {
+    const out: number[] = [];
+    for (const [id, damage] of this.damage) {
+      const u = this.mg!.unit(id);
+      if (u === undefined || !u.isActive()) continue;
+      const max = this.maxHp(u);
+      const icon = hasIcon(u);
+      // A cell-drawn building's bar sits over its cell, not its tile.
+      const tile = icon ? u.tile() : this.tileOfCell(this.cellOf(u.tile()));
+      out.push(tile, Math.max(0, max - damage), max, icon ? 1 : 0);
+    }
+    for (const s of this.spans) {
+      if (s.broken || s.damage === 0 || s.cells.length === 0) continue;
+      const max = this.spanMaxHp(s);
+      const mid = s.cells[s.cells.length >> 1];
+      out.push(this.tileOfCell(mid), Math.max(0, max - s.damage), max, 0);
+    }
+    return Int32Array.from(out);
+  }
+
+  /** The tile at a coarse cell's top-left corner. */
+  private tileOfCell(cell: number): TileRef {
+    const x = cell % this.width;
+    const y = (cell - x) / this.width;
+    const map = this.mg!.map();
+    return map.ref(
+      Math.min(map.width() - 1, x * 2),
+      Math.min(map.height() - 1, y * 2),
+    );
   }
 
   /** Four ints per shell: see HordeFrame.mortarShells. */

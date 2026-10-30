@@ -50,6 +50,7 @@ function frame(overrides: Partial<HordeFrame> = {}): HordeFrame {
     hqTile: -1,
     settleRadius: 0,
     turretShots: new Int32Array(),
+    structureHp: new Int32Array(),
     mortarShells: new Int32Array(),
     mortarBlasts: new Int32Array(),
     mortarBlastRadius: 2,
