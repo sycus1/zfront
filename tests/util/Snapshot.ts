@@ -182,6 +182,8 @@ export const DERIVED_FIELDS = new Set<string>([
   "moveCost", // the live cost: terrain plus structure cells, rebuilt on scan
   "hordeProfile",
   "hordeTurretShots", // cosmetic, refilled by fireTurrets every tick
+  "hordeMortars", // rebuilt with hordeTurrets
+  "hordeBlasts", // cosmetic, refilled by fireMortars every tick
   "obstacle",
   // zfront HordeField / Elites: double buffer and per-cell scratch
   "back",

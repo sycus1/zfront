@@ -348,6 +348,18 @@ _Started 2026-10-29._ Dan found the income passive and "solved": the HQ trickle 
 
 So ignoring the crates now costs HQ health and games, and looting all of them gives about what the old trickle did. The exception is `fort` on Lincolnshire, which now loses on wave 10 even looting every crate: it was the closest win before and the bot spends on walls, not turrets, so a lower trickle tips it. `none` is unchanged (lost on waves 4 to 6).
 
+## Mortars
+
+_Started 2026-10-30._ Dan asked for the missile system to become a medium-range mortar building that fires smaller blasts than nukes at the horde on its own. In horde mode the Missile Silo is now the Mortar (`packages/engine/src/horde/Mortars.ts`).
+
+- **Firing.** A finished mortar fires every `mortarReload` ticks (30, 3 s) at the reachable cell with the most shamblers under its blast, between `mortarMinRange` and `mortarRange` coarse cells away (4 to 20, so 8 to 40 tiles; a turret reaches 8 cells). It holds fire until at least `mortarMinTarget` (40) shamblers would be hit, and looks again every tick until then. The shell flies for `mortarFlight` ticks (15) and is aimed where the horde will have walked by then, along the flow field.
+- **Blast.** On landing it kills up to `mortarKills` (600) shamblers within `mortarBlastRadius` (2 coarse cells), nearest the impact first, and does `mortarEliteDamage` (150) to each elite there. Each level above 1 adds `mortarLevelPercent` (50%), so level 3 doubles both. Kills pay the usual bounty to the mortar's owner, even if it has fallen while the shell was in the air.
+- **Building.** 100k in horde mode (1M outside), three levels like the turret, snapped to the build grid, 10 s to build, and a horde target like any building. Nukes, MIRVs and SAM launchers are disabled in horde mode. New icon (`MortarIconWhite.svg`, icon atlas column 5).
+- **Client.** `HordeFrame.mortarShells` (from, target, ticks left, flight) and `mortarBlasts` (cells hit last tick). The horde pass draws each shell on an arc over its shadow, then a fireball and shock ring where it lands.
+- **Snapshot.** Horde version 14; older games keep silos that do nothing to the horde.
+
+Every range and size is an option in coarse cells, so the neighbourhood-scale reset only has to change the numbers. `balance:horde` has a `mortars` strategy (half the inner turret ring, then two mortars by the HQ, upgraded with the turrets) and a "by mortar" column. With the defaults it won 4 of 5 Britannia starts with every win at nearly full HQ health, against `turrets` winning all 5 with less HQ left; it loses Lincolnshire on wave 10 because it spends 100k on mortars before the turret ring is up. With `--zone 0` it won all 5. A mortar did 25-60% of the killing once built. At the first try (300 kills every 4 s) a mortar was worse per gold than a turret and fell in wave 6.
+
 ## Prerequisites
 
 - npm 12.1 or later. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`. The machine currently has npm 11.19.
