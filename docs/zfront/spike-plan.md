@@ -421,7 +421,21 @@ _2026-10-31._ On town maps every defended strategy won with the HQ untouched, wh
 | Whitby    | lost, wave 1 | lost, wave 9 | lost, wave 10 | lost, wave 9 | lost, wave 1  | lost, wave 9 |
 | Britannia | lost, wave 1 | 3 of 5 won   | 5 of 5 won    | 5 of 5 won   | 3 of 5 won    | 4 of 5 won   |
 
-Town growth 50% was too hard (Bath 2 of 5 wins, Sheffield 1, Whitby 0) and 40-ish too easy on Bath, so the towns now differ more from each other than the numbers do: per-map difficulty is a follow-up. The HQ still tends to go from full health to fallen within one wave once the horde reaches it. The scripted `scavenge` player loses wave 1 on Whitby because it builds depots before its free turret.
+Town growth 50% was too hard (Bath 2 of 5 wins, Sheffield 1, Whitby 0) and 40-ish too easy on Bath, so the towns now differ more from each other than the numbers do: see "Per-town difficulty" below. The HQ still tends to go from full health to fallen within one wave once the horde reaches it. The scripted `scavenge` player loses wave 1 on Whitby because it builds depots before its free turret.
+
+## Per-town difficulty
+
+_2026-10-31._ With one set of town numbers Bath was easy, Sheffield mixed and Whitby hard, because street layout decides how many fronts a crowd presses on. `TOWN_MAP_OPTIONS` in `horde/TownScale.ts` now lays per-town changes over `TOWN_HORDE_OPTIONS`, and `hordeOptionsForMap` merges them. Only `firstWaveSize` differs (Bath 185, Sheffield 150, Whitby 120); growth stays 45% everywhere, so every later wave scales with the first. The options are saved in the horde snapshot, so games already under way keep theirs and no version bump is needed.
+
+`balance:horde -- --zone 0`, plus the same with `--loot 50` and with `--call-early` (wins out of 15 = 5 defended strategies x 3 ways of playing):
+
+| Map       | `turrets` | `fort`       | `spans` | `scavenge`    | `mortars`    | wins of 15 |
+| --------- | --------- | ------------ | ------- | ------------- | ------------ | ---------- |
+| Bath      | won       | lost, wave 9 | won     | won           | lost, wave 9 | 13         |
+| Sheffield | won       | won          | won     | lost, wave 10 | lost, wave 9 | 12         |
+| Whitby    | won       | won          | won     | lost, wave 10 | lost, wave 9 | 11         |
+
+Before: Bath 15 of 15, Whitby 0 of 5 at plain settings. Raising Bath's growth instead was a cliff (48% lost all five plain games, 50% won two), and a Bath first wave of 200 or more loses `fort` in wave 1, so first-wave size is the gentler knob. A Whitby first wave of 120 also ends the scripted `scavenge` player's wave-1 loss there. Looting crates (`--loot 50`) makes every town much easier, so the plain runs are the ones to judge by.
 
 ## Prerequisites
 

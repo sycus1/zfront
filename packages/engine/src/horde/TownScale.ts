@@ -74,7 +74,31 @@ export const TOWN_HORDE_OPTIONS: Partial<HordeOptions> = {
   crateMaxDistance: 40,
 };
 
-/** Horde options for `map`: the town numbers on town maps, else none. */
+/**
+ * Per-town changes laid over TOWN_HORDE_OPTIONS, so the towns are about
+ * equally hard. Street layout decides how many fronts a crowd presses on:
+ * Bath's narrow streets let a few turrets hold, Whitby's open ground and
+ * harbour sides let crowds spread round them. Only the first wave changes
+ * (growth stays 45%), so every wave on a town scales with it. Tuned with
+ * `npm run balance:horde -- --zone 0 --map <town>` so each town is won by
+ * three of the five defended strategies, losing late (wave 9 or 10). See
+ * "Per-town difficulty" in docs/zfront/spike-plan.md.
+ */
+export const TOWN_MAP_OPTIONS: Partial<
+  Record<GameMapType, Partial<HordeOptions>>
+> = {
+  [GameMapType.Bath]: { firstWaveSize: 185 },
+  [GameMapType.Whitby]: { firstWaveSize: 120 },
+};
+
+/**
+ * Horde options for `map`: the town numbers, plus the map's own changes,
+ * on town maps, else none.
+ */
 export function hordeOptionsForMap(map: GameMapType): Partial<HordeOptions> {
-  return isTownScale(map) ? TOWN_HORDE_OPTIONS : {};
+  if (!isTownScale(map)) return {};
+  const own = TOWN_MAP_OPTIONS[map];
+  return own === undefined
+    ? TOWN_HORDE_OPTIONS
+    : { ...TOWN_HORDE_OPTIONS, ...own };
 }

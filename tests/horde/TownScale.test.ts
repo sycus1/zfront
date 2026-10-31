@@ -28,6 +28,7 @@ import {
 import {
   hordeOptionsForMap,
   TOWN_HORDE_OPTIONS,
+  TOWN_MAP_OPTIONS,
 } from "@openfront/engine/horde/TownScale";
 import { playerInfo, setup } from "../util/Setup";
 import { expectSnapshotRoundTrip } from "../util/Snapshot";
@@ -116,6 +117,24 @@ describe("Town scale", () => {
     // Every town number is a real option.
     for (const k of Object.keys(TOWN_HORDE_OPTIONS)) {
       expect(DEFAULT_HORDE_OPTIONS).toHaveProperty(k);
+    }
+  });
+
+  test("towns can change the town numbers for themselves", () => {
+    expect(hordeOptionsForMap(GameMapType.Bath)).toEqual({
+      ...TOWN_HORDE_OPTIONS,
+      firstWaveSize: 185,
+    });
+    expect(hordeOptionsForMap(GameMapType.Whitby).firstWaveSize).toBe(120);
+    expect(hordeOptionsForMap(GameMapType.Whitby).cellCap).toBe(
+      TOWN_HORDE_OPTIONS.cellCap,
+    );
+    // Every override is a real option, and only town maps have them.
+    for (const [map, own] of Object.entries(TOWN_MAP_OPTIONS)) {
+      expect(isTownScale(map as GameMapType)).toBe(true);
+      for (const k of Object.keys(own ?? {})) {
+        expect(DEFAULT_HORDE_OPTIONS).toHaveProperty(k);
+      }
     }
   });
 
