@@ -930,6 +930,46 @@ export class UserSettingModal extends BaseModal {
       ></setting-keybind>
 
       <setting-keybind
+        action="buildOutpost"
+        label=${translateText("user_setting.build_outpost")}
+        description=${translateText("user_setting.build_outpost_desc")}
+        defaultKey=${this.defaultKeybinds.buildOutpost}
+        .value=${this.getKeyValue("buildOutpost")}
+        .display=${this.getKeyChar("buildOutpost")}
+        @change=${this.handleKeybindChange}
+      ></setting-keybind>
+
+      <setting-keybind
+        action="buildDepot"
+        label=${translateText("user_setting.build_depot")}
+        description=${translateText("user_setting.build_depot_desc")}
+        defaultKey=${this.defaultKeybinds.buildDepot}
+        .value=${this.getKeyValue("buildDepot")}
+        .display=${this.getKeyChar("buildDepot")}
+        @change=${this.handleKeybindChange}
+      ></setting-keybind>
+
+      <setting-keybind
+        action="buildMine"
+        label=${translateText("user_setting.build_mine")}
+        description=${translateText("user_setting.build_mine_desc")}
+        defaultKey=${this.defaultKeybinds.buildMine}
+        .value=${this.getKeyValue("buildMine")}
+        .display=${this.getKeyChar("buildMine")}
+        @change=${this.handleKeybindChange}
+      ></setting-keybind>
+
+      <setting-keybind
+        action="buildNoiseBeacon"
+        label=${translateText("user_setting.build_noise_beacon")}
+        description=${translateText("user_setting.build_noise_beacon_desc")}
+        defaultKey=${this.defaultKeybinds.buildNoiseBeacon}
+        .value=${this.getKeyValue("buildNoiseBeacon")}
+        .display=${this.getKeyChar("buildNoiseBeacon")}
+        @change=${this.handleKeybindChange}
+      ></setting-keybind>
+
+      <setting-keybind
         action="buildMissileSilo"
         label=${translateText("user_setting.build_missile_silo")}
         description=${translateText("user_setting.build_missile_silo_desc")}

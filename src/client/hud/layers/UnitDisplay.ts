@@ -20,11 +20,15 @@ import {
   atomBombIcon,
   cityIcon,
   defensePostIcon,
+  depotIcon,
   factoryIcon,
   goldCoinIcon,
   hydrogenBombIcon,
+  mineIcon,
   mirvIcon,
   missileSiloIcon,
+  noiseBeaconIcon,
+  outpostIcon,
   portIcon,
   samLauncherIcon,
   wallIcon,
@@ -47,6 +51,10 @@ export class UnitDisplay extends LitElement implements Controller {
   private _port = 0;
   private _defensePost = 0;
   private _walls = 0;
+  private _outposts = 0;
+  private _depots = 0;
+  private _mines = 0;
+  private _noiseBeacons = 0;
   private _samLauncher = 0;
   private allDisabled = false;
   private _hoveredUnit: PlayerBuildableUnitType | null = null;
@@ -126,6 +134,10 @@ export class UnitDisplay extends LitElement implements Controller {
     this._port = player.totalUnitLevels(UnitType.Port);
     this._defensePost = player.totalUnitLevels(UnitType.DefensePost);
     this._walls = player.totalUnitLevels(UnitType.Wall);
+    this._outposts = player.totalUnitLevels(UnitType.Outpost);
+    this._depots = player.totalUnitLevels(UnitType.Depot);
+    this._mines = player.totalUnitLevels(UnitType.Mine);
+    this._noiseBeacons = player.totalUnitLevels(UnitType.NoiseBeacon);
     this._samLauncher = player.totalUnitLevels(UnitType.SAMLauncher);
     this._factories = player.totalUnitLevels(UnitType.Factory);
     this._warships = player.totalUnitLevels(UnitType.Warship);
@@ -190,6 +202,34 @@ export class UnitDisplay extends LitElement implements Controller {
             UnitType.MissileSilo,
             "missile_silo",
             this.getHotkey("buildMissileSilo", "Digit5"),
+          )}
+          ${this.renderUnitItem(
+            outpostIcon,
+            this._outposts,
+            UnitType.Outpost,
+            "outpost",
+            this.getHotkey("buildOutpost", "KeyO"),
+          )}
+          ${this.renderUnitItem(
+            depotIcon,
+            this._depots,
+            UnitType.Depot,
+            "depot",
+            this.getHotkey("buildDepot", "KeyH"),
+          )}
+          ${this.renderUnitItem(
+            mineIcon,
+            this._mines,
+            UnitType.Mine,
+            "mine",
+            this.getHotkey("buildMine", "KeyK"),
+          )}
+          ${this.renderUnitItem(
+            noiseBeaconIcon,
+            this._noiseBeacons,
+            UnitType.NoiseBeacon,
+            "noise_beacon",
+            this.getHotkey("buildNoiseBeacon", "KeyL"),
           )}
           ${this.renderUnitItem(
             samLauncherIcon,
