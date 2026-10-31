@@ -115,7 +115,7 @@ describe("HordeExecution", () => {
     await expectSnapshotRoundTrip(game, "plains", 30);
   });
 
-  test("surviving every wave wins the game and stops the horde", async () => {
+  test("surviving every wave wins, and waves go on for keep playing", async () => {
     const { game, horde } = await hordeGame({
       ...SMALL_WAVES,
       wavesToWin: 2,
@@ -130,10 +130,46 @@ describe("HordeExecution", () => {
     run(game, 40);
     expect(horde.stats().outcome).toBe("won");
     expect(game.getWinner()).toBe(survivor);
-    // No third wave, and the horde is frozen.
+    // The next wave is announced with a countdown, then arrives: the game
+    // keeps running past the win instead of freezing.
+    const frame = horde.encodeFrame()!;
+    expect(frame.nextWave).toBe(3);
+    expect(frame.nextWaveFinal).toBe(false);
+    expect(frame.nextWaveIn).toBeGreaterThan(0);
     const hash = horde.stateHash();
     run(game, 250);
-    expect(horde.stats().wave).toBe(2);
+    expect(horde.stats().wave).toBe(3);
+    expect(horde.stateHash()).not.toBe(hash);
+    // Still won, and the result is only reported once.
+    expect(horde.stats().outcome).toBe("won");
+    expect(game.getWinner()).toBe(survivor);
+  });
+
+  test("a won game played on keeps its win when the HQ later falls", async () => {
+    const { game, horde } = await hordeGame({
+      ...SMALL_WAVES,
+      wavesToWin: 1,
+      hqHp: 100_000,
+    });
+    const survivor = game.player("survivor");
+    survivor.setSpawnTile(game.ref(50, 48));
+    run(game, 205);
+    expect(horde.stats().outcome).toBe("won");
+    for (let t = 0; t < 2_000 && survivor.isAlive(); t++) {
+      game.executeNextTick();
+    }
+    expect(survivor.isAlive()).toBe(false);
+    expect(horde.stats().outcome).toBe("won");
+    expect(game.getWinner()).toBe(survivor);
+  });
+
+  test("a lost game stops the horde", async () => {
+    const { game, horde } = await hordeGame({ ...SMALL_WAVES, hqHp: 2_000 });
+    game.player("survivor").setSpawnTile(game.ref(50, 48));
+    run(game, 400);
+    expect(horde.stats().outcome).toBe("lost");
+    const hash = horde.stateHash();
+    run(game, 250);
     expect(horde.stateHash()).toBe(hash);
   });
 

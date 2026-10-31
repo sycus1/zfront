@@ -68,7 +68,8 @@ import { readyToFire } from "./Weapons";
  *
  * The player wins by keeping their HQ standing until the wave after
  * `wavesToWin` would arrive, and loses when every human HQ has fallen.
- * Either way the horde then stops.
+ * A loss stops the horde; after a win the waves go on without end, for
+ * players who keep playing.
  *
  * Deterministic: integer state, a seeded PRNG for spawn points, and a fixed
  * scan order everywhere. Timings are recorded for the perf harness only and
@@ -527,7 +528,9 @@ export class HordeExecution implements Execution {
   }
 
   tick(ticks: number): void {
-    if (this.mg === null || this.outcome !== "playing") return;
+    // A won game keeps going (the result screen's "Keep playing"): waves
+    // carry on past wavesToWin. Only a lost one stops.
+    if (this.mg === null || this.outcome === "lost") return;
     this.ticks = ticks;
     if (this.nextWaveTick < 0) {
       this.nextWaveTick = ticks + this.opts.firstWaveDelay;
@@ -537,12 +540,15 @@ export class HordeExecution implements Execution {
     this.planNextWave();
     if (ticks >= this.nextWaveTick) {
       if (this.allWavesStarted()) {
+        // Victory. Play on: a break, then waves without end.
         this.win();
-        return;
+        this.nextWaveTick = ticks + this.opts.waveInterval;
+        this.planNextWave();
+      } else {
+        this.startWave();
+        this.nextWaveTick = ticks + this.opts.waveInterval;
+        this.planNextWave();
       }
-      this.startWave();
-      this.nextWaveTick = ticks + this.opts.waveInterval;
-      this.planNextWave();
     }
     payHqIncome(this.mg!, this.opts);
     this.emit();
@@ -584,7 +590,7 @@ export class HordeExecution implements Execution {
    * when it can't.
    */
   lootCrate(player: Player, id: number): boolean {
-    if (this.mg === null || this.outcome !== "playing") return false;
+    if (this.mg === null || this.outcome === "lost") return false;
     return this.crates.loot(player, id, this.ticks);
   }
 
@@ -628,7 +634,7 @@ export class HordeExecution implements Execution {
    * before the first), and only while one is announced.
    */
   callableTicks(): number {
-    if (this.mg === null || this.outcome !== "playing") return 0;
+    if (this.mg === null || this.outcome === "lost") return 0;
     if (this.nextPlan === null || this.wavesSurvived < this.wave) return 0;
     return Math.max(0, this.nextWaveTick - this.ticks);
   }
@@ -707,7 +713,7 @@ export class HordeExecution implements Execution {
       hqHp: this.firstHqHp(),
       hqMaxHp: this.opts.hqHp,
       nextWaveIn:
-        this.outcome === "playing" && this.nextWaveTick >= 0
+        this.outcome !== "lost" && this.nextWaveTick >= 0
           ? Math.max(0, this.nextWaveTick - this.ticks)
           : -1,
       nextWave: next?.wave ?? 0,
@@ -1275,8 +1281,13 @@ export class HordeExecution implements Execution {
     if (ms > prof.maxRecomputeMs) prof.maxRecomputeMs = ms;
   }
 
+  /** The last wave to win has started (false once won: waves go on). */
   private allWavesStarted(): boolean {
-    return this.opts.wavesToWin > 0 && this.wave >= this.opts.wavesToWin;
+    return (
+      this.outcome === "playing" &&
+      this.opts.wavesToWin > 0 &&
+      this.wave >= this.opts.wavesToWin
+    );
   }
 
   /** Plans (and so announces) the next wave once the last one has started. */
@@ -1685,7 +1696,8 @@ export class HordeExecution implements Execution {
     const humansLeft = this.mg!.players().some(
       (p) => p.type() === PlayerType.Human && p.isAlive(),
     );
-    if (!humansLeft) {
+    // After a win, falling later doesn't take the win away.
+    if (!humansLeft && this.outcome === "playing") {
       this.outcome = "lost";
       this.mg!.setWinner(null, this.mg!.stats().stats());
     }
