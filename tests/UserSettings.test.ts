@@ -557,6 +557,15 @@ describe("getDefaultKeybinds", () => {
     expect(keybinds.zoomInNumpad).toBe("NumpadAdd");
   });
 
+  it("binds a key to each zfront horde building", () => {
+    const keybinds = getDefaultKeybinds(false);
+    expect(keybinds.buildWall).toBe("KeyV");
+    expect(keybinds.buildOutpost).toBe("KeyO");
+    expect(keybinds.buildDepot).toBe("KeyH");
+    expect(keybinds.buildMine).toBe("KeyK");
+    expect(keybinds.buildNoiseBeacon).toBe("KeyL");
+  });
+
   it("never gives two actions the same letter key, except shared pairs", () => {
     const binds = Object.entries(getDefaultKeybinds(false)).filter(([, k]) =>
       /^Key[A-Z]$/.test(k),
