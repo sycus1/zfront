@@ -25,6 +25,7 @@ import {
   HORDE_EXACT_MAX,
   hordeDensityCount,
 } from "@openfront/engine-lib/game/HordeCells";
+import { assetUrl } from "@openfront/shared/AssetUrls";
 import {
   HordeSwarm,
   SWARM_DEATH_SEC,
@@ -363,6 +364,14 @@ export class HordePass {
   private program: WebGLProgram;
   private vao: WebGLVertexArrayObject;
   private tex: WebGLTexture | null = null;
+  /**
+   * Pixel-art textures for one-cell buildings (cell-sprites.png, drawn by
+   * scripts/sprites/buildingSprites.ts); transparent until it loads.
+   */
+  private cellTex: WebGLTexture;
+  private uCells: WebGLUniformLocation;
+  private uCellTexSize: WebGLUniformLocation;
+  private cellTexSize: [number, number] = [1, 1];
   private gridW = 0;
   private gridH = 0;
   private uCamera: WebGLUniformLocation;
@@ -460,6 +469,26 @@ export class HordePass {
     this.uCrates = gl.getUniformLocation(this.program, "uCrates")!;
     this.uCrateCount = gl.getUniformLocation(this.program, "uCrateCount")!;
     this.vao = createMapQuad(gl, mapW, mapH);
+    this.uCells = gl.getUniformLocation(this.program, "uCells")!;
+    this.uCellTexSize = gl.getUniformLocation(this.program, "uCellTexSize")!;
+    this.cellTex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this.cellTex);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA,
+      1,
+      1,
+      0,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      new Uint8Array([0, 0, 0, 0]),
+    );
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    void this.loadCells();
 
     this.swarmProgram = createProgram(
       gl,
@@ -679,6 +708,11 @@ export class HordePass {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
     gl.uniform1i(this.uHorde, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, this.cellTex);
+    gl.uniform1i(this.uCells, 1);
+    gl.uniform2f(this.uCellTexSize, this.cellTexSize[0], this.cellTexSize[1]);
+    gl.activeTexture(gl.TEXTURE0);
     gl.uniform2i(this.uGridSize, this.gridW, this.gridH);
     gl.uniform1f(this.uTime, timeSec);
     gl.uniform4fv(this.uArrows, this.arrows);
@@ -723,10 +757,24 @@ export class HordePass {
     return true;
   }
 
+  private async loadCells(): Promise<void> {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = assetUrl("atlases/cell-sprites.png");
+    await img.decode();
+    const gl = this.gl;
+    gl.bindTexture(gl.TEXTURE_2D, this.cellTex);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    this.cellTexSize = [img.width, img.height];
+  }
+
   dispose(): void {
     const gl = this.gl;
     gl.deleteProgram(this.program);
     if (this.tex) gl.deleteTexture(this.tex);
+    gl.deleteTexture(this.cellTex);
     if (this.query) gl.deleteQuery(this.query);
     gl.deleteVertexArray(this.vao);
     gl.deleteProgram(this.swarmProgram);

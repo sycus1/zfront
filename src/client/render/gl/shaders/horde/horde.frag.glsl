@@ -39,6 +39,12 @@ uniform int uLinkCount;
 // (-1 when nobody is looting), w the share of its life left.
 uniform vec4 uCrates[MAX_CRATES];
 uniform int uCrateCount;
+// Pixel-art one-cell buildings (cell-sprites.png, premultiplied), CELL_PX
+// square frames in this order: barricade, stone, reinforced, mine, beacon,
+// sounding beacon, depot.
+uniform sampler2D uCells;
+uniform vec2 uCellTexSize;
+const float CELL_PX = 8.0;
 
 in vec2 vUV;
 out vec4 fragColor;
@@ -223,9 +229,30 @@ float gridAt(vec2 p, vec2 px) {
   return line * (here ? 0.9 : 0.35 * (1.0 - r / GRID_RADIUS));
 }
 
+bool isWall(ivec2 cell) {
+  int b = byteAt(cell);
+  return b >= int(WALL) && b != int(ELITE);
+}
+
+// A one-cell building's art at f (0-1 across the cell), sampled sharply so
+// each art pixel stays a flat square at any zoom. Premultiplied.
+// pw is fwidth(p), taken in uniform control flow.
+vec4 cellSprite(int frame, vec2 f, vec2 pw) {
+  vec2 texel = vec2((float(frame) + f.x) * CELL_PX, f.y * CELL_PX);
+  vec2 seam = floor(texel + 0.5);
+  vec2 dudv = max(pw * CELL_PX, vec2(1e-4));
+  texel = seam + clamp((texel - seam) / dudv, -0.5, 0.5);
+  // Stay inside this frame so its neighbours don't bleed in.
+  float lo = float(frame) * CELL_PX + 0.5;
+  texel.x = clamp(texel.x, lo, lo + CELL_PX - 1.0);
+  texel.y = clamp(texel.y, 0.5, CELL_PX - 0.5);
+  return texture(uCells, texel / uCellTexSize);
+}
+
 void main() {
   vec2 p = vUV * vec2(uGridSize);
-  float grid = gridAt(p, fwidth(p));
+  vec2 pw = fwidth(p);
+  float grid = gridAt(p, pw);
   ivec2 cell = clamp(ivec2(p), ivec2(0), uGridSize - 1);
   int raw = byteAt(cell);
 
@@ -288,34 +315,29 @@ void main() {
     fragColor = vec4(vec3(0.95, 0.85, 0.2) * pulse, 1.0);
     return;
   }
-  if (raw >= int(MINE) && raw <= int(DEPOT)) {
-    vec2 f = fract(p) - 0.5;
-    float r = length(f);
-    if (raw == int(MINE)) {
-      // A dark disc with a red light.
-      if (r > 0.42) discard;
-      fragColor = r < 0.14 ? vec4(0.95, 0.15, 0.1, 1.0) : vec4(0.15, 0.15, 0.12, 1.0);
-    } else if (raw == int(DEPOT)) {
-      // A crate: tan with a darker rim.
-      float edge = 0.5 - max(abs(f.x), abs(f.y));
-      fragColor = vec4(vec3(0.72, 0.56, 0.3) * (edge < 0.1 ? 0.6 : 1.0), 1.0);
-    } else {
-      // A blue post; a sounding beacon pulses brighter.
-      float pulse = raw == int(BEACON_SOUNDING) ? 0.7 + 0.3 * sin(uTime * 10.0) : 0.45;
-      if (r > 0.45) discard;
-      fragColor = vec4(vec3(0.3, 0.6, 1.0) * (r < 0.2 ? 1.0 : pulse), 1.0);
-    }
-    return;
-  }
-  if (raw >= int(WALL)) {
-    // A block with a darker rim, so a line of walls reads as segments:
-    // brown timber, grey stone, then dark steel.
-    vec3 tint = raw == int(WALL)
-      ? vec3(0.55, 0.4, 0.25)
-      : raw == int(WALL) + 1 ? vec3(0.62, 0.6, 0.56) : vec3(0.36, 0.4, 0.46);
+  if (raw >= int(MINE) && raw != int(ELITE)) {
     vec2 f = fract(p);
-    float edge = min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y));
-    fragColor = vec4(tint * (edge < 0.12 ? 0.68 : 1.0), 1.0);
+    int frame;
+    if (raw >= int(WALL)) {
+      frame = raw - int(WALL);
+      // Wall art runs east-west; turn it where the wall runs north-south.
+      bool ew = isWall(cell + ivec2(1, 0)) || isWall(cell - ivec2(1, 0));
+      bool ns = isWall(cell + ivec2(0, 1)) || isWall(cell - ivec2(0, 1));
+      if (ns && !ew) f = f.yx;
+    } else if (raw == int(MINE)) frame = 3;
+    else if (raw == int(BEACON)) frame = 4;
+    else if (raw == int(BEACON_SOUNDING)) frame = 5;
+    else frame = 6; // depot
+    vec4 c = cellSprite(frame, f, pw);
+    if (raw == int(BEACON_SOUNDING)) {
+      // A sound ring pulses out from the siren.
+      float r = length(f - 0.5);
+      float wave = fract(uTime * 1.5);
+      float ring = (1.0 - smoothstep(0.0, 0.06, abs(r - wave * 0.5))) * (1.0 - wave);
+      c = mix(c, vec4(0.95, 0.35, 0.2, 1.0), ring * 0.8);
+    }
+    if (c.a < 0.02) discard;
+    fragColor = vec4(c.rgb / c.a, c.a);
     return;
   }
 

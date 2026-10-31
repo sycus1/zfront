@@ -161,7 +161,9 @@
     "iconR": 1.0,
     "iconG": 1.0,
     "iconB": 1.0,
-    "iconDarken": 0
+    "iconDarken": 0,
+    "spriteZoom": 2.5,
+    "spriteScale": 1.1
   },
   "structureLevel": {
     "scale": 1,

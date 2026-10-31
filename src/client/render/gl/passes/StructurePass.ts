@@ -4,9 +4,13 @@
  * Renders a filled circle in player color with a white icon overlay,
  * sampled from a pre-built 6-column sprite atlas (generate-sprite-atlases.mjs).
  *
- * Two LODs based on zoom:
- *   - zoom > 0.5: full icon with circle background
- *   - zoom <= 0.5: smaller dots (no icon detail)
+ * Three LODs based on zoom:
+ *   - zoom >= structure.spriteZoom (zfront): a pixel-art sprite of the
+ *     building itself (building-sprites.png, drawn by
+ *     scripts/sprites/buildingSprites.ts), tinted with the owner's colour
+ *     where its mask says so; the HQ is drawn this way too
+ *   - zoom > dotsZoomThreshold: full icon with circle background
+ *   - below that: smaller dots (no icon detail)
  *
  * One instanced draw call per frame.
  *
@@ -38,6 +42,7 @@ import structureFragSrc from "../shaders/structure/structure.frag.glsl?raw";
 import structureVertSrc from "../shaders/structure/structure.vert.glsl?raw";
 
 const iconAtlasUrl = assetUrl("atlases/icon-atlas.png");
+const spriteAtlasUrl = assetUrl("atlases/building-sprites.png");
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -58,6 +63,16 @@ const STRUCTURE_ORDER = [
 ] as const;
 
 const ATLAS_COLS = STRUCTURE_ORDER.length;
+
+/**
+ * zfront: sprite atlas frames: STRUCTURE_ORDER, then the HQ (which is not a
+ * unit; it is drawn at the HQ tile the horde frame gives).
+ */
+const SPRITE_COLS = ATLAS_COLS + 1;
+const HQ_COL = ATLAS_COLS;
+/** Frames that have a sprite: all but the SAM Launcher (none in horde mode). */
+const SPRITE_MASK =
+  ((1 << SPRITE_COLS) - 1) & ~(1 << STRUCTURE_ORDER.indexOf(UT_SAM_LAUNCHER));
 
 // ---------------------------------------------------------------------------
 // Instance data layout
@@ -100,6 +115,8 @@ export class StructurePass {
   private uIconDarken: WebGLUniformLocation;
   private uTime: WebGLUniformLocation;
   private uHoverOwner: WebGLUniformLocation;
+  private uSpriteZoom: WebGLUniformLocation;
+  private uSpriteScale: WebGLUniformLocation;
   // Anchored at construction so the uniform stays small (float32 precision).
   private readonly startTime = performance.now();
   /** smallID of the hovered territory's owner (0 = none) — gates the effect. */
@@ -112,6 +129,9 @@ export class StructurePass {
   private paletteTex: WebGLTexture;
   private effectTex: WebGLTexture;
   private atlasTex: WebGLTexture;
+  private spriteTex: WebGLTexture;
+  /** zfront: the HQ's tile, drawn as a sprite (-1 = none). */
+  private hqTile = -1;
   private affiliationTex: WebGLTexture | null = null;
   private altView = false;
 
@@ -155,7 +175,7 @@ export class StructurePass {
     // Compile shaders
     this.program = createProgram(
       gl,
-      shaderSrc(structureVertSrc, { ATLAS_COLS }),
+      shaderSrc(structureVertSrc, { ATLAS_COLS, SPRITE_COLS, HQ_COL }),
       shaderSrc(structureFragSrc, {
         PALETTE_SIZE: getPaletteSize(),
         ATLAS_COLS,
@@ -202,6 +222,8 @@ export class StructurePass {
     this.uIconDarken = gl.getUniformLocation(this.program, "uIconDarken")!;
     this.uTime = gl.getUniformLocation(this.program, "uTime")!;
     this.uHoverOwner = gl.getUniformLocation(this.program, "uHoverOwner")!;
+    this.uSpriteZoom = gl.getUniformLocation(this.program, "uSpriteZoom")!;
+    this.uSpriteScale = gl.getUniformLocation(this.program, "uSpriteScale")!;
 
     // Texture unit bindings + ghost defaults
     gl.useProgram(this.program);
@@ -212,6 +234,12 @@ export class StructurePass {
     gl.uniform1f(this.uGhostAlpha, 1.0);
     gl.uniform3f(this.uOutlineColor, 0, 0, 0);
     gl.uniform1i(this.uHighlightMask, 0);
+    gl.uniform1i(gl.getUniformLocation(this.program, "uSprites"), 4);
+    gl.uniform1i(
+      gl.getUniformLocation(this.program, "uSpriteMask"),
+      SPRITE_MASK,
+    );
+    gl.uniform2f(gl.getUniformLocation(this.program, "uSpriteTexSize"), 1, 1);
 
     // Create placeholder atlas texture (1×1 white pixel)
     // Replaced asynchronously once SVGs load
@@ -234,8 +262,31 @@ export class StructurePass {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
+    // Sprite atlas: a transparent 1x1 until it loads, so buildings draw
+    // nothing rather than a white square for the first frames.
+    this.spriteTex = gl.createTexture()!;
+    gl.activeTexture(gl.TEXTURE4);
+    gl.bindTexture(gl.TEXTURE_2D, this.spriteTex);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA,
+      1,
+      1,
+      0,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      new Uint8Array([0, 0, 0, 0]),
+    );
+    // Linear filtering for the sharp pixel-art sampling in the shader.
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
     // Start async atlas build
     this.loadAtlas();
+    this.loadSprites();
 
     // --- Instance buffers ---
     const instanceGlBuf = gl.createBuffer()!;
@@ -295,6 +346,31 @@ export class StructurePass {
       gl.TEXTURE_MIN_FILTER,
       gl.LINEAR_MIPMAP_LINEAR,
     );
+  }
+
+  private async loadSprites(): Promise<void> {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = spriteAtlasUrl;
+    await img.decode();
+    const gl = this.gl;
+    gl.activeTexture(gl.TEXTURE4);
+    gl.bindTexture(gl.TEXTURE_2D, this.spriteTex);
+    // Premultiplied, so a pixel blends cleanly with its transparent neighbours.
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.useProgram(this.program);
+    gl.uniform2f(
+      gl.getUniformLocation(this.program, "uSpriteTexSize"),
+      img.width,
+      img.height,
+    );
+  }
+
+  /** zfront: the HQ's tile from the horde frame (-1 = no HQ). */
+  setHq(tile: number): void {
+    this.hqTile = tile;
   }
 
   setLocalPlayer(smallID: number): void {
@@ -372,7 +448,9 @@ export class StructurePass {
   draw(cameraMatrix: Float32Array, zoom: number): void {
     const hasGhost =
       this.ghost !== null && this.typeToAtlasCol.has(this.ghost.ghostType);
-    if (this.instanceCount === 0 && !hasGhost) return;
+    const hasHq =
+      this.hqTile >= 0 && zoom >= this.settings.structure.spriteZoom;
+    if (this.instanceCount === 0 && !hasGhost && !hasHq) return;
 
     const gl = this.gl;
     gl.useProgram(this.program);
@@ -386,10 +464,12 @@ export class StructurePass {
     gl.uniform1f(this.uDotScale, ss.dotScale);
     gl.uniform1f(this.uScaleFactor, ss.iconScaleFactorZoomedOut);
     gl.uniform1f(this.uIconGrowZoom, ss.iconGrowZoom);
+    gl.uniform1f(this.uSpriteZoom, ss.spriteZoom);
+    gl.uniform1f(this.uSpriteScale, ss.spriteScale);
 
     // Build per-structure uniform arrays from settings, ordered by atlas column
-    const scales = new Float32Array(ATLAS_COLS);
-    const fills = new Float32Array(ATLAS_COLS);
+    const scales = new Float32Array(SPRITE_COLS).fill(1);
+    const fills = new Float32Array(SPRITE_COLS).fill(1);
     for (let i = 0; i < STRUCTURE_ORDER.length; i++) {
       const cfg = ss.shapes[STRUCTURE_ORDER[i]];
       scales[i] = cfg?.scale ?? 1.0;
@@ -428,7 +508,16 @@ export class StructurePass {
     gl.activeTexture(gl.TEXTURE3);
     gl.bindTexture(gl.TEXTURE_2D, this.effectTex);
 
+    gl.activeTexture(gl.TEXTURE4);
+    gl.bindTexture(gl.TEXTURE_2D, this.spriteTex);
+
     gl.bindVertexArray(this.vao);
+
+    // --- zfront: the HQ, under everything built round it ---
+    if (hasHq) {
+      const tx = this.hqTile % this.mapW;
+      this.drawSingle(tx, (this.hqTile - tx) / this.mapW, HQ_COL);
+    }
 
     // --- Real structures ---
     if (this.instanceCount > 0) {
@@ -490,6 +579,27 @@ export class StructurePass {
     }
   }
 
+  /** One instance from the scratch buffer, drawn opaque with no tint. */
+  private drawSingle(x: number, y: number, col: number): void {
+    const gl = this.gl;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.ghostInstanceBuf);
+    gl.vertexAttribPointer(1, 4, gl.FLOAT, false, BYTES_PER_INSTANCE, 0);
+    gl.vertexAttribPointer(2, 2, gl.FLOAT, false, BYTES_PER_INSTANCE, 16);
+    this.ghostBuf[0] = x;
+    this.ghostBuf[1] = y;
+    this.ghostBuf[2] = this.localPlayerID;
+    this.ghostBuf[3] = 0;
+    this.ghostBuf[4] = col;
+    this.ghostBuf[5] = 0;
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.ghostBuf);
+    gl.uniform1f(this.uGhostAlpha, 1.0);
+    gl.uniform3f(this.uOutlineColor, 0, 0, 0);
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, 1);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuf.buffer);
+    gl.vertexAttribPointer(1, 4, gl.FLOAT, false, BYTES_PER_INSTANCE, 0);
+    gl.vertexAttribPointer(2, 2, gl.FLOAT, false, BYTES_PER_INSTANCE, 16);
+  }
+
   dispose(): void {
     const gl = this.gl;
     gl.deleteProgram(this.program);
@@ -497,5 +607,6 @@ export class StructurePass {
     if (this.ghostInstanceBuf) gl.deleteBuffer(this.ghostInstanceBuf);
     gl.deleteVertexArray(this.vao);
     gl.deleteTexture(this.atlasTex);
+    gl.deleteTexture(this.spriteTex);
   }
 }

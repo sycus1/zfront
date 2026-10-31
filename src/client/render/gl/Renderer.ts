@@ -732,6 +732,7 @@ export class GPURenderer {
   updateHorde(frame: HordeFrame): void {
     this.hordePass.update(frame);
     this.barPass.setStructureHealth(frame.structureHp);
+    this.structurePass.setHq(frame.hqTile);
     this.settleCircle =
       frame.hqTile >= 0
         ? {

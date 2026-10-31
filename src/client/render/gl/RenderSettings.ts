@@ -212,6 +212,14 @@ export interface RenderSettings {
      * (HSV value multiplier) instead of the flat iconR/G/B color. 0 = off.
      */
     iconDarken: number;
+    /**
+     * zfront: from this zoom up, buildings are drawn as pixel-art sprites
+     * (building-sprites.png) instead of badges. Below it a building is only
+     * a few pixels wide and the badge reads better.
+     */
+    spriteZoom: number;
+    /** zfront: sprite quad size relative to a scale-1 badge. */
+    spriteScale: number;
   };
   structureLevel: {
     scale: number;
