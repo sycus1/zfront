@@ -127,7 +127,7 @@ export function buildOverlay(
  */
 export function waveArrows(frame: HordeFrame): Float32Array {
   const out = new Float32Array(MAX_ARROWS * 4);
-  if (frame.outcome !== "playing" || frame.nextWave === 0 || frame.hqCell < 0) {
+  if (frame.outcome === "lost" || frame.nextWave === 0 || frame.hqCell < 0) {
     return out.subarray(0, 0);
   }
   const w = frame.width;

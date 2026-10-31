@@ -594,6 +594,7 @@
     "next_wave": "Wave {wave} in {time}",
     "victory_in": "Hold on: victory in {time}",
     "wave": "Wave {wave}",
+    "wave_endless": "Wave {wave} (endless)",
     "wave_of": "Wave {wave} / {total}"
   },
   "horde_result": {

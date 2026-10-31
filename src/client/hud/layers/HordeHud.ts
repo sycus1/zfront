@@ -56,12 +56,14 @@ export class HordeHud extends LitElement implements Controller {
           ? "bg-yellow-400"
           : "bg-red-500";
     const wave =
-      s.wavesToWin > 0
-        ? translateText("horde_hud.wave_of", {
-            wave: s.wave,
-            total: s.wavesToWin,
-          })
-        : translateText("horde_hud.wave", { wave: s.wave });
+      s.wavesToWin > 0 && s.wave > s.wavesToWin
+        ? translateText("horde_hud.wave_endless", { wave: s.wave })
+        : s.wavesToWin > 0
+          ? translateText("horde_hud.wave_of", {
+              wave: s.wave,
+              total: s.wavesToWin,
+            })
+          : translateText("horde_hud.wave", { wave: s.wave });
     return html`
       <div
         class="fixed top-3 left-1/2 -translate-x-1/2 z-[1001] pointer-events-none select-none rounded-lg bg-gray-900/75 backdrop-blur-xs px-4 py-2 text-white shadow-lg w-[min(90vw,320px)]"
@@ -100,7 +102,7 @@ export class HordeHud extends LitElement implements Controller {
   }
 
   private renderNextWave(s: HordeFrame) {
-    if (s.outcome !== "playing" || s.nextWaveIn < 0) return nothing;
+    if (s.outcome === "lost" || s.nextWaveIn < 0) return nothing;
     const time = formatCountdown(s.nextWaveIn);
     if (s.nextWave === 0) {
       return html`<div class="mt-1.5 text-xs text-white/80" data-horde-next>

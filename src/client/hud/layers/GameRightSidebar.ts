@@ -155,7 +155,8 @@ export class GameRightSidebar extends LitElement implements Controller {
 
     const elapsedSeconds = Math.floor(this.game.elapsedGameSeconds());
 
-    if (this.hasWinner) {
+    // zfront: a won horde game can be played on, so its clock keeps going.
+    if (this.hasWinner && this.game.config().gameConfig().horde !== true) {
       return;
     }
 
