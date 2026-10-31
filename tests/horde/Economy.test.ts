@@ -16,6 +16,9 @@ import { playerInfo, setup } from "../util/Setup";
 // The "plains" test map is 100x100 tiles of passable plains (50x50 coarse
 // cells), so waves come ashore along the map edges.
 const WAVES: Partial<HordeOptions> = {
+  // No head start: these tests count gold and land from zero.
+  startingGold: 0,
+  startingRadius: 0,
   firstWaveDelay: 1,
   maxWaveTicks: 1_000,
   firstWaveSize: 400,
@@ -32,13 +35,20 @@ const WAVES: Partial<HordeOptions> = {
 
 // Only the source under test pays.
 const NO_PAY: Partial<HordeOptions> = {
+  // No head start: these tests count gold and land from zero.
+  startingGold: 0,
+  startingRadius: 0,
   hqIncome: 0,
   killBounty: 0,
   eliteBounty: 0,
   clearBonusPerWave: 0,
 };
 
-const QUIET: Partial<HordeOptions> = { firstWaveDelay: 10_000 };
+const QUIET: Partial<HordeOptions> = {
+  firstWaveDelay: 10_000,
+  startingGold: 0,
+  startingRadius: 0,
+};
 
 /** A horde-mode survivor owning tiles 40..59 square, with plenty of gold. */
 async function economyGame(

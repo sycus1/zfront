@@ -334,7 +334,11 @@ export class UnitDisplay extends LitElement implements Controller {
                   <div class="flex items-center justify-center gap-1">
                     <img src=${goldCoinIcon} width="13" height="13" />
                     <span class="text-yellow-300"
-                      >${renderNumber(this.cost(unitType))}</span
+                      >${
+                        this.cost(unitType) === 0n
+                          ? translateText("build_menu.free")
+                          : renderNumber(this.cost(unitType))
+                      }</span
                     >
                   </div>
                 </div>

@@ -17,6 +17,7 @@
       "wall": "Blocks the horde. Zombies go round walls, or break through when there's no other way. Upgrade a barricade to stone, then reinforced. Walls repair for gold when left alone",
       "warship": "Captures trade ships, destroys ships and boats"
     },
+    "free": "Free",
     "not_enough_money": "Not enough money",
     "upgrade_amount": "x{amount}",
     "warship_shift_hint": "Hold Shift and drag to select multiple warships at once"

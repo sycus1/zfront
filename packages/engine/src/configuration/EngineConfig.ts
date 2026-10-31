@@ -117,6 +117,12 @@ function terrainAttackBase(terrain: TerrainType): {
 }
 
 /**
+ * zfront: turrets each human player can build for free in horde mode
+ * (counting every turret and upgrade they have ever placed).
+ */
+export const HORDE_FREE_TURRETS = 1;
+
+/**
  * The engine's rules: everything in Config plus the tunables only the
  * simulation reads (attack resolution, costs, warships, nukes, trade).
  */
@@ -363,9 +369,16 @@ export class EngineConfig extends Config {
         );
       case UnitType.DefensePost:
         // zfront: in horde mode the Defense Post is the turret, at a flat
-        // price for each one and each level.
+        // price for each one and each level, except that a player's first
+        // HORDE_FREE_TURRETS turrets cost nothing, to place where they like.
         if (this.horde()) {
-          return this.costWrapper(() => 50_000, UnitType.DefensePost);
+          const flat = this.costWrapper(() => 50_000, UnitType.DefensePost);
+          return (game: Game, player: Player, extraUnits: number = 0) =>
+            player.type() === PlayerType.Human &&
+            player.unitsConstructed(UnitType.DefensePost) + extraUnits <
+              HORDE_FREE_TURRETS
+              ? 0n
+              : flat(game, player, extraUnits);
         }
         return this.costWrapper(
           (numUnits: number) => Math.min(250_000, (numUnits + 1) * 50_000),

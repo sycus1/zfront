@@ -19,6 +19,9 @@ import { expectSnapshotRoundTrip } from "../util/Snapshot";
 // cells). The survivor owns 40..59 square, so crates land in the open
 // around it. No wave comes unless a test asks for one.
 const QUIET: Partial<HordeOptions> = {
+  // No head start: these tests count gold and land from zero.
+  startingGold: 0,
+  startingRadius: 0,
   firstWaveDelay: 10_000,
   hqIncome: 0,
   flowDebounce: 0,

@@ -153,17 +153,25 @@ describe("wall tiers", () => {
 });
 
 describe("turrets", () => {
-  test("in horde mode turrets cost the same each time and have 3 levels", async () => {
+  test("in horde mode the first turret is free, then each costs the same, with 3 levels", async () => {
     const { game } = await defenceGame(QUIET);
     const survivor = game.player("survivor");
+    survivor.addGold(1_000_000n);
     const info = game.unitInfo(UnitType.DefensePost);
-    const first = info.cost(game, survivor);
+    expect(info.cost(game, survivor)).toBe(0n);
+    const free = survivor.buildUnit(UnitType.DefensePost, game.ref(50, 44), {});
+    // The free one doesn't make its upgrades free.
+    const price = info.cost(game, survivor);
+    expect(price).toBe(50_000n);
+    const gold = survivor.gold();
+    survivor.upgradeUnit(free);
+    expect(survivor.gold()).toBe(gold - price);
     const turret = survivor.buildUnit(
       UnitType.DefensePost,
-      game.ref(50, 44),
+      game.ref(50, 58),
       {},
     );
-    expect(info.cost(game, survivor)).toBe(first);
+    expect(info.cost(game, survivor)).toBe(price);
     survivor.upgradeUnit(turret);
     survivor.upgradeUnit(turret);
     expect(turret.level()).toBe(3);
@@ -210,6 +218,8 @@ describe("turrets", () => {
 });
 
 describe("starting turret", () => {
+  // Off by default (the first turret the player places is free instead).
+  const QUIET = { firstWaveDelay: 10_000, startingTurrets: 1 };
   test("each survivor starts with a finished turret by the HQ, for free", async () => {
     const free = await defenceGame(QUIET);
     const none = await defenceGame({ ...QUIET, startingTurrets: 0 });
@@ -239,6 +249,7 @@ describe("starting turret", () => {
   test("the starting turret fights the first wave", async () => {
     const { game, horde } = await defenceGame({
       ...WAVES,
+      startingTurrets: 1,
       structureHp: 10_000_000,
       hqHp: 10_000_000,
     });
@@ -249,6 +260,7 @@ describe("starting turret", () => {
   test("the frame carries each firing turret's shot", async () => {
     const { game, horde } = await defenceGame({
       ...WAVES,
+      startingTurrets: 1,
       structureHp: 10_000_000,
       hqHp: 10_000_000,
     });
@@ -269,6 +281,7 @@ describe("starting turret", () => {
   test("a turret under construction neither kills nor shoots", async () => {
     const { game, horde } = await defenceGame({
       ...WAVES,
+      startingTurrets: 1,
       structureHp: 10_000_000,
       hqHp: 10_000_000,
     });

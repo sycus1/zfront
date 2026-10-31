@@ -46,6 +46,7 @@ import { FlowField, ORTHO_STEP, WALL_COST } from "./FlowField";
 import { buildCostField, HordeField } from "./HordeField";
 import { MortarGun, MortarOptions, Mortars, MortarState } from "./Mortars";
 import {
+  claimStartingLand,
   passiveRadius,
   settle,
   SettleOptions,
@@ -182,8 +183,19 @@ export interface HordeOptions
   hqHp: number;
   /** Waves to survive to win; 0 means endless. */
   wavesToWin: number;
-  /** Free turrets built next to each human HQ when the game starts. */
+  /**
+   * Finished turrets built for free next to each human HQ when the game
+   * starts. 0 by default: the first turret the player places is free
+   * instead (HORDE_FREE_TURRETS in EngineConfig).
+   */
   startingTurrets: number;
+  /** Gold each human gets when the horde starts, for a first few walls. */
+  startingGold: number;
+  /**
+   * Free land within this many tiles of each human HQ is theirs when the
+   * horde starts, so the game opens on a sizeable neighbourhood.
+   */
+  startingRadius: number;
   /**
    * Ticks the structure set must stay unchanged before the flow field is
    * recomputed, so placing a row of walls costs one recompute, not one each.
@@ -285,7 +297,9 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   repairGoldPerHp: 1,
   hqHp: 50_000,
   wavesToWin: 10,
-  startingTurrets: 1,
+  startingTurrets: 0,
+  startingGold: 30_000,
+  startingRadius: 24,
   flowDebounce: 10,
   flowMaxDelay: 50,
   settleInterval: 10,
@@ -572,7 +586,7 @@ export class HordeExecution implements Execution {
         ticks,
         this.nextWaveTick - this.opts.waveCountdown,
       );
-      this.buildStartingTurrets();
+      this.giveStart();
     }
     this.scanStructures(ticks);
     this.planNextWave();
@@ -938,6 +952,20 @@ export class HordeExecution implements Execution {
     const x = Math.min(this.width - 1, map.x(tile) >> 1);
     const y = Math.min(this.height - 1, map.y(tile) >> 1);
     return y * this.width + x;
+  }
+
+  /**
+   * What every human starts the horde with: the land within
+   * `startingRadius` of their HQ, `startingGold`, and any starting turrets.
+   */
+  private giveStart(): void {
+    const mg = this.mg!;
+    for (const p of mg.players()) {
+      if (p.type() !== PlayerType.Human || !p.isAlive()) continue;
+      claimStartingLand(mg, p, this.opts.startingRadius);
+      if (this.opts.startingGold > 0) p.addGold(BigInt(this.opts.startingGold));
+    }
+    if (this.opts.startingTurrets > 0) this.buildStartingTurrets();
   }
 
   /**
@@ -2030,6 +2058,8 @@ const HordeOptionsSchema = z.object({
   hqHp: zInt(),
   wavesToWin: zInt(),
   startingTurrets: zInt(),
+  startingGold: zInt(),
+  startingRadius: zInt(),
   flowDebounce: zInt(),
   flowMaxDelay: zInt(),
   settleInterval: zInt(),
@@ -2193,7 +2223,7 @@ export function hordeOf(game: Game): HordeExecution | null {
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 16,
+  version: 17,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -2441,6 +2471,12 @@ export const HordeExecutionSnapshot = execSnapshotType({
         waveStartTick: d.nextWaveTick - waveInterval,
       };
     },
+    // 16 -> 17: a bigger start. Old games have long since started, so
+    // they get no land or gold now.
+    16: (d) => ({
+      ...d,
+      options: { ...d.options, startingGold: 0, startingRadius: 0 },
+    }),
   },
   cls: () => HordeExecution,
 });

@@ -17,7 +17,10 @@ import { HordeOptions } from "./HordeExecution";
  * match. See "Neighbourhood scale" in docs/zfront/spike-plan.md.
  */
 export const TOWN_HORDE_OPTIONS: Partial<HordeOptions> = {
-  firstWaveSize: 300,
+  firstWaveSize: 150,
+  // Packed crowds make a bigger wave press harder, so growth bites: about
+  // 4,300 on wave 10.
+  waveGrowthPercent: 45,
   emitRate: 4,
   elitePoints: 10,
   minSpawnDistance: 40,
@@ -26,10 +29,12 @@ export const TOWN_HORDE_OPTIONS: Partial<HordeOptions> = {
   // 240-420 m away, beyond the settled land.
   inlandSpawns: 1,
   maxElites: 40,
-  shamblerSpeed: 5,
-  eliteSpeed: 4,
+  shamblerSpeed: 3,
+  eliteSpeed: 2,
   elitePressure: 4,
-  cellCap: 12,
+  // Packed crowds that move: a turret or two can't hold a street on their
+  // own, so bigger waves press harder (see "Town balance" in spike-plan.md).
+  cellCap: 40,
   turretRange: TOWN_TURRET_RANGE,
   turretKillsPerTick: 2,
   turretFireInterval: 6,
@@ -58,7 +63,9 @@ export const TOWN_HORDE_OPTIONS: Partial<HordeOptions> = {
   mineRadius: 3,
   mineTrigger: 6,
   mineKills: 40,
-  settleRadius: 40,
+  // The game opens on a whole neighbourhood, 180 m across each way.
+  startingRadius: 60,
+  settleRadius: 60,
   settleRadiusPerWave: 4,
   settleCost: 20,
   refugeesPerWave: 2_000,
