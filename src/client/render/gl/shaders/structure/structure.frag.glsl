@@ -26,6 +26,10 @@ uniform float uIconAlpha;       // global multiplier on final icon alpha
 uniform vec3  uIconColor;       // color of the inner icon glyph (was white)
 uniform float uIconDarken;      // >0: glyph = darkened player color instead of uIconColor
 uniform float uLocalPlayerID;
+// zfront: pixel-art sprites. Row 0 of the atlas is the colour, row 1 the
+// owner mask (red = brightness of the owner's colour, 128 = as is).
+uniform sampler2D uSprites;
+uniform vec2 uSpriteTexSize;
 
 in vec2  vLocalPos;
 in vec2  vAtlasUV;
@@ -35,6 +39,8 @@ flat in float vMarkedForDeletion;
 flat in float vZoom;
 flat in float vAtlasIdx;
 flat in float vShapeScale;
+flat in float vSprite;
+in vec2 vSpriteUV;
 
 out vec4 fragColor;
 
@@ -129,7 +135,64 @@ float shapeSDF(vec2 p, float R) {
   return sdPolygon(p, R, 3.0, PI * 0.5);      // Missile Silo → triangle (vertex up)
 }
 
+// Sharp sampling for pixel art drawn at a non-whole scale: each art pixel
+// stays a flat square, with only a one-screen-pixel blend at its edges, so
+// the sprite neither blurs nor shimmers as the camera moves.
+vec2 sharpUV(vec2 uv) {
+  vec2 texel = uv * uSpriteTexSize;
+  vec2 seam = floor(texel + 0.5);
+  vec2 dudv = max(fwidth(texel), vec2(1e-4));
+  texel = seam + clamp((texel - seam) / dudv, -0.5, 0.5);
+  return texel / uSpriteTexSize;
+}
+
+vec3 ownerColor() {
+  if (uAltView != 0)
+    return texelFetch(uAffiliation, ivec2(int(vOwnerID), 1), 0).rgb;
+  float u = (vOwnerID + 0.5) / float(PALETTE_SIZE);
+  return texture(uPalette, vec2(u, 0.25)).rgb;
+}
+
+void drawSprite() {
+  vec2 uv = sharpUV(vSpriteUV);
+  vec4 c = texture(uSprites, uv);
+  if (c.a < 0.02) discard;
+  vec3 rgb = c.rgb / c.a; // the atlas is premultiplied for clean edges
+  vec4 m = texture(uSprites, uv + vec2(0.0, 0.5));
+  if (m.a > 0.0) {
+    float shade = (m.r / m.a) * 255.0 / 128.0;
+    rgb = mix(rgb, clamp(ownerColor() * shade, 0.0, 1.0), m.a);
+  }
+  if (vUnderConstruction > 0.5) {
+    // Greyed out under diagonal scaffold hatching, one art pixel wide.
+    float lum = dot(rgb, vec3(0.299, 0.587, 0.114));
+    rgb = mix(rgb, vec3(lum * 0.9 + 0.12), 0.8);
+    vec2 t = floor(vSpriteUV * uSpriteTexSize);
+    if (mod(t.x + t.y, 5.0) < 1.0) rgb *= 0.72;
+  }
+  if (vMarkedForDeletion > 0.5) {
+    float fw = fwidth(vLocalPos.x);
+    float d1 = abs(vLocalPos.x - vLocalPos.y) * 0.7071;
+    float d2 = abs(vLocalPos.x + vLocalPos.y) * 0.7071;
+    float lineW = max(0.025, fw * 1.5);
+    float xLine = 1.0 - smoothstep(lineW - fw, lineW + fw, min(d1, d2));
+    xLine *= 1.0 - smoothstep(0.3, 0.32, length(vLocalPos));
+    rgb = mix(rgb, vec3(1.0, 0.25, 0.25), xLine * 0.95);
+  }
+  // Ghost tint, as for badges.
+  float tintActive = step(0.01, dot(uOutlineColor, uOutlineColor));
+  rgb = mix(rgb, uOutlineColor, tintActive * 0.5);
+  float a = c.a * uGhostAlpha * uIconAlpha;
+  if (uHighlightMask != 0 && (uHighlightMask & (1 << int(vAtlasIdx + 0.5))) == 0)
+    a *= uHighlightDimAlpha;
+  fragColor = vec4(rgb, a);
+}
+
 void main() {
+  if (vSprite > 0.5) {
+    drawSprite();
+    return;
+  }
   float dist = length(vLocalPos);
   float radius = 0.45;
   float borderWidth = 0.06 / vShapeScale;

@@ -216,6 +216,8 @@ export function buildTree(s: RenderSettings, d: RenderSettings): DebugNode[] {
     folder("Structure", [
       slider(s.structure, "iconSize", d.structure, 10, 100, 1),
       slider(s.structure, "dotsZoomThreshold", d.structure, 0.1, 2, 0.05),
+      slider(s.structure, "spriteZoom", d.structure, 0.5, 10, 0.1),
+      slider(s.structure, "spriteScale", d.structure, 0.5, 3, 0.05),
       slider(
         s.structure,
         "iconScaleFactorZoomedOut",

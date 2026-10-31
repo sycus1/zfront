@@ -15,8 +15,14 @@ uniform float uDotsThreshold;
 uniform float uDotScale;
 uniform float uScaleFactor;
 uniform float uIconGrowZoom;
-uniform float uShapeScales[ATLAS_COLS];
-uniform float uIconFills[ATLAS_COLS];
+uniform float uShapeScales[SPRITE_COLS];
+uniform float uIconFills[SPRITE_COLS];
+// zfront: pixel-art sprites (building-sprites.png, SPRITE_COLS frames) from
+// uSpriteZoom up, for the columns set in uSpriteMask. Column HQ_COL is the
+// HQ, which has a sprite and no badge.
+uniform float uSpriteZoom;
+uniform float uSpriteScale;
+uniform int uSpriteMask;
 
 out vec2  vLocalPos;
 out vec2  vAtlasUV;
@@ -26,6 +32,8 @@ flat out float vMarkedForDeletion;
 flat out float vZoom;
 flat out float vAtlasIdx;
 flat out float vShapeScale;
+flat out float vSprite;     // 1 = drawn as a sprite, 0 = as a badge
+out vec2  vSpriteUV;        // colour frame; the owner mask is 0.5 below
 
 void main() {
   float worldX = aInst0.x;
@@ -49,7 +57,15 @@ void main() {
   }
 
   int shapeIdx = int(aInst1.x);
-  float shapeScale = uShapeScales[shapeIdx];
+  bool sprite = uZoom >= uSpriteZoom && (uSpriteMask & (1 << shapeIdx)) != 0;
+  vSprite = sprite ? 1.0 : 0.0;
+  vSpriteUV = vec2((aInst1.x + aPos.x) / float(SPRITE_COLS), aPos.y * 0.5);
+  if (!sprite && shapeIdx == HQ_COL) {
+    // The HQ has no badge: zoomed out, collapse it to nothing.
+    gl_Position = vec4(2.0, 2.0, 0.0, 1.0);
+    return;
+  }
+  float shapeScale = sprite ? uSpriteScale : uShapeScales[shapeIdx];
   vShapeScale = shapeScale;
 
   float halfSize = uIconSize * iconScale * 0.5 / uZoom * shapeScale;
