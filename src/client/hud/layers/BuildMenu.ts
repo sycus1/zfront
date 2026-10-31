@@ -489,9 +489,15 @@ export class BuildMenu extends LitElement implements Controller {
                       }</span
                     >
                     <span class="build-cost" translate="no">
-                      ${renderNumber(
-                        this.game && this.game.myPlayer() ? this.cost(item) : 0,
-                      )}
+                      ${
+                        this.game?.myPlayer() && this.cost(item) === 0n
+                          ? translateText("build_menu.free")
+                          : renderNumber(
+                              this.game && this.game.myPlayer()
+                                ? this.cost(item)
+                                : 0,
+                            )
+                      }
                       <img
                         src=${goldCoinIcon}
                         alt="gold"

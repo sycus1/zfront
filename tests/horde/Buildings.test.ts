@@ -20,6 +20,9 @@ import { expectSnapshotRoundTrip } from "../util/Snapshot";
 // The "plains" test map is 100x100 tiles of passable plains (50x50 coarse
 // cells), so waves come ashore along the map edges.
 const WAVES: Partial<HordeOptions> = {
+  // No head start: these tests count gold and land from zero.
+  startingGold: 0,
+  startingRadius: 0,
   firstWaveDelay: 1,
   maxWaveTicks: 1_000,
   firstWaveSize: 4_000,
@@ -38,6 +41,9 @@ const WAVES: Partial<HordeOptions> = {
 };
 
 const QUIET: Partial<HordeOptions> = {
+  // No head start: these tests count gold and land from zero.
+  startingGold: 0,
+  startingRadius: 0,
   firstWaveDelay: 10_000,
   hqIncome: 0,
   flowDebounce: 0,

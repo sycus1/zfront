@@ -128,6 +128,36 @@ export function settle(
   return claimed;
 }
 
+/**
+ * Gives `player` every free tile of open land within `radius` tiles of
+ * their HQ, as the start of a horde game. Returns the tiles claimed.
+ */
+export function claimStartingLand(
+  game: Game,
+  player: Player,
+  radius: number,
+): number {
+  const hq = player.spawnTile();
+  if (hq === undefined || radius <= 0) return 0;
+  const map = game.map();
+  const hx = map.x(hq);
+  const hy = map.y(hq);
+  let claimed = 0;
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      if (dx * dx + dy * dy > radius * radius) continue;
+      const x = hx + dx;
+      const y = hy + dy;
+      if (!map.isValidCoord(x, y)) continue;
+      const t = map.ref(x, y);
+      if (map.hasOwner(t) || !map.isLand(t) || map.isImpassable(t)) continue;
+      player.conquer(t);
+      claimed++;
+    }
+  }
+  return claimed;
+}
+
 /** Refugees who join every surviving human after wave `wave`. */
 export function welcomeRefugees(
   game: Game,

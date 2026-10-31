@@ -92,6 +92,9 @@ describe("wall links", () => {
 // No income, settling or free turret, so gold only moves when something
 // is built.
 const QUIET: Partial<HordeOptions> = {
+  // No head start: these tests count gold and land from zero.
+  startingGold: 0,
+  startingRadius: 0,
   firstWaveDelay: 10_000,
   hqIncome: 0,
   settleCost: 0,

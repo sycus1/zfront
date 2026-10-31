@@ -402,6 +402,27 @@ _2026-10-31._ Dan found the game was constant waves with no breathing space to b
 
 Lincolnshire games are the long ones: its waves come a long way and some hit the 5-minute stall limit. On Bath every defended strategy won with the HQ untouched both before and after, at any growth from 35% to 55%, so the town numbers need their own pass; the game there goes from 13.5 minutes to 35-45.
 
+## Town balance and a bigger start
+
+_2026-10-31._ On town maps every defended strategy won with the HQ untouched, whatever the wave growth. A probe of a Bath game showed why: after wave 1 no zombie got within 24 to 30 coarse cells of the HQ. With cells of at most 12 stepping every 5 ticks, each cell of crowd front fed in about 1.2 zombies a tick, and one level-1 turret kills 0.33 a tick, so a few turrets held a street indefinitely. Wave size never mattered: bigger waves only took longer and paid more bounty. (On Britannia a front cell feeds about 333 a tick against a turret's 8.) A smaller kill bounty, cells of 30, waves from every side and slower turret fire all changed nothing.
+
+- **Town crowds.** `cellCap` 12 → 40, `shamblerSpeed` 5 → 3 (elites 4 → 2, still quicker), so a front cell feeds about 6.7 a tick and wave size counts again. `firstWaveSize` 300 → 150 and town `waveGrowthPercent` 45 (about 4,300 on wave 10).
+- **Bigger start.** Each human owns the free land within `startingRadius` of the HQ when the horde starts: 60 tiles (180 m) on towns, 24 on continent maps. The town settle disc starts at 60 too, so settlers carry on from its edge.
+- **Free turret, placed by the player.** No turret is built automatically any more (`startingTurrets` 0). Instead a player's first turret costs nothing (`HORDE_FREE_TURRETS` in `EngineConfig`), and the build bar and menu show "Free".
+- **Starting gold.** `startingGold` 30,000 when the horde starts, enough for a few walls.
+- Horde snapshot version 17 (older games get no land or gold).
+
+`balance:horde -- --zone 0`:
+
+| Map       | `none`       | `turrets`    | `fort`        | `spans`      | `scavenge`    | `mortars`    |
+| --------- | ------------ | ------------ | ------------- | ------------ | ------------- | ------------ |
+| Bath      | lost, wave 1 | won          | won (84% HQ)  | won          | won           | won          |
+| Sheffield | lost, wave 1 | won          | won           | won          | lost, wave 10 | lost, wave 9 |
+| Whitby    | lost, wave 1 | lost, wave 9 | lost, wave 10 | lost, wave 9 | lost, wave 1  | lost, wave 9 |
+| Britannia | lost, wave 1 | 3 of 5 won   | 5 of 5 won    | 5 of 5 won   | 3 of 5 won    | 4 of 5 won   |
+
+Town growth 50% was too hard (Bath 2 of 5 wins, Sheffield 1, Whitby 0) and 40-ish too easy on Bath, so the towns now differ more from each other than the numbers do: per-map difficulty is a follow-up. The HQ still tends to go from full health to fallen within one wave once the horde reaches it. The scripted `scavenge` player loses wave 1 on Whitby because it builds depots before its free turret.
+
 ## Prerequisites
 
 - npm 12.1 or later. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`. The machine currently has npm 11.19.
