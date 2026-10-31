@@ -314,12 +314,15 @@ async function main(): Promise<void> {
   );
   runner.init();
 
-  // zfront: one full-size wave every minute, all elites in the first one.
+  // zfront: a full-size wave every minute at most (sooner if one is
+  // cleared, with no downtime), all elites in the first one.
   const horde =
     opts.hordeSize > 0
       ? new HordeExecution({
           firstWaveDelay: 50,
-          waveInterval: 600,
+          downtimeTicks: 0,
+          waveCountdown: 0,
+          maxWaveTicks: 600,
           firstWaveSize: opts.hordeSize,
           waveGrowthPercent: 0,
           emittersPerWave: 16,

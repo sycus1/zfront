@@ -50,10 +50,20 @@ export interface HordeFrame {
   hqHp: number;
   hqMaxHp: number;
   /**
-   * Ticks until the next wave starts, or until the win once every wave has
-   * started; -1 once the game is over.
+   * Ticks until the next wave starts (downtime and countdown together);
+   * -1 while the wave under way has to be cleared first, and once the game
+   * is over.
    */
   nextWaveIn: number;
+  /**
+   * The wave under way has to be cleared before the downtime (and then the
+   * next wave's countdown) starts.
+   */
+  clearing: boolean;
+  /** While clearing: zombies still to kill (or to spawn) for the clear. */
+  clearLeft: number;
+  /** Ticks of downtime left before the countdown starts; 0 in the countdown. */
+  downtimeIn: number;
   /** The announced next wave's number, or 0 when no wave is left. */
   nextWave: number;
   nextWaveShamblers: number;

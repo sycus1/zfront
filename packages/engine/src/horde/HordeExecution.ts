@@ -86,7 +86,19 @@ export interface HordeOptions
     MortarOptions {
   /** Ticks from the end of the spawn phase to the first wave. */
   firstWaveDelay: number;
-  waveInterval: number;
+  /**
+   * Build time after a wave is cleared, in ticks. The next wave's countdown
+   * only starts once the wave under way is cleared and this has run out.
+   */
+  downtimeTicks: number;
+  /** The countdown to the next wave that follows the downtime, in ticks. */
+  waveCountdown: number;
+  /**
+   * A wave that still isn't cleared this long after it started is treated
+   * as outlasted and the downtime starts anyway, so stragglers stuck out of
+   * reach can't stall the game; 0 waits for the clear however long it takes.
+   */
+  maxWaveTicks: number;
   /** Points for the first wave: one per shambler, `elitePoints` per elite. */
   firstWaveSize: number;
   /** Each wave's budget is this many percent bigger than the last. */
@@ -176,17 +188,23 @@ export interface HordeOptions
 }
 
 // MVP defaults, tuned with `npm run balance:horde` (see "MVP: balance",
-// "MVP: defences" and "MVP: economy" in docs/zfront/spike-plan.md): a minute
-// to build before the first wave of 2,500, a wave every 75 seconds growing
-// by 35% to about 37k on wave 10, coming ashore 30 to 60 coarse cells out,
+// "MVP: defences", "MVP: economy" and "Downtime between waves" in
+// docs/zfront/spike-plan.md): a minute to build before the first wave of
+// 2,500; once a wave is cleared, DOWNTIME of build time and then a
+// 30-second countdown to the next, each 35% bigger, to about 37k on wave 10, coming ashore 30 to 60 coarse cells out,
 // and shamblers that walk a coarse cell every 3 ticks. Gold comes from the
 // HQ, turret kills, cleared waves and supply crates the player loots (see
 // "Supply drops" in docs/zfront/spike-plan.md). An undefended HQ falls on
 // wave 2 or 3; a ring of upgraded turrets wins, and mortars ("Mortars"
 // there) help it win with more HQ left.
+/** Build time after each cleared wave: 90 seconds. */
+const DOWNTIME_TICKS = 900;
+
 export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   firstWaveDelay: 600,
-  waveInterval: 750,
+  downtimeTicks: DOWNTIME_TICKS,
+  waveCountdown: 300,
+  maxWaveTicks: 3_000,
   firstWaveSize: 2_500,
   waveGrowthPercent: 35,
   emittersPerWave: 8,
@@ -399,7 +417,15 @@ export class HordeExecution implements Execution {
   /** The wave under way (or last started), and the one announced next. */
   private currentPlan: WavePlan | null = null;
   private nextPlan: WavePlan | null = null;
-  private nextWaveTick = -1;
+  /**
+   * When the next wave starts: NOT_STARTED before the first tick, and
+   * WAITING_FOR_CLEAR while the wave under way holds up the downtime.
+   */
+  private nextWaveTick = NOT_STARTED;
+  /** When the downtime ends and the countdown begins (-1 outside a break). */
+  private downtimeEndTick = -1;
+  /** When the wave under way started, for maxWaveTicks. */
+  private waveStartTick = -1;
   private ticks = 0;
   private emitterCells: number[] = [];
   private emitterRemaining: number[] = [];
@@ -532,21 +558,35 @@ export class HordeExecution implements Execution {
     // carry on past wavesToWin. Only a lost one stops.
     if (this.mg === null || this.outcome === "lost") return;
     this.ticks = ticks;
-    if (this.nextWaveTick < 0) {
+    if (this.nextWaveTick === NOT_STARTED) {
+      // The first break: firstWaveDelay in all, ending with the countdown.
       this.nextWaveTick = ticks + this.opts.firstWaveDelay;
+      this.downtimeEndTick = Math.max(
+        ticks,
+        this.nextWaveTick - this.opts.waveCountdown,
+      );
       this.buildStartingTurrets();
     }
     this.scanStructures(ticks);
     this.planNextWave();
-    if (ticks >= this.nextWaveTick) {
+    if (
+      this.nextWaveTick === WAITING_FOR_CLEAR &&
+      this.opts.maxWaveTicks > 0 &&
+      ticks - this.waveStartTick >= this.opts.maxWaveTicks
+    ) {
+      this.startBreak();
+    }
+    if (this.nextWaveTick !== WAITING_FOR_CLEAR && ticks >= this.nextWaveTick) {
       if (this.allWavesStarted()) {
-        // Victory. Play on: a break, then waves without end.
+        // Victory. Play on: a downtime, then waves without end.
         this.win();
-        this.nextWaveTick = ticks + this.opts.waveInterval;
+        this.startBreak();
         this.planNextWave();
       } else {
         this.startWave();
-        this.nextWaveTick = ticks + this.opts.waveInterval;
+        this.nextWaveTick = WAITING_FOR_CLEAR;
+        this.downtimeEndTick = -1;
+        this.waveStartTick = ticks;
         this.planNextWave();
       }
     }
@@ -650,6 +690,7 @@ export class HordeExecution implements Execution {
     if (caller.type() !== PlayerType.Human || !caller.isAlive()) return false;
     payCallEarlyBonus(this.mg!, this.opts, this.nextPlan!.wave, skipped);
     this.nextWaveTick = this.ticks;
+    this.downtimeEndTick = this.ticks;
     return true;
   }
 
@@ -716,6 +757,13 @@ export class HordeExecution implements Execution {
         this.outcome !== "lost" && this.nextWaveTick >= 0
           ? Math.max(0, this.nextWaveTick - this.ticks)
           : -1,
+      clearing:
+        this.outcome !== "lost" && this.nextWaveTick === WAITING_FOR_CLEAR,
+      clearLeft: this.clearLeft(),
+      downtimeIn:
+        this.outcome !== "lost" && this.downtimeEndTick >= 0
+          ? Math.max(0, this.downtimeEndTick - this.ticks)
+          : 0,
       nextWave: next?.wave ?? 0,
       nextWaveShamblers: next?.shamblers ?? 0,
       nextWaveElites: next?.elites ?? 0,
@@ -1366,7 +1414,36 @@ export class HordeExecution implements Execution {
         payClearBonus(this.mg!, this.opts, this.wave);
       }
       this.survived(this.wave);
+      if (this.nextWaveTick === WAITING_FOR_CLEAR) this.startBreak();
     }
+  }
+
+  /**
+   * Zombies still to kill (or still to spawn) before the wave under way
+   * counts as cleared; 0 when it is cleared or none is under way.
+   */
+  private clearLeft(): number {
+    const plan = this.currentPlan;
+    if (plan === null || this.nextWaveTick !== WAITING_FOR_CLEAR) return 0;
+    let left = this.field.total() + this.elites.count;
+    for (const n of this.emitterRemaining) left += n;
+    const allowed = Math.floor((plan.budget * this.opts.clearedPercent) / 100);
+    return Math.max(0, left - allowed);
+  }
+
+  /**
+   * The wave under way is over (cleared, or outlasted for maxWaveTicks):
+   * the downtime starts, then the countdown. After the last wave there's
+   * nothing to wait for, so the player wins on the next tick.
+   */
+  private startBreak(): void {
+    if (this.allWavesStarted()) {
+      this.downtimeEndTick = this.ticks;
+      this.nextWaveTick = this.ticks;
+      return;
+    }
+    this.downtimeEndTick = this.ticks + this.opts.downtimeTicks;
+    this.nextWaveTick = this.downtimeEndTick + this.opts.waveCountdown;
   }
 
   private survived(wave: number): void {
@@ -1725,6 +1802,8 @@ export class HordeExecution implements Execution {
       currentPlan: this.currentPlan,
       nextPlan: this.nextPlan,
       nextWaveTick: this.nextWaveTick,
+      downtimeEndTick: this.downtimeEndTick,
+      waveStartTick: this.waveStartTick,
       ticks: this.ticks,
       density:
         this.mg !== null ? this.field.density.slice() : new Uint16Array(),
@@ -1779,6 +1858,8 @@ export class HordeExecution implements Execution {
     this.currentPlan = s.currentPlan;
     this.nextPlan = s.nextPlan;
     this.nextWaveTick = s.nextWaveTick;
+    this.downtimeEndTick = s.downtimeEndTick;
+    this.waveStartTick = s.waveStartTick;
     this.ticks = s.ticks;
     this.killed = s.killed;
     this.structuresDestroyed = s.structuresDestroyed;
@@ -1922,7 +2003,9 @@ function discOffsets(
 
 const HordeOptionsSchema = z.object({
   firstWaveDelay: zInt(),
-  waveInterval: zInt(),
+  downtimeTicks: zInt(),
+  waveCountdown: zInt(),
+  maxWaveTicks: zInt(),
   firstWaveSize: zInt(),
   waveGrowthPercent: zInt(),
   emittersPerWave: zInt(),
@@ -2066,6 +2149,8 @@ const HordeStateSchema = z.object({
   currentPlan: WavePlanSchema.nullable(),
   nextPlan: WavePlanSchema.nullable(),
   nextWaveTick: zInt(),
+  downtimeEndTick: zInt(),
+  waveStartTick: zInt(),
   ticks: zInt(),
   density: zU16Array(),
   emitterCells: z.array(zInt()),
@@ -2121,6 +2206,11 @@ const CRATE_STRIDE = 5;
 
 const OUTCOMES: readonly HordeOutcome[] = ["playing", "won", "lost"];
 
+/** nextWaveTick before the horde's first tick. */
+const NOT_STARTED = -1;
+/** nextWaveTick while the wave under way has to be cleared first. */
+const WAITING_FOR_CLEAR = -2;
+
 /** The horde running in each game, for executions that act on it. */
 const HORDES = new WeakMap<Game, HordeExecution>();
 
@@ -2131,7 +2221,7 @@ export function hordeOf(game: Game): HordeExecution | null {
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 15,
+  version: 16,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -2362,6 +2452,23 @@ export const HordeExecutionSnapshot = execSnapshotType({
       ...d,
       options: { ...d.options, turretFireInterval: 1, inlandSpawns: 0 },
     }),
+    // 15 -> 16: downtime between waves. An old game's next wave keeps the
+    // tick it was due on, with no downtime marked before it; from then on
+    // it plays by the new rules, and a stall lasts its old wave interval.
+    15: (d) => {
+      const { waveInterval, ...options } = d.options;
+      return {
+        ...d,
+        options: {
+          ...options,
+          downtimeTicks: DOWNTIME_TICKS,
+          waveCountdown: 300,
+          maxWaveTicks: waveInterval,
+        },
+        downtimeEndTick: -1,
+        waveStartTick: d.nextWaveTick - waveInterval,
+      };
+    },
   },
   cls: () => HordeExecution,
 });

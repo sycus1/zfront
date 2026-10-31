@@ -104,7 +104,7 @@ const QUIET: Partial<HordeOptions> = { firstWaveDelay: 10_000 };
 
 const SMALL_WAVES: Partial<HordeOptions> = {
   firstWaveDelay: 1,
-  waveInterval: 200,
+  maxWaveTicks: 200,
   firstWaveSize: 4_000,
   emittersPerWave: 4,
   emitRate: 200,

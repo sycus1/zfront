@@ -130,7 +130,9 @@ describe("Settlement", () => {
     const horde = new HordeExecution({
       ...OPTS,
       firstWaveDelay: 1,
-      waveInterval: 50,
+      maxWaveTicks: 50,
+      downtimeTicks: 0,
+      waveCountdown: 0,
       firstWaveSize: 100,
       emittersPerWave: 1,
       elitesPerWave: 0,

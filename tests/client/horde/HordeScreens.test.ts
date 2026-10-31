@@ -40,6 +40,9 @@ function frame(overrides: Partial<HordeFrame> = {}): HordeFrame {
     hqHp: 15_000,
     hqMaxHp: 50_000,
     nextWaveIn: 230,
+    clearing: false,
+    clearLeft: 0,
+    downtimeIn: 0,
     nextWave: 5,
     nextWaveShamblers: 90_000,
     nextWaveElites: 120,
@@ -203,6 +206,52 @@ describe("calling the next wave", () => {
     await hud.updateComplete;
 
     expect(hud.querySelector("[data-horde-call]")).toBeNull();
+  });
+});
+
+describe("downtime between waves", () => {
+  async function render(status: HordeFrame): Promise<HordeHud> {
+    const hud = new HordeHud();
+    hud.game = hordeGame({ status });
+    document.body.append(hud);
+    hud.tick();
+    await hud.updateComplete;
+    return hud;
+  }
+
+  it("asks for the clear while the wave under way holds up the next", async () => {
+    const hud = await render(
+      frame({ clearing: true, clearLeft: 340, nextWaveIn: -1 }),
+    );
+    const clearing = hud.querySelector("[data-horde-clearing]");
+    expect(clearing?.textContent).toContain("horde_hud.clear_first");
+    // The next wave is still shown, with no countdown yet.
+    expect(hud.querySelector("[data-horde-next]")?.textContent).toContain(
+      "horde_hud.next_after_clear",
+    );
+    expect(hud.querySelector("[data-horde-downtime]")).toBeNull();
+  });
+
+  it("asks for the clear to win on the final wave", async () => {
+    const hud = await render(
+      frame({ clearing: true, clearLeft: 12, nextWaveIn: -1, nextWave: 0 }),
+    );
+    expect(hud.querySelector("[data-horde-clearing]")?.textContent).toContain(
+      "horde_hud.clear_to_win",
+    );
+  });
+
+  it("shows the build time left, then just the countdown", async () => {
+    const building = await render(frame({ downtimeIn: 600, nextWaveIn: 900 }));
+    expect(
+      building.querySelector("[data-horde-downtime]")?.textContent,
+    ).toContain("horde_hud.build_time");
+    expect(building.querySelector("[data-horde-clearing]")).toBeNull();
+    const counting = await render(frame({ downtimeIn: 0, nextWaveIn: 200 }));
+    expect(counting.querySelector("[data-horde-downtime]")).toBeNull();
+    expect(counting.querySelector("[data-horde-next]")?.textContent).toContain(
+      "horde_hud.next_wave",
+    );
   });
 });
 
