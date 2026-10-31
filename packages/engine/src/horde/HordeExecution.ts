@@ -190,9 +190,10 @@ export interface HordeOptions
 // MVP defaults, tuned with `npm run balance:horde` (see "MVP: balance",
 // "MVP: defences", "MVP: economy" and "Downtime between waves" in
 // docs/zfront/spike-plan.md): a minute to build before the first wave of
-// 2,500; once a wave is cleared, DOWNTIME of build time and then a
-// 30-second countdown to the next, each 35% bigger, to about 37k on wave 10, coming ashore 30 to 60 coarse cells out,
-// and shamblers that walk a coarse cell every 3 ticks. Gold comes from the
+// 2,500. Once a wave is cleared there are 90 seconds to build, then a
+// 30-second countdown to the next, each 40% bigger, to about 52k on wave
+// 10, coming ashore 30 to 60 coarse cells out, and shamblers that walk a
+// coarse cell every 3 ticks. Gold comes from the
 // HQ, turret kills, cleared waves and supply crates the player loots (see
 // "Supply drops" in docs/zfront/spike-plan.md). An undefended HQ falls on
 // wave 2 or 3; a ring of upgraded turrets wins, and mortars ("Mortars"
@@ -206,7 +207,7 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   waveCountdown: 300,
   maxWaveTicks: 3_000,
   firstWaveSize: 2_500,
-  waveGrowthPercent: 35,
+  waveGrowthPercent: 40,
   emittersPerWave: 8,
   emitRate: 200,
   elitesPerWave: 2,
