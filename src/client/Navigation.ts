@@ -1,25 +1,8 @@
 import { loadModal } from "./LazyModals";
 
-export function closeMobileSidebar() {
-  const sidebar = document.getElementById("sidebar-menu");
-  const backdrop = document.getElementById("mobile-menu-backdrop");
-  if (sidebar?.classList.contains("open")) {
-    sidebar.classList.remove("open");
-    backdrop?.classList.remove("open");
-    document.documentElement.classList.remove("overflow-hidden");
-    sidebar.setAttribute("aria-hidden", "true");
-    backdrop?.setAttribute("aria-hidden", "true");
-    const hb = document.getElementById("hamburger-btn");
-    if (hb) hb.setAttribute("aria-expanded", "false");
-  }
-}
-
 export function initNavigation() {
   const showPage = (pageId: string) => {
     window.currentPageId = pageId;
-
-    // Close mobile sidebar if a nav item was clicked
-    closeMobileSidebar();
 
     // Close the currently visible modal properly
     const visibleModal = document.querySelector(".page-content:not(.hidden)");

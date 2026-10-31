@@ -1,8 +1,14 @@
-import { assetUrl } from "@openfront/shared/AssetUrls";
 import { LitElement, html } from "lit";
 import { customElement } from "lit/decorators.js";
 import { currentGameVersion } from "../GameVersion";
+import { translateText } from "../Utils";
 
+/**
+ * The Night Shift footer on every menu screen. It carries the licence line
+ * "© OpenFront and Contributors · AGPL-3.0", which the AGPL Section 7 terms in
+ * LICENSE require to stay visible, so it must never be dropped or hidden on a
+ * menu page.
+ */
 @customElement("page-footer")
 export class Footer extends LitElement {
   // Per instance, not at module scope: currentGameVersion reads
@@ -16,62 +22,45 @@ export class Footer extends LitElement {
 
   render() {
     return html`
-      <footer
-        class="[.in-game_&]:hidden bg-zinc-900/90 backdrop-blur-md flex flex-col items-center justify-center gap-1 pt-1 pb-3 text-white/50 w-full border-t border-white/10 shrink-0 relative z-50 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center lg:gap-0"
-      >
-        <!-- Icons and legal links stay centred on the bar; on desktop they
-             share it with the language selector. -->
-        <div
-          class="flex w-full flex-col items-center gap-1 lg:col-start-2 lg:w-auto"
-        >
-          <div
-            class="flex items-center justify-center gap-4 lg:gap-6 pt-2 w-full relative"
+      <footer class="zf-footer [.in-game_&]:hidden relative z-50">
+        <p class="m-0 flex flex-wrap items-center gap-x-2">
+          <span>${translateText("main.licence_notice")}</span>
+          <span aria-hidden="true">·</span>
+          <span>${translateText("main.alpha")}</span>
+          <span class="footer-version font-zf-data text-xs text-zf-muted-300"
+            >${this.gameVersion}</span
           >
+        </p>
+        <div class="flex flex-wrap items-center gap-x-5 gap-y-1">
+          <nav
+            class="flex flex-wrap gap-x-5 gap-y-1"
+            aria-label=${translateText("main.legal")}
+          >
+            <a href="/privacy-policy.html" target="_blank"
+              >${translateText("main.privacy_policy")}</a
+            >
+            <a href="/terms-of-service.html" target="_blank"
+              >${translateText("main.terms_of_service")}</a
+            >
+            <button
+              type="button"
+              class="nav-menu-item"
+              data-page="page-troubleshooting"
+            >
+              ${translateText("main.troubleshooting")}
+            </button>
             <a
               href="https://github.com/sycus1/zfront"
               target="_blank"
               rel="noopener noreferrer"
-              class="opacity-60 hover:opacity-100 hover:scale-110 transition-all"
+              >${translateText("main.github")}</a
             >
-              <img
-                src=${assetUrl("icons/github-mark-white.svg")}
-                data-i18n-alt="main.github"
-                class="h-6 w-6 lg:h-7 lg:w-7 object-contain pointer-events-none"
-                draggable="false"
-              />
-            </a>
-          </div>
-          <!-- The nav bar shows the game version alone so it reads the same
-               across web and Steam; the full string, shell version included,
-               lives down here where a player can quote it in a bug report. -->
-          <div class="footer-version text-xs mt-1 lg:mt-2 text-center px-4">
-            ${this.gameVersion}
-          </div>
-          <div
-            class="text-xs mt-1 lg:mt-2 flex items-center justify-center gap-4 px-4"
-          >
-            <a
-              href="/terms-of-service.html"
-              data-i18n="main.terms_of_service"
-              target="_blank"
-              class="hover:text-white transition-colors"
-            ></a>
-            <span data-i18n="main.copyright"></span>
-            <a
-              href="/privacy-policy.html"
-              data-i18n="main.privacy_policy"
-              target="_blank"
-              class="hover:text-white transition-colors"
-            ></a>
-          </div>
+          </nav>
+          <!-- Single instance: translateText() resolves the active language
+               via document.querySelector("lang-selector"), so a second one
+               would shadow it. -->
+          <lang-selector></lang-selector>
         </div>
-
-        <!-- Single instance: translateText() resolves the active language via
-             document.querySelector("lang-selector"), so a second one would
-             shadow it. -->
-        <lang-selector
-          class="absolute right-4 top-3 lg:top-1/2 lg:-translate-y-1/2"
-        ></lang-selector>
       </footer>
     `;
   }

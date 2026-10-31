@@ -1,4 +1,3 @@
-import { assetUrl } from "@openfront/shared/AssetUrls";
 import { EventBus } from "@openfront/shared/EventBus";
 import { toWireGameStartInfo } from "@openfront/shared/SharedUtil";
 import {
@@ -7,7 +6,6 @@ import {
   PublicGameInfo,
   WireGameStartInfo,
 } from "@openfront/shared/WireSchemas";
-import { renderNavVersion } from "src/client/GameVersion";
 import type { JoinLobbyResult } from "./ClientGameRunner";
 import { loadGameClient, prefetchGameClient } from "./GameClientLoader";
 // The class is used as a type; retain this for registration.
@@ -21,7 +19,6 @@ import { showInGameConfirm } from "./InGameModal";
 // oxlint-disable-next-line import/no-duplicates -- Required custom-element registration.
 import "./LangSelector";
 import { LangSelector } from "./LangSelector";
-import { initLayout } from "./Layout";
 import { loadModal, prefetchModals, whenModalLoaded } from "./LazyModals";
 import {
   hideMenuChrome,
@@ -54,11 +51,10 @@ import {
   translateText,
 } from "./Utils";
 
-import "./components/DesktopNavBar";
 import "./components/Footer";
 import "./components/MainLayout";
-import "./components/MobileNavBar";
 import "./components/PlayPage";
+import "./components/nightshift/LiveFeedBackdrop";
 import "./components/baseComponents/Button";
 import "./components/baseComponents/Modal";
 import "./styles.css";
@@ -170,21 +166,6 @@ class Client {
       tag: "troubleshooting-modal",
       pageId: "page-troubleshooting",
     });
-
-    // Wait for components to render before setting version
-    await customElements.whenDefined("mobile-nav-bar");
-    await customElements.whenDefined("desktop-nav-bar");
-
-    const openFrontFont = new FontFace(
-      "OpenFront",
-      `url(${assetUrl("fonts/OpenFront.ttf")})`,
-    );
-    document.fonts.add(openFrontFont);
-    openFrontFont.load().catch(() => {});
-
-    if (renderNavVersion() === 0) {
-      console.warn("Game version element not found");
-    }
 
     const langSelector = document.querySelector(
       "lang-selector",
@@ -522,7 +503,6 @@ const bootstrap = () => {
   // of the map. See issue #5098.
   installCtrlWheelZoomBlocker();
 
-  initLayout();
   new Client().initialize();
   initNavigation();
   prefetchGameClient();

@@ -672,19 +672,24 @@
     "warships": "Warships"
   },
   "main": {
-    "copyright": "© OpenFront™ and Contributors",
+    "alpha": "zfront Alpha",
     "github": "GitHub",
     "go_to_troubleshooting": "Go to our troubleshooting page",
     "help": "Help",
+    "legal": "Legal",
+    "licence_notice": "© OpenFront and Contributors · AGPL-3.0",
+    "logo_alt": "zfront",
     "menu": "Menu",
     "play": "Play",
+    "play_solo": "PLAY SOLO",
     "privacy_policy": "Privacy Policy",
     "settings": "Settings",
     "solo": "Solo",
     "terms_of_service": "Terms of Service",
     "title": "zFront (ALPHA)",
     "troubleshooting": "Troubleshooting",
-    "tutorial": "Tutorial"
+    "tutorial": "Tutorial",
+    "your_name": "Your Name"
   },
   "map": {
     "all": "All",
@@ -1109,8 +1114,6 @@
     "graphics_refresh_modifier_desc": "Hold this key and {key} to refresh graphics",
     "ground_attack": "Ground Attack",
     "ground_attack_desc": "Send a ground attack to the tile under your cursor.",
-    "halloween_theme_desc": "Show the Halloween look on the home page.",
-    "halloween_theme_label": "Halloween Theme",
     "help_messages_desc": "Show contextual tips and warnings during gameplay, such as army limit warnings and general gameplay advice.",
     "help_messages_label": "Help Messages",
     "highlight_glow_strength_label": "Highlight strength",

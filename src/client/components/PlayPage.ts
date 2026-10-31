@@ -1,7 +1,22 @@
+import { assetUrl } from "@openfront/shared/AssetUrls";
 import { LitElement, html } from "lit";
 import { customElement } from "lit/decorators.js";
-import "./NavUtilityIcons";
+import { translateText } from "../Utils";
+import "./IOSAddToHomeScreenBanner";
 
+/**
+ * The main menu (Night Shift, "B2 Live Feed"): the wordmark with the hazard
+ * stripe under it, and the yellow panel with the player's name, PLAY SOLO and
+ * the links to Tutorial, Settings and Help. The live feed behind it is
+ * <zf-live-feed> in index.html.
+ *
+ * Desktop: the wordmark and the panel side by side, the panel a cut tile.
+ * Phone (under 640px): the wordmark at the top, the panel full-bleed along the
+ * bottom with the links as three icon buttons.
+ *
+ * The wordmark's clear space is a quarter of its cap height, and the hazard
+ * stripe is the one element allowed that close (Logos README).
+ */
 @customElement("play-page")
 export class PlayPage extends LitElement {
   createRenderRoot() {
@@ -12,84 +27,41 @@ export class PlayPage extends LitElement {
     return html`
       <div
         id="page-play"
-        class="flex flex-col gap-2 w-full px-0 lg:px-4 min-h-0"
+        class="relative flex flex-1 flex-col w-full min-h-0 font-zf-body text-zf-signal-400
+          [--zf-logo-h:102px] sm:[--zf-logo-h:clamp(96px,15.2vw,224px)]
+          sm:flex-row sm:flex-wrap sm:items-start sm:gap-[clamp(24px,4vw,56px)]
+          sm:px-(--zf-gutter) sm:py-[clamp(24px,4vw,56px)]"
       >
-        <!-- Mobile: Fixed top bar -->
-        <div
-          class="lg:hidden fixed left-0 right-0 top-[var(--top-ad-height,0px)] z-40 pt-[env(safe-area-inset-top)] bg-surface border-b border-white/10"
+        <header
+          class="flex flex-col gap-[calc(var(--zf-logo-h)/4)] px-4 pt-7 sm:p-0 sm:flex-[999_1_560px] sm:min-w-0"
         >
+          <h1 class="m-0">
+            <img
+              src=${assetUrl("images/logo/zfront-wordmark.svg")}
+              alt=${translateText("main.logo_alt")}
+              class="block h-(--zf-logo-h) w-auto max-w-full"
+              draggable="false"
+            />
+          </h1>
           <div
-            class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center h-14 px-2 gap-2"
-          >
-            <button
-              id="hamburger-btn"
-              class="col-start-1 justify-self-start h-10 shrink-0 aspect-[4/3] flex text-white/90 rounded-md items-center justify-center transition-colors"
-              data-i18n-aria-label="main.menu"
-              aria-expanded="false"
-              aria-controls="sidebar-menu"
-              aria-haspopup="dialog"
-              data-i18n-title="main.menu"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke-width="1.5"
-                stroke="currentColor"
-                class="size-8"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-                />
-              </svg>
-            </button>
-
-            <div
-              class="col-start-2 flex items-center justify-center text-malibu-blue min-w-0"
-            >
-              <span class="text-2xl font-bold tracking-wider text-white"
-                >zFront</span
-              >
-            </div>
-
-            <!-- Right slot: bell, help and settings. -->
-            <div
-              class="col-start-3 justify-self-end shrink-0 flex items-center gap-0.5"
-            >
-              <nav-utility-icons size="mobile"></nav-utility-icons>
-            </div>
-          </div>
-        </div>
-
-        <!-- Top strip: the player's name. -->
-        <div
-          class="w-full pb-4 lg:pb-0 flex flex-col gap-4 sm:-mx-4 sm:w-[calc(100%+2rem)] lg:mx-0 lg:w-full lg:grid lg:grid-cols-1 lg:gap-4 lg:items-stretch"
-        >
-          <!-- Mobile: spacer for fixed top bar -->
-          <div
-            class="lg:hidden h-[calc(env(safe-area-inset-top)+56px)] -mb-4"
+            class="zf-hazard h-[14px] [--zf-stripe-step:12px] sm:h-[22px] sm:[--zf-stripe-step:18px] sm:max-w-[760px]"
+            aria-hidden="true"
           ></div>
+        </header>
 
-          <!-- Identity row. -->
-          <div class="flex flex-col gap-2 min-w-0">
-            <!-- Identity row: username over the currently selected cosmetic background. -->
-            <div
-              class="relative bg-surface border-y border-white/10 overflow-visible flex items-center sm:min-h-[60px] sm:flex-1 sm:z-20 sm:border-y-0 sm:rounded-xl"
-            >
-              <div
-                class="relative z-10 flex h-full w-full min-w-0 items-center bg-surface/80 p-1 sm:rounded-xl"
-              >
-                <username-input
-                  class="flex-1 min-w-0 h-10 sm:h-[50px]"
-                ></username-input>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ios-add-to-home-screen-banner
+          class="no-game-portal px-4 pt-4 sm:hidden [&:empty]:hidden"
+        ></ios-add-to-home-screen-banner>
 
-        <game-mode-selector></game-mode-selector>
+        <div class="flex-1 min-h-[160px] sm:hidden" aria-hidden="true"></div>
+
+        <section
+          aria-label=${translateText("main.play")}
+          class="zf-menu-panel zf-frame flex flex-col gap-3.5 px-4 py-5 sm:gap-5 sm:p-7 sm:flex-[1_1_340px] sm:max-w-[440px]"
+        >
+          <username-input class="relative block w-full"></username-input>
+          <game-mode-selector class="block"></game-mode-selector>
+        </section>
       </div>
     `;
   }

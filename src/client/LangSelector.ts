@@ -259,6 +259,8 @@ export class LangSelector extends LitElement {
       "settings-modal",
       "username-input",
       "game-mode-selector",
+      "play-page",
+      "page-footer",
       "graphics-preset-selector",
       "user-setting",
       "o-modal",
@@ -403,20 +405,24 @@ export class LangSelector extends LitElement {
           });
 
     return html`
-      <button
-        id="lang-selector"
-        title="Change Language"
-        @click=${this.openModal}
-        class="border-none bg-none cursor-pointer p-0 flex items-center justify-center transition-transform duration-200 hover:scale-[1.1] active:scale-[0.9] opacity-60 hover:opacity-100 w-[40px] h-[40px] lg:w-[56px] lg:h-[56px]"
-      >
-        <img
-          id="lang-flag"
-          class="object-contain pointer-events-none transition-all w-[40px] h-[40px] lg:w-[48px] lg:h-[48px]"
-          src=${assetUrl(`flags/${currentLang.svg}.svg`)}
-          alt="flag"
-          draggable="false"
-        />
-      </button>
+      <span class="zf-ring">
+        <button
+          id="lang-selector"
+          type="button"
+          title=${currentLang.native}
+          aria-label=${currentLang.native}
+          @click=${this.openModal}
+          class="zf-frame zf-sweep flex items-center justify-center w-11 h-11 cursor-pointer p-0 border-0 [--zf-border:var(--color-zf-signal-400)] [--zf-fill:transparent]"
+        >
+          <img
+            id="lang-flag"
+            class="object-contain pointer-events-none w-6 h-6"
+            src=${assetUrl(`flags/${currentLang.svg}.svg`)}
+            alt="flag"
+            draggable="false"
+          />
+        </button>
+      </span>
     `;
   }
 }

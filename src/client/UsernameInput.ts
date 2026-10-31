@@ -14,13 +14,7 @@ import {
 
 const usernameKey: string = "username";
 
-// `line-height: normal` because that is what an <input> uses for its editor
-// box.
-const NAME_BOX =
-  "min-w-0 flex-1 h-full max-h-[44px] rounded-lg bg-transparent px-2 sm:px-3";
-const NAME_TEXT =
-  "text-xl/[normal] sm:text-2xl/[normal] font-medium tracking-wider " +
-  "[text-shadow:0_1px_2px_rgba(0,0,0,0.9)]";
+const INPUT_ID = "username-field";
 
 /**
  * The local player's name. Stored in localStorage; a generated placeholder is
@@ -47,30 +41,38 @@ export class UsernameInput extends LitElement {
 
   render() {
     return html`
-      <div class="flex items-center w-full h-full gap-1.5 sm:gap-2">
-        <input
-          type="text"
-          .value=${this.baseUsername}
-          @input=${this.handleUsernameChange}
-          placeholder="${translateText("username.enter_username")}"
-          minlength="${MIN_USERNAME_LENGTH}"
-          maxlength="${MAX_USERNAME_LENGTH}"
-          aria-label=${translateText("username.enter_username")}
-          class="text-left text-white placeholder-white/50 transition-colors text-ellipsis hover:bg-white/5 focus:bg-white/5 focus:outline-none focus:ring-2 focus:ring-malibu-blue/60 ${NAME_BOX} ${NAME_TEXT}"
-        />
-      </div>
-      ${
-        this.validationError
-          ? html`<div class="absolute top-full left-0 z-50 w-full mt-1">
-              <div
+      <div class="flex flex-col gap-1.5 w-full">
+        <label for=${INPUT_ID} class="zf-tile-title"
+          >${translateText("main.your_name")}</label
+        >
+        <div class="zf-ring">
+          <input
+            id=${INPUT_ID}
+            type="text"
+            .value=${this.baseUsername}
+            @input=${this.handleUsernameChange}
+            placeholder="${translateText("username.enter_username")}"
+            minlength="${MIN_USERNAME_LENGTH}"
+            maxlength="${MAX_USERNAME_LENGTH}"
+            aria-invalid=${this.validationError ? "true" : "false"}
+            aria-describedby=${
+              this.validationError ? "username-validation-error" : ""
+            }
+            class="zf-frame zf-field text-ellipsis"
+          />
+        </div>
+        ${
+          this.validationError
+            ? html`<div
                 id="username-validation-error"
-                class="w-full px-3 py-2 text-sm font-medium border border-red-500/50 rounded-lg bg-red-900/90 text-red-200 backdrop-blur-md shadow-lg"
+                role="alert"
+                class="zf-frame zf-field-error"
               >
                 ${this.validationError}
-              </div>
-            </div>`
-          : null
-      }
+              </div>`
+            : null
+        }
+      </div>
     `;
   }
 

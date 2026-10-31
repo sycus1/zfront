@@ -9,6 +9,8 @@
     <title data-i18n="main.title">zFront (ALPHA)</title>
     <link rel="manifest" href="<%- manifestHref %>" />
     <link rel="icon" type="image/svg+xml" href="<%- faviconHref %>" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#111111" />
 
     <!-- Preload styles -->
     <style>
@@ -19,7 +21,7 @@
       html.preload {
         visibility: visible !important;
         opacity: 1 !important;
-        background-color: #111827 !important;
+        background-color: #111111 !important;
       }
 
       html.preload body {
@@ -134,91 +136,27 @@
       ) {
         document.documentElement.classList.add("desktop-shell");
       }
-      document.documentElement.style.setProperty(
-        "--background-image-url",
-        `url("<%- backgroundImageUrl %>")`,
-      );
-      document.documentElement.style.setProperty(
-        "--mobile-logo-image-url",
-        `url("<%- mobileLogoImageUrl %>")`,
-      );
     </script>
   </head>
 
   <body
-    class="select-none font-sans min-h-screen bg-neutral-800 transition-opacity duration-300 ease-in-out flex flex-row flex-wrap content-start"
+    class="select-none font-sans min-h-screen bg-zf-ink-900 transition-opacity duration-300 ease-in-out flex flex-row flex-wrap content-start"
   >
-    <script>
-      // Halloween theme (src/client/halloween.css), Oct 25 through Nov 1 local
-      // time. It recolors the desktop logo, which is otherwise left unset.
-      // The season marker lets the settings toggle (UserSettings.halloweenTheme,
-      // same key and default) restyle live without repeating the date check.
-      (() => {
-        const now = new Date();
-        const month = now.getMonth();
-        const day = now.getDate();
-        if ((month === 9 && day >= 25) || (month === 10 && day === 1)) {
-          document.body.dataset.halloweenSeason = "";
-          document.documentElement.style.setProperty(
-            "--desktop-logo-image-url",
-            `url("<%- desktopLogoImageUrl %>")`,
-          );
-          if (localStorage.getItem("settings.halloweenTheme") !== "false") {
-            document.body.classList.add("halloween-theme");
-          }
-        }
-      })();
-    </script>
-    <div id="hex-grid" class="fixed inset-0 -z-50 pointer-events-none">
-      <div
-        id="background-layer"
-        class="absolute inset-x-0 top-0 -bottom-[4cm] bg-cover opacity-30 [filter:brightness(1.0)] dark:[filter:sepia(0.2)_saturate(1.2)_hue-rotate(180deg)_brightness(0.9)]"
-        style="
-          background-image: var(--background-image-url);
-          background-position: center top;
-        "
-      ></div>
-      <div
-        class="absolute inset-0 bg-center bg-no-repeat bg-contain hidden lg:block"
-        style="background-image: var(--desktop-logo-image-url); opacity: 0.5"
-      ></div>
-      <div
-        class="absolute inset-0 bg-center bg-no-repeat bg-contain lg:hidden"
-        style="background-image: var(--mobile-logo-image-url); opacity: 0.5"
-      ></div>
-    </div>
-
-    <!-- LEFT SIDEBAR MENU -->
-
-    <div
-      id="mobile-menu-backdrop"
-      class="lg:hidden! in-[.in-game]:hidden hidden pointer-events-none [&.open]:block [&.open]:pointer-events-auto [&.open]:fixed [&.open]:inset-0 [&.open]:bg-black/60 [&.open]:z-[40000] transition-opacity"
-      role="presentation"
-      aria-hidden="true"
-    ></div>
-
-    <mobile-nav-bar
-      id="sidebar-menu"
-      class="peer [.in-game_&]:hidden z-[40001] fixed left-0 top-0 h-full flex flex-col justify-start overflow-visible bg-black/70 backdrop-blur-xl border-r border-white/10 transition-transform duration-500 ease-out transform -translate-x-full w-[70%] [&.open]:translate-x-0 lg:hidden"
-      role="dialog"
-      data-i18n-aria-label="main.menu"
-    ></mobile-nav-bar>
+    <!-- The main menu's live feed (Night Shift). Hidden, and so paused,
+         during a match. -->
+    <zf-live-feed
+      class="fixed inset-0 -z-50 in-[.in-game]:hidden"
+    ></zf-live-feed>
 
     <!-- MAIN CONTENT AREA -->
     <div
       class="in-[.in-game]:hidden flex-1 basis-full min-w-0 min-h-dvh in-[.page-open]:min-h-0 in-[.page-open]:overflow-hidden relative pt-[var(--top-ad-pad,0px)] in-[.page-open]:pt-[var(--top-ad-height,0px)] transition-[margin] duration-500 ease-out will-change-[margin-left] flex flex-col"
     >
-      <!-- Desktop Top Bar (sticky so it stays visible while the page scrolls,
-           offset below the header ad when one is showing; static while an
-           inline page is open, when the content area is padded below the ad
-           instead and nothing scrolls) -->
-      <desktop-nav-bar
-        class="sticky top-[var(--top-ad-height,0px)] z-[60] in-[.page-open]:static"
-      ></desktop-nav-bar>
-
       <!-- Main container with responsive padding -->
-      <main-layout class="contents">
-        <play-page class="contents"></play-page>
+      <play-page class="contents"></play-page>
+      <!-- The inline pages. Shown only while one is open (body.page-open):
+           the main menu takes the full width on its own. -->
+      <main-layout class="hidden in-[.page-open]:contents">
         <single-player-modal
           id="page-single-player"
           inline
@@ -337,68 +275,6 @@
       setTimeout(function () {
         document.documentElement.classList.remove("preload");
       }, 3000);
-    </script>
-
-    <script>
-      // Fallback sidebar toggle so hamburger works even if module bundle fails to load
-      window.__toggleSidebar = function (e) {
-        try {
-          const sidebar = document.getElementById("sidebar-menu");
-          const backdrop = document.getElementById("mobile-menu-backdrop");
-          if (!sidebar || !backdrop) return;
-
-          const isOpen = sidebar.classList.contains("open");
-
-          if (isOpen) {
-            sidebar.classList.remove("open");
-            backdrop.classList.remove("open");
-            document.documentElement.classList.remove("overflow-hidden");
-            sidebar.setAttribute("aria-hidden", "true");
-            sidebar.removeAttribute("aria-modal");
-            backdrop.setAttribute("aria-hidden", "true");
-          } else {
-            sidebar.classList.add("open");
-            backdrop.classList.add("open");
-            document.documentElement.classList.add("overflow-hidden");
-            sidebar.setAttribute("aria-hidden", "false");
-            sidebar.setAttribute("aria-modal", "true");
-            backdrop.setAttribute("aria-hidden", "false");
-          }
-
-          const hb = document.getElementById("hamburger-btn");
-          if (hb) hb.setAttribute("aria-expanded", (!isOpen).toString());
-        } catch (err) {
-          console.error("Toggle failed", err);
-        }
-      };
-
-      // Wire up the hamburger button inline
-      const hamburger = document.getElementById("hamburger-btn");
-      if (hamburger) {
-        hamburger.onclick = window.__toggleSidebar;
-        hamburger.setAttribute("aria-expanded", "false");
-      }
-
-      // Wire up backdrop click to close menu
-      const backdrop = document.getElementById("mobile-menu-backdrop");
-      if (backdrop) {
-        backdrop.onclick = function (e) {
-          const sidebar = document.getElementById("sidebar-menu");
-          if (sidebar && sidebar.classList.contains("open")) {
-            window.__toggleSidebar(e);
-          }
-        };
-      }
-
-      // Wire up Escape key to close menu
-      document.addEventListener("keydown", function (e) {
-        if (e.key === "Escape" || e.key === "Esc") {
-          const sidebar = document.getElementById("sidebar-menu");
-          if (sidebar && sidebar.classList.contains("open")) {
-            window.__toggleSidebar(e);
-          }
-        }
-      });
     </script>
 
     <script type="module" src="/src/client/Main.ts"></script>

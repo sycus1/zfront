@@ -87,9 +87,6 @@ export function keysMayBeShared(a: string, b: string): boolean {
 
 export const USER_SETTINGS_CHANGED_EVENT = "event:user-settings-changed";
 
-// index.html reads this key directly to set the theme class before first paint.
-const HALLOWEEN_THEME_KEY = "settings.halloweenTheme";
-
 /**
  * Mixer channels. Category is a pure function of the cue name (categoryOf in
  * client/sound/Sounds.ts); nothing chooses a channel at the call site.
@@ -538,14 +535,6 @@ export class UserSettings {
 
   toggleGoToPlayer() {
     this.setBool("settings.goToPlayer", !this.goToPlayer());
-  }
-
-  halloweenTheme() {
-    return this.getBool(HALLOWEEN_THEME_KEY, true);
-  }
-
-  toggleHalloweenTheme() {
-    this.setBool(HALLOWEEN_THEME_KEY, !this.halloweenTheme());
   }
 
   // For development only. Used for testing patterns, set in the console manually.
