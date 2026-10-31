@@ -1,12 +1,14 @@
 import { Elites } from "./Elites";
 import { UNREACHABLE } from "./FlowField";
 import { HordeField } from "./HordeField";
+import { cellD2 } from "./Weapons";
 
 /**
  * zfront: mortars. In horde mode the Missile Silo is a mortar: a building
- * that fires on its own, every `mortarReload` ticks, at the thickest part
- * of the horde between `mortarMinRange` and `mortarRange` coarse cells
- * away. Each shell is in the air for `mortarFlight` ticks and aims where
+ * that fires on its own, every `mortarReload` ticks, at the crowd nearest
+ * the HQ it defends (of those at least half as thick as the thickest),
+ * between `mortarMinRange` and `mortarRange` coarse cells away (with no
+ * HQ, at the thickest part). Each shell is in the air for `mortarFlight` ticks and aims where
  * the zombies it saw will have walked by then (along the flow field). When
  * it lands it kills up to `mortarKills` shamblers within
  * `mortarBlastRadius`, nearest the impact first, and hurts every elite
@@ -15,7 +17,8 @@ import { HordeField } from "./HordeField";
  * mortar falls; the bounty goes to the mortar's owner.
  *
  * Mortars complement turrets: slower, longer reach, a dead zone up close,
- * and kills in bulk where the horde bunches up (at walls, or on a beacon).
+ * and kills in bulk where the horde bunches up (at walls, or on a beacon):
+ * a shell only goes where `mortarMinTarget` zombies are under the blast.
  *
  * Range and blast are in coarse cells, so retuning for another map scale
  * is a matter of changing these options. Deterministic: integer state and
@@ -50,6 +53,8 @@ export interface MortarGun {
   /** Its owner's smallID, who gets the bounty. */
   owner: number;
   level: number;
+  /** Coarse cell of the HQ it defends; -1 or left out for none. */
+  hq?: number;
 }
 
 /** A shell in the air. */
@@ -81,6 +86,16 @@ export interface Blast {
   elites: number;
 }
 
+/**
+ * A mortar aiming for its HQ's side only takes crowds at least this percent
+ * of the thickest one in reach, so it doesn't spend its shells on stragglers.
+ */
+const CROWD_PERCENT = 50;
+
+/** Reused by Mortars.target, which clears them first, to save garbage. */
+const CAND_CELLS: number[] = [];
+const CAND_SCORES: number[] = [];
+
 export class Mortars {
   private ready = new Map<number, number>();
   private shells: Shell[] = [];
@@ -110,8 +125,9 @@ export class Mortars {
   }
 
   /**
-   * Each mortar that has reloaded picks the reachable cell with the most
-   * shamblers under its blast and fires there, aimed `lead` horde steps
+   * Each mortar that has reloaded picks the reachable cell nearest its HQ
+   * with a crowd worth a shell under its blast (or, with no HQ, the one
+   * with the most) and fires there, aimed `lead` horde steps
    * ahead along `dist` (the flow field). Mortars that are gone are
    * forgotten.
    */
@@ -128,7 +144,7 @@ export class Mortars {
     for (const g of guns) {
       seen.add(g.id);
       if (ticks < (this.ready.get(g.id) ?? ticks)) continue;
-      const seenAt = this.target(g.cell, field);
+      const seenAt = this.target(g.cell, g.hq ?? -1, field);
       if (seenAt < 0) {
         // Look again next tick.
         this.ready.set(g.id, ticks + 1);
@@ -197,19 +213,26 @@ export class Mortars {
   }
 
   /**
-   * The cell within reach of `c` with the most shamblers under a blast
-   * centred on it (nearest first on a tie), or -1 if none has
-   * `mortarMinTarget`. Only cells with zombies of their own are tried.
+   * Of the cells within reach of `c` with at least `mortarMinTarget`
+   * shamblers under a blast centred on them, and at least CROWD_PERCENT
+   * of the most any has, the one nearest `hq` (then the one with the most,
+   * then nearest the mortar); with hq -1 just the one with the most
+   * (nearest the mortar on a tie). -1 if none. Only cells with zombies of
+   * their own are tried.
    */
-  private target(c: number, field: HordeField): number {
+  private target(c: number, hq: number, field: HordeField): number {
     const w = this.width;
     const n = w * this.height;
     const density = field.density;
     const cx = c % w;
     const reach = this.reach;
     const blast = this.blast;
-    let best = -1;
-    let bestScore = Math.max(1, this.opts.mortarMinTarget) - 1;
+    const min = Math.max(1, this.opts.mortarMinTarget);
+    const cells = CAND_CELLS;
+    const scores = CAND_SCORES;
+    cells.length = 0;
+    scores.length = 0;
+    let most = 0;
     for (let k = 0; k < reach.length; k += 2) {
       const x = cx + reach[k];
       const cell = c + reach[k + 1];
@@ -222,9 +245,24 @@ export class Mortars {
         if (bx < 0 || bx >= w || b < 0 || b >= n) continue;
         score += density[b];
       }
-      if (score > bestScore) {
-        best = cell;
+      if (score < min) continue;
+      cells.push(cell);
+      scores.push(score);
+      if (score > most) most = score;
+    }
+    // Worth a shell: at least CROWD_PERCENT of the thickest crowd in reach.
+    const worth = Math.max(min, Math.ceil((most * CROWD_PERCENT) / 100));
+    let best = -1;
+    let bestScore = 0;
+    let bestNear = Infinity;
+    for (let i = 0; i < cells.length; i++) {
+      const score = scores[i];
+      if (score < worth) continue;
+      const near = hq < 0 ? 0 : cellD2(cells[i], hq, w);
+      if (near < bestNear || (near === bestNear && score > bestScore)) {
+        best = cells[i];
         bestScore = score;
+        bestNear = near;
       }
     }
     return best;

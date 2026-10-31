@@ -53,7 +53,13 @@ import {
 } from "./Settlement";
 import { chooseLinks, LinkGrid, LinkPost, WallLink } from "./WallLinks";
 import { WaveDirector, WavePlan } from "./WaveDirector";
-import { readyToFire } from "./Weapons";
+import {
+  discOffsets,
+  nearestCell,
+  priorityElite,
+  readyToFire,
+  turretVolley,
+} from "./Weapons";
 
 /**
  * Zombie waves (zfront spike). The mass horde is a density field on the
@@ -1565,52 +1571,41 @@ export class HordeExecution implements Execution {
 
   private fireTurrets(): void {
     const w = this.width;
-    const n = w * this.height;
-    const offsets = this.turretReach;
-    const d2 = this.turretReachD2;
+    const hqs = [...this.hordeHqAt.keys()];
     this.hordeTurretShots = [];
     for (const t of this.hordeTurrets) {
       if (!readyToFire(t)) continue;
       const c = this.cellOf(t.tile());
-      const cx = c % w;
-      const cy = (c - cx) / w;
+      const hq = nearestCell(c, hqs, w);
       const range = this.turretRangeAt(t.tile());
       const r2 = range * range;
       // Each level above 1 adds turretLevelPercent of the base firepower.
       const power = 100 + (t.level() - 1) * this.opts.turretLevelPercent;
-      let budget = Math.floor((this.opts.turretKillsPerTick * power) / 100);
-      let shamblers = 0;
+      const volley = turretVolley(
+        this.field,
+        c,
+        w,
+        this.height,
+        this.turretReach,
+        this.turretReachD2,
+        r2,
+        hq,
+        Math.floor((this.opts.turretKillsPerTick * power) / 100),
+      );
+      this.killed += volley.shamblers;
+      let target = volley.target;
       let elites = 0;
-      let target = -1;
-      for (let k = 0; k < offsets.length && budget > 0; k += 2) {
-        if (d2[k >> 1] > r2) break;
-        const x = cx + offsets[k];
-        const cell = c + offsets[k + 1];
-        if (x < 0 || x >= w || cell < 0 || cell >= n) continue;
-        const removed = this.field.remove(cell, budget);
-        if (removed > 0) target = cell;
-        budget -= removed;
-        this.killed += removed;
-        shamblers += removed;
-      }
-      // One elite per turret per tick: the first in range.
-      for (let e = 0; e < this.elites.count; e++) {
-        const ec = this.elites.cell[e];
-        const ex = ec % w;
-        const ey = (ec - ex) / w;
-        const dx = ex - cx;
-        const dy = ey - cy;
-        if (dx * dx + dy * dy <= r2 && this.elites.hp[e] > 0) {
-          this.elites.hp[e] -= Math.floor(
-            (this.opts.turretEliteDamage * power) / 100,
-          );
-          if (this.elites.hp[e] <= 0) elites++;
-          target = ec;
-          break;
-        }
+      // One elite per turret per tick: the one in range nearest the HQ.
+      const e = priorityElite(this.elites, c, w, r2, hq);
+      if (e >= 0) {
+        this.elites.hp[e] -= Math.floor(
+          (this.opts.turretEliteDamage * power) / 100,
+        );
+        if (this.elites.hp[e] <= 0) elites++;
+        target = this.elites.cell[e];
       }
       if (target >= 0) this.hordeTurretShots.push(c, target);
-      payBounty(t.owner(), this.opts, shamblers, elites);
+      payBounty(t.owner(), this.opts, volley.shamblers, elites);
     }
     this.killed += this.elites.removeDead();
   }
@@ -1630,11 +1625,14 @@ export class HordeExecution implements Execution {
     }
     this.killed += this.elites.removeDead();
     const guns: MortarGun[] = [];
+    const hqs = [...this.hordeHqAt.keys()];
     for (const u of this.hordeMortars) {
       if (!readyToFire(u)) continue;
+      const cell = this.cellOf(u.tile());
       guns.push({
         id: u.id(),
-        cell: this.cellOf(u.tile()),
+        cell,
+        hq: nearestCell(cell, hqs, this.width),
         owner: u.owner().smallID(),
         level: u.level(),
       });
@@ -1973,33 +1971,6 @@ function spawnableCells(
     }
   }
   return Int32Array.from(cells);
-}
-
-/**
- * (dx, cell offset) pairs for every cell within `r`, nearest first and then
- * in row-major order, so turrets always pick targets the same way, with
- * each cell's distance squared.
- */
-function discOffsets(
-  r: number,
-  w: number,
-): { offsets: Int32Array; d2: Int32Array } {
-  const pts: [number, number, number][] = [];
-  for (let dy = -r; dy <= r; dy++) {
-    for (let dx = -r; dx <= r; dx++) {
-      const d2 = dx * dx + dy * dy;
-      if (d2 <= r * r) pts.push([d2, dy, dx]);
-    }
-  }
-  pts.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
-  const offsets = new Int32Array(pts.length * 2);
-  const d2 = new Int32Array(pts.length);
-  pts.forEach(([dist2, dy, dx], k) => {
-    offsets[2 * k] = dx;
-    offsets[2 * k + 1] = dy * w + dx;
-    d2[k] = dist2;
-  });
-  return { offsets, d2 };
 }
 
 const HordeOptionsSchema = z.object({
