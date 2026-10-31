@@ -18,8 +18,9 @@ export function formatCountdown(ticks: number): string {
 
 /**
  * zfront: the wave counter, HQ health bar and the next wave's countdown and
- * directions, top centre, with a button to call the next wave early once
- * the last one is cleared. Shown in horde games once the first wave timer
+ * directions, top centre. While a wave is under way it shows how many are
+ * left to clear it; after the clear, the downtime left to build, then the
+ * countdown, with a button to call the next wave early. Shown in horde games once the first wave timer
  * starts.
  */
 @customElement("horde-hud")
@@ -102,43 +103,38 @@ export class HordeHud extends LitElement implements Controller {
   }
 
   private renderNextWave(s: HordeFrame) {
-    if (s.outcome === "lost" || s.nextWaveIn < 0) return nothing;
+    if (s.outcome === "lost") return nothing;
+    if (s.clearing) return this.renderClearing(s);
+    if (s.nextWaveIn < 0) return nothing;
     const time = formatCountdown(s.nextWaveIn);
     if (s.nextWave === 0) {
       return html`<div class="mt-1.5 text-xs text-white/80" data-horde-next>
         ${translateText("horde_hud.victory_in", { time })}
       </div>`;
     }
-    const directions = DIRECTIONS.filter(
-      (_, k) => (s.nextWaveSectors & (1 << k)) !== 0,
-    ).map((d) => translateText(`horde_direction.${d}`));
-    const from =
-      s.nextWaveFinal || directions.length === DIRECTIONS.length
-        ? translateText("horde_hud.from_everywhere")
-        : translateText("horde_hud.from", {
-            directions: directions.join(", "),
-          });
     return html`
       <div class="mt-1.5 text-xs" data-horde-next>
-        <div class="flex items-baseline justify-between gap-3">
-          <span class="font-semibold ${s.nextWaveFinal ? "text-red-300" : ""}">
-            ${
-              s.nextWaveFinal
-                ? translateText("horde_hud.final_wave", { time })
-                : translateText("horde_hud.next_wave", {
-                    wave: s.nextWave,
-                    time,
-                  })
-            }
-          </span>
-          <span class="text-white/80" data-horde-from>${from}</span>
-        </div>
-        <div class="text-white/60">
-          ${translateText("horde_hud.next_size", {
-            count: renderNumber(s.nextWaveShamblers),
-            elites: renderNumber(s.nextWaveElites),
-          })}
-        </div>
+        ${
+          s.downtimeIn > 0
+            ? html`<div
+                class="mb-1 font-semibold text-green-300"
+                data-horde-downtime
+              >
+                ${translateText("horde_hud.build_time", {
+                  time: formatCountdown(s.downtimeIn),
+                })}
+              </div>`
+            : nothing
+        }
+        ${this.renderWaveDetails(
+          s,
+          s.nextWaveFinal
+            ? translateText("horde_hud.final_wave", { time })
+            : translateText("horde_hud.next_wave", {
+                wave: s.nextWave,
+                time,
+              }),
+        )}
         ${
           s.canCallWave
             ? html`<button
@@ -152,6 +148,64 @@ export class HordeHud extends LitElement implements Controller {
               </button>`
             : nothing
         }
+      </div>
+    `;
+  }
+
+  /**
+   * The wave under way still has to be cleared: how many are left, and the
+   * next wave, which waits for the clear and the downtime after it.
+   */
+  private renderClearing(s: HordeFrame) {
+    const count = renderNumber(s.clearLeft);
+    if (s.nextWave === 0) {
+      return html`<div
+        class="mt-1.5 text-xs font-semibold text-red-300"
+        data-horde-clearing
+      >
+        ${translateText("horde_hud.clear_to_win", { count })}
+      </div>`;
+    }
+    return html`
+      <div class="mt-1.5 text-xs" data-horde-next>
+        <div class="mb-1 font-semibold text-yellow-300" data-horde-clearing>
+          ${translateText("horde_hud.clear_first", { count })}
+        </div>
+        ${this.renderWaveDetails(
+          s,
+          s.nextWaveFinal
+            ? translateText("horde_hud.final_after_clear")
+            : translateText("horde_hud.next_after_clear", {
+                wave: s.nextWave,
+              }),
+        )}
+      </div>
+    `;
+  }
+
+  /** The announced wave's heading, directions and size. */
+  private renderWaveDetails(s: HordeFrame, heading: string) {
+    const directions = DIRECTIONS.filter(
+      (_, k) => (s.nextWaveSectors & (1 << k)) !== 0,
+    ).map((d) => translateText(`horde_direction.${d}`));
+    const from =
+      s.nextWaveFinal || directions.length === DIRECTIONS.length
+        ? translateText("horde_hud.from_everywhere")
+        : translateText("horde_hud.from", {
+            directions: directions.join(", "),
+          });
+    return html`
+      <div class="flex items-baseline justify-between gap-3">
+        <span class="font-semibold ${s.nextWaveFinal ? "text-red-300" : ""}">
+          ${heading}
+        </span>
+        <span class="text-white/80" data-horde-from>${from}</span>
+      </div>
+      <div class="text-white/60">
+        ${translateText("horde_hud.next_size", {
+          count: renderNumber(s.nextWaveShamblers),
+          elites: renderNumber(s.nextWaveElites),
+        })}
       </div>
     `;
   }

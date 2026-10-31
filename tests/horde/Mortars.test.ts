@@ -144,7 +144,7 @@ describe("Mortars", () => {
 // cells), so waves come ashore along the map edges.
 const WAVES: Partial<HordeOptions> = {
   firstWaveDelay: 1,
-  waveInterval: 1_000,
+  maxWaveTicks: 1_000,
   firstWaveSize: 4_000,
   emittersPerWave: 4,
   elitesPerWave: 0,

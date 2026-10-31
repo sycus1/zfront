@@ -13,7 +13,7 @@ import { expectSnapshotRoundTrip } from "../util/Snapshot";
 // coarse cells from a city in the middle.
 const WAVES: Partial<HordeOptions> = {
   firstWaveDelay: 1,
-  waveInterval: 1_000,
+  maxWaveTicks: 1_000,
   firstWaveSize: 4_000,
   emittersPerWave: 4,
   elitesPerWave: 0,

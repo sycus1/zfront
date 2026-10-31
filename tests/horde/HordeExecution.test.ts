@@ -17,7 +17,9 @@ import { expectSnapshotRoundTrip } from "../util/Snapshot";
 // cells), so waves come ashore along the map edges.
 const SMALL_WAVES: Partial<HordeOptions> = {
   firstWaveDelay: 1,
-  waveInterval: 200,
+  maxWaveTicks: 200,
+  downtimeTicks: 0,
+  waveCountdown: 0,
   firstWaveSize: 4_000,
   emittersPerWave: 4,
   emitRate: 200,
@@ -120,14 +122,22 @@ describe("HordeExecution", () => {
       ...SMALL_WAVES,
       wavesToWin: 2,
       hqHp: 10_000_000,
+      // No turret: neither wave is cleared, so each is outlasted.
+      startingTurrets: 0,
+      downtimeTicks: 150,
+      waveCountdown: 50,
+      maxWaveTicks: 200,
     });
     const survivor = game.player("survivor");
     survivor.setSpawnTile(game.ref(50, 48));
-    run(game, 380);
+    for (let t = 0; t < 1_000 && horde.stats().wave < 2; t++) {
+      game.executeNextTick();
+    }
     expect(horde.stats().wave).toBe(2);
     expect(horde.stats().outcome).toBe("playing");
     expect(game.getWinner()).toBeNull();
-    run(game, 40);
+    // Outlasted after maxWaveTicks, the final wave wins.
+    run(game, 202);
     expect(horde.stats().outcome).toBe("won");
     expect(game.getWinner()).toBe(survivor);
     // The next wave is announced with a countdown, then arrives: the game

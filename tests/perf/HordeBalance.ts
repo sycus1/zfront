@@ -27,7 +27,7 @@
  * Usage:
  *   npm run balance:horde -- [--strategy none,turrets,fort]
  *                            [--spawn yorkshire,lincolnshire,...]
- *                            [--seed balance] [--set waveInterval=600,...]
+ *                            [--seed balance] [--set maxWaveTicks=600,...]
  *                            [--zone 20] [--call-early] [--map Bath]
  *                            [--loot 100]
  *
@@ -423,8 +423,9 @@ async function play(
   let lastLost = 0;
   let lastCrates = 0;
   let lastMortar = 0;
-  // Ten waves at the default timings take well under an hour.
-  const limit = start + 36_000;
+  // Ten waves, each waiting for the clear and then the downtime, take
+  // well under two hours.
+  const limit = start + 72_000;
   while (game.ticks() < limit) {
     // An order is paid for when its construction starts, a tick later.
     if (game.ticks() % 2 === 0) spend(game, me, hqXY, strategy, ordered);

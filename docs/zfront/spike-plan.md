@@ -380,6 +380,28 @@ _Started 2026-10-30._ Dan found the scale off: on the 4 km Sheffield map the bas
 | Bath      | lost, wave 3 | won       | won          | won     | won          |
 | Whitby    | lost, wave 3 | won       | won          | won     | lost, wave 3 |
 
+## Downtime between waves
+
+_2026-10-31._ Dan found the game was constant waves with no breathing space to build. Now the next wave's countdown only starts once the wave under way is **cleared** (at most 2% of it left, as before) **and** a downtime has run out.
+
+- **Timing.** After a clear: `downtimeTicks` 900 (90 s of build time), then `waveCountdown` 300 (a 30 s countdown). The first wave still comes `firstWaveDelay` (60 s) in, the last 30 s of it shown as the countdown. `waveInterval` is gone.
+- **Stalls.** A wave not cleared `maxWaveTicks` (3,000, 5 minutes) after it started counts as outlasted and the downtime starts anyway, so stragglers stuck out of reach can't freeze the game. It isn't marked survived (no clear bonus, no early call) until the next wave starts, as before.
+- **Final wave.** Clearing (or outlasting) the last wave wins straight away. Played on after a win, the endless waves get the same downtime.
+- **Calling early.** Still only once the wave is cleared; it now skips what's left of the downtime and the countdown, paying `callEarlyGoldPerTick` for both.
+- **HUD.** While a wave is under way: "Clear this wave: N to go", with the next wave's size and directions. Then "Build time: m:ss" over "Wave N in m:ss", then just the countdown.
+- **Rebalance.** The breaks roughly double the gold a player banks per wave (HQ trickle and crates), so `waveGrowthPercent` goes 35 → 40 (wave 10 about 52,000). Horde snapshot version 16.
+
+`balance:horde -- --zone 0` on Britannia, wins out of the five spawns (most losses are on wave 10), and the typical game length:
+
+| Change               | `turrets` | `fort` | `spans` | `scavenge` | `mortars` | Game length  |
+| -------------------- | --------- | ------ | ------- | ---------- | --------- | ------------ |
+| Before (no downtime) | 5         | 2      | 4       | 4          | 5         | 13.5 min     |
+| Downtime, growth 35% | 5         | 5      | 5       | 5          | 5         | 26 to 56 min |
+| Downtime, growth 40% | 3         | 4      | 3       | 3          | 5         | 27 to 62 min |
+| Downtime, growth 45% | 2         | 2      | 1       | 1          | 3         | 25 to 60 min |
+
+Lincolnshire games are the long ones: its waves come a long way and some hit the 5-minute stall limit. On Bath every defended strategy won with the HQ untouched both before and after, at any growth from 35% to 55%, so the town numbers need their own pass; the game there goes from 13.5 minutes to 35-45.
+
 ## Prerequisites
 
 - npm 12.1 or later. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`. The machine currently has npm 11.19.

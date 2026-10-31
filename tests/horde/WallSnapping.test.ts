@@ -326,7 +326,7 @@ describe("wall spans", () => {
   test("a snapshot with spans restores identically", async () => {
     const { game, horde } = await wallGame({
       firstWaveDelay: 1,
-      waveInterval: 200,
+      maxWaveTicks: 200,
       firstWaveSize: 4_000,
       emittersPerWave: 4,
       elitesPerWave: 0,

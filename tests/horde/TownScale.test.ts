@@ -35,7 +35,7 @@ import { expectSnapshotRoundTrip } from "../util/Snapshot";
 // The "plains" test map is 100x100 tiles (50x50 coarse cells) of open land.
 const WAVES: Partial<HordeOptions> = {
   firstWaveDelay: 1,
-  waveInterval: 400,
+  maxWaveTicks: 400,
   firstWaveSize: 2_000,
   emittersPerWave: 4,
   emitRate: 200,
