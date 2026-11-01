@@ -162,3 +162,28 @@ describe("user-setting Night Shift page", () => {
     expect(el.isOpen()).toBe(false);
   });
 });
+
+describe("user-setting key caps", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    localStorage.clear();
+    const statics = UserSettings as unknown as {
+      cache: Map<string, string | null>;
+    };
+    statics.cache.clear();
+  });
+
+  it("labels keys the way the boards do (CTRL, SPACE, NUM -)", async () => {
+    const el = await mount({ inline: true, tab: "keybinds" });
+    const cap = (action: string) =>
+      el
+        .querySelector(`setting-keybind[action="${action}"] [role="button"]`)
+        ?.textContent?.trim();
+
+    expect(cap("buildMenuModifier")).toBe("CTRL");
+    expect(cap("toggleView")).toBe("SPACE");
+    expect(cap("zoomOutNumpad")).toBe("NUM -");
+    expect(cap("moveUpArrow")).toBe("↑");
+    expect(cap("buildCity")).toBe("1");
+  });
+});

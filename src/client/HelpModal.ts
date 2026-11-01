@@ -3,6 +3,7 @@ import { html, nothing, type TemplateResult } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import {
   DESKTOP_TUTORIAL_VIDEO_URL,
+  keyCapLabel,
   textDirection,
   translateText,
   TUTORIAL_VIDEO_URL,
@@ -32,42 +33,17 @@ export class HelpModal extends BaseModal {
     if (!code) return "";
     const layoutMap = this.keyboardLayout.map;
 
-    const specialLabels: Record<string, string> = {
-      ShiftLeft: "⇧ Shift",
-      ShiftRight: "⇧ Shift",
-      ControlLeft: "Ctrl",
-      ControlRight: "Ctrl",
-      AltLeft: "Alt",
-      AltRight: "Alt",
-      MetaLeft: "⌘",
-      MetaRight: "⌘",
-      Space: "Space",
-      Escape: "Esc",
-      Enter: "↵ Return",
-      ArrowUp: "↑",
-      ArrowDown: "↓",
-      ArrowLeft: "←",
-      ArrowRight: "→",
-      Period: ">",
-      Comma: "<",
-    };
-
-    if ((code === "Period" || code === "Comma") && layoutMap?.has(code)) {
-      return layoutMap.get(code)!.toUpperCase();
-    }
-    if (specialLabels[code]) return specialLabels[code];
+    // The layout's own character for letter and punctuation keys (so AZERTY
+    // reads A, not Q); everything else, and the number row, by its code.
     if (
       layoutMap?.has(code) &&
-      !code.startsWith("Digit") &&
-      !code.startsWith("Numpad")
+      /^(Key[A-Z]|Period|Comma|Minus|Equal|Slash|Semicolon|Quote|Bracket(Left|Right)|Backslash|Backquote)$/.test(
+        code,
+      )
     ) {
-      return layoutMap.get(code)!.toUpperCase();
+      return keyCapLabel(layoutMap.get(code)!, Platform.isMac);
     }
-    if (code.startsWith("Key") && code.length === 4) return code.slice(3);
-    if (code.startsWith("Digit")) return code.slice(5);
-    if (code.startsWith("Numpad")) return `Num ${code.slice(6)}`;
-
-    return code;
+    return keyCapLabel(code, Platform.isMac);
   }
 
   /** One key as a KeyCap, named for the player's keyboard layout. */
