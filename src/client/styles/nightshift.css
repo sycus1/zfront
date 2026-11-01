@@ -921,9 +921,17 @@
     line-height: 1;
     text-transform: uppercase;
   }
+  /* Sized to its label (never narrower than 280px), so a two-word label such
+     as START GAME stays on one line; on a narrow window it wraps under the
+     items and takes the full width instead of squeezing the label. */
   .zf-strip-action {
-    flex: 1 1 280px;
+    flex: 1 0 auto;
+    min-width: min(280px, 100%);
+    max-width: 100%;
     display: flex;
+  }
+  .zf-strip-action .zf-btn > span {
+    white-space: nowrap;
   }
   .zf-strip-action .zf-ring,
   .zf-strip-action .zf-btn {
