@@ -257,15 +257,15 @@ export class HelpModal extends BaseModal {
           ${zfTile({
             title: translateText("help_modal.in_game_tutorial"),
             body: html`<p class="zf-prose">
-                ${translateText("help_modal.in_game_tutorial_desc")}
+                ${translateText("help_modal.in_game_tutorial_soon")}
               </p>
               <div style="display: flex">
                 ${zfButton({
-                  label: translateText("help_modal.in_game_tutorial_start"),
-                  variant: "signal",
+                  label: translateText("common.coming_soon"),
+                  variant: "outline",
                   icon: "play",
-                  onClick: () =>
-                    document.dispatchEvent(new CustomEvent("start-tutorial")),
+                  disabled: true,
+                  onClick: () => {},
                 })}
               </div>`,
           })}

@@ -485,6 +485,10 @@ export enum MessageType {
   DONATION_SENT,
   DONATION_RECEIVED,
   CHAT,
+  /** zfront: the horde taking losses (a mine going off). */
+  HORDE_KILLS,
+  /** zfront: the horde threatening the base (an elite at a wall). */
+  HORDE_THREAT,
 }
 
 // Message categories used for filtering events in the EventsDisplay
@@ -513,6 +517,8 @@ export const MESSAGE_TYPE_CATEGORIES: Record<MessageType, MessageCategory> = {
   [MessageType.DONATION_SENT]: MessageCategory.TRADE,
   [MessageType.DONATION_RECEIVED]: MessageCategory.TRADE,
   [MessageType.CHAT]: MessageCategory.CHAT,
+  [MessageType.HORDE_KILLS]: MessageCategory.ATTACK,
+  [MessageType.HORDE_THREAT]: MessageCategory.ATTACK,
 } as const;
 
 /**

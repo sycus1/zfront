@@ -73,16 +73,20 @@ describe("main menu", () => {
     expect(play.disabled).toBe(true);
   });
 
-  it("starts the tutorial from its link", async () => {
+  // zfront: OpenFront's tutorial teaches the wrong game; a zombie one is
+  // coming, so the link is shown but can't be used yet.
+  it("marks the tutorial link as coming soon", async () => {
     const selector = await mount("game-mode-selector");
     const listener = vi.fn();
     document.addEventListener("start-tutorial", listener);
     const tutorial = Array.from(
       selector.querySelectorAll<HTMLButtonElement>(".zf-menu-link"),
     ).find((b) => b.textContent?.includes("main.tutorial"))!;
+    expect(tutorial.disabled).toBe(true);
+    expect(tutorial.textContent).toContain("common.coming_soon");
     tutorial.click();
     document.removeEventListener("start-tutorial", listener);
-    expect(listener).toHaveBeenCalledOnce();
+    expect(listener).not.toHaveBeenCalled();
   });
 
   it("routes Settings and Help to their inline pages", async () => {

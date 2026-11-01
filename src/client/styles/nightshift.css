@@ -444,6 +444,17 @@
   .zf-menu-link .zf-menu-link-arrow {
     display: none;
   }
+  /* A menu entry that isn't ready yet: dimmed, with a small tag. */
+  .zf-menu-link:disabled {
+    opacity: 0.55;
+  }
+  .zf-menu-link:disabled .zf-menu-link-arrow {
+    visibility: hidden;
+  }
+  .zf-menu-link-soon {
+    font-size: 9px;
+    letter-spacing: 0.16em;
+  }
 }
 
 @media (max-width: 639.98px) {

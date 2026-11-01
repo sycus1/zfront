@@ -46,6 +46,7 @@ import { MessageType } from "@openfront/engine-api/game/GameTypes";
 import { GameUpdateType } from "@openfront/engine-api/game/GameUpdates";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EventsDisplay } from "../../../../src/client/hud/layers/EventsDisplay";
+import { translateText } from "../../../../src/client/Utils";
 
 interface Ed {
   events: { description: string; type: MessageType; focusID?: number }[];
@@ -178,6 +179,31 @@ describe("EventsDisplay handlers", () => {
         "hello world",
         "incoming!",
       ]);
+    });
+
+    it("translates the side of the base an elite is at", () => {
+      game.updatesSinceLastTick = () => ({
+        [GameUpdateType.DisplayEvent]: [
+          {
+            type: GameUpdateType.DisplayEvent,
+            message: "events_display.elite_at_wall",
+            messageType: MessageType.HORDE_THREAT,
+            playerID: 1,
+            params: { direction: "horde_direction_long.s" },
+          },
+        ],
+      });
+
+      ed.tick();
+
+      // The mock echoes params, so the direction went through translateText
+      // (which here returns the key) before being put into the sentence.
+      expect(events()[0].description).toBe(
+        'events_display.elite_at_wall {"direction":"horde_direction_long.s"}',
+      );
+      expect(vi.mocked(translateText)).toHaveBeenCalledWith(
+        "horde_direction_long.s",
+      );
     });
 
     it("adds nothing when there are no updates", () => {

@@ -35,6 +35,9 @@ const DYNAMIC_KEY_PATTERNS: RegExp[] = [
   /^territory_patterns\.color_palette\.[^.]+$/,
   /^build_menu\.desc\.[^.]+$/,
   /^unit_type\.[^.]+$/,
+  // zfront: the horde engine names a side of the base by key, built from
+  // its sector (packages/engine/src/horde/Alerts.ts SECTOR_KEYS).
+  /^horde_direction_long\.[^.]+$/,
   /^news_box\.(tournament|tutorial|news|warning|firefox_warning)$/,
   // Built-in graphics preset names/descriptions are referenced from
   // src/client/render/gl/graphics-presets.json, not translateText literals.
