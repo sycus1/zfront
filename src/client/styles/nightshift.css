@@ -1173,3 +1173,1073 @@
     font-size: 30px;
   }
 }
+
+/* ---- Phase 3: shared controls -------------------------------------------- */
+
+@layer components {
+  .zf-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* The title row of a page with tabs: title left, tabs right; on phone the
+     tabs drop under the title and share the width. */
+  .zf-page-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px 32px;
+  }
+  .zf-page-head .zf-page-title {
+    padding-bottom: 0;
+  }
+  .zf-page-head-aside {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 8px;
+    padding-bottom: 4px;
+  }
+
+  /* Tabs */
+  .zf-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .zf-tab {
+    --zf-border: var(--color-zf-line-600);
+    --zf-ink: var(--color-zf-cream-100);
+    min-height: var(--zf-option-min);
+    padding: 0 22px;
+    border: 0;
+    margin: 0;
+    font-family: var(--font-zf-display);
+    font-weight: 900;
+    font-size: 28px;
+    line-height: 1;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .zf-tab[aria-selected="true"] {
+    --zf-fill: var(--color-zf-signal-400);
+    --zf-border: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-ink-900);
+  }
+
+  /* Buttons beside the one primary action. Stencil capitals (md) or small
+     spaced Archivo capitals (sm, e.g. TEST). */
+  .zf-btn-md {
+    justify-content: center;
+    gap: 10px;
+    width: auto;
+    min-height: var(--zf-control-min);
+    padding: 0 18px;
+    font-size: 24px;
+  }
+  .zf-btn-sm {
+    justify-content: center;
+    gap: 8px;
+    width: auto;
+    min-height: var(--zf-control-min);
+    padding: 0 14px;
+    font-family: var(--font-zf-body);
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+  }
+  .zf-btn-outline {
+    --zf-border: var(--color-zf-line-600);
+    --zf-ink: var(--color-zf-cream-100);
+  }
+  .zf-btn-outline-signal {
+    --zf-border: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-signal-400);
+  }
+  /* Destructive only: Reset to Defaults, Delete. */
+  .zf-btn-danger {
+    --zf-border: var(--color-zf-horde-300);
+    --zf-ink: var(--color-zf-horde-300);
+    --zf-sweep-a: var(--color-zf-horde-300);
+    --zf-invert-fill: var(--color-zf-horde-500);
+    --zf-invert-border: var(--color-zf-horde-500);
+    --zf-invert-ink: var(--color-zf-cream-100);
+  }
+  .zf-btn-danger-solid {
+    --zf-fill: var(--color-zf-horde-500);
+    --zf-border: var(--color-zf-horde-500);
+    --zf-ink: var(--color-zf-cream-100);
+    --zf-sweep-a: var(--color-zf-cream-100);
+    --zf-invert-fill: var(--color-zf-horde-300);
+    --zf-invert-ink: var(--color-zf-ink-900);
+  }
+  .zf-btn-md:disabled,
+  .zf-btn-sm:disabled {
+    opacity: 0.5;
+  }
+
+  /* KeyCap: a raised key in the data face. */
+  .zf-keycap {
+    --zf-border: var(--color-zf-signal-400);
+    --zf-fill: var(--color-zf-ink-800);
+    --zf-ink: var(--color-zf-signal-400);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    min-height: 34px;
+    padding: 0 10px 3px;
+    border-bottom: 3px solid var(--color-zf-signal-400);
+    font-family: var(--font-zf-data);
+    font-weight: 700;
+    font-size: 14px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .zf-keycap-plus {
+    font-family: var(--font-zf-data);
+    font-weight: 700;
+    color: var(--color-zf-muted-400);
+  }
+  .zf-keys {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .zf-keys-word {
+    font-family: var(--font-zf-body);
+    font-weight: 800;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-zf-muted-300);
+  }
+
+  /* Note (a tip, line-bordered) and Alert (danger, the only red text). */
+  .zf-note {
+    --zf-border: var(--color-zf-line-500);
+    --zf-fill: var(--color-zf-ink-800);
+    --zf-ink: var(--color-zf-cream-100);
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 10px 14px;
+    font-family: var(--font-zf-body);
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 20px;
+  }
+  .zf-note > .zf-icon {
+    color: var(--color-zf-signal-400);
+    margin-top: 0;
+  }
+  .zf-alert {
+    --zf-border: var(--color-zf-horde-500);
+    --zf-fill: rgb(199 26 18 / 0.14);
+    --zf-ink: var(--color-zf-cream-100);
+    --zf-bw: var(--zf-border-3);
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 14px 16px;
+    font-family: var(--font-zf-body);
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 21px;
+  }
+  .zf-alert > .zf-icon {
+    color: var(--color-zf-horde-300);
+  }
+  .zf-alert-title {
+    display: block;
+    margin-bottom: 2px;
+    font-family: var(--font-zf-display);
+    font-weight: 900;
+    font-size: 26px;
+    line-height: 1;
+    text-transform: uppercase;
+    color: var(--color-zf-horde-300);
+  }
+
+  /* Label/value rows (diagnostics). Values in the data face. */
+  .zf-data-rows {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .zf-data-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 4px 16px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--color-zf-line-700);
+  }
+  .zf-data-row dt {
+    font-weight: 800;
+    font-size: 14px;
+  }
+  .zf-data-row dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    text-align: right;
+    font-family: var(--font-zf-data);
+    font-weight: 700;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-zf-signal-400);
+  }
+
+  /* Prose inside tiles (Help). */
+  .zf-prose {
+    margin: 0;
+    font-family: var(--font-zf-body);
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 22px;
+    color: var(--color-zf-cream-100);
+    unicode-bidi: plaintext;
+  }
+  .zf-prose-muted {
+    color: var(--color-zf-muted-300);
+  }
+  .zf-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .zf-list > li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 20px;
+    unicode-bidi: plaintext;
+  }
+  .zf-list-bullets > li::before {
+    content: "";
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    background: var(--color-zf-signal-400);
+  }
+  .zf-list img {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+  .zf-figure {
+    display: block;
+    max-width: 100%;
+    border: 2px solid var(--color-zf-line-600);
+    image-rendering: auto;
+  }
+  .zf-media {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border: 2px solid var(--color-zf-line-600);
+    background: var(--color-zf-ink-900);
+  }
+  .zf-media > iframe,
+  .zf-media > video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+
+  /* KeyBindRow and the other one-line rows of a tile. */
+  .zf-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: var(--zf-option-min);
+    padding: 4px 0;
+    border-bottom: 1px solid var(--color-zf-line-700);
+  }
+  .zf-row:last-child {
+    border-bottom: 0;
+  }
+  .zf-row-label {
+    min-width: 0;
+    font-family: var(--font-zf-body);
+    font-weight: 800;
+    font-size: 15px;
+    line-height: 19px;
+    unicode-bidi: plaintext;
+  }
+  .zf-row-desc {
+    display: block;
+    margin-top: 2px;
+    font-weight: 600;
+    font-size: 13px;
+    line-height: 17px;
+    color: var(--color-zf-muted-300);
+  }
+  .zf-row-end {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .zf-tile-rows {
+    gap: 0;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .zf-tile-rows > .zf-tile-body {
+    gap: 0;
+  }
+}
+
+/* ---- Phase 3: the setting-* elements --------------------------------------
+   One skin for every setting row, on the Settings page and in the graphics
+   Advanced fold. A toggle is a SwitchChip (the `chip` attribute) or a row
+   with its description. */
+
+@layer components {
+  setting-toggle,
+  setting-slider,
+  setting-select,
+  setting-number,
+  setting-color,
+  setting-keybind {
+    display: block;
+    min-width: 0;
+    color: var(--color-zf-cream-100);
+    font-family: var(--font-zf-body);
+  }
+  setting-toggle[chip] {
+    display: flex;
+  }
+
+  /* A checkbox drawn as the square switch. */
+  .zf-check {
+    cursor: pointer;
+  }
+  .zf-check:has(input:checked) .zf-switch {
+    justify-content: flex-end;
+    border-color: var(--color-zf-signal-400);
+    background: var(--color-zf-signal-400);
+  }
+  .zf-check:has(input:checked) .zf-switch > span {
+    background: var(--color-zf-ink-900);
+  }
+  .zf-chip.zf-check:has(input:checked) {
+    --zf-fill: var(--color-zf-signal-wash);
+    --zf-border: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-signal-400);
+  }
+  .zf-check:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+  .zf-chip.zf-check {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .zf-switch {
+    flex-shrink: 0;
+  }
+
+  /* A setting as a row: label and description left, control right. */
+  .zf-setting {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: var(--zf-option-min);
+    padding: 10px 0;
+    border-bottom: 1px solid var(--color-zf-line-700);
+  }
+  .zf-setting:has(:focus-visible) {
+    outline: 3px solid var(--color-zf-focus-ring);
+    outline-offset: 2px;
+  }
+  .zf-setting :focus-visible {
+    outline: none;
+  }
+  .zf-setting-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .zf-setting-label {
+    font-weight: 800;
+    font-size: 15px;
+    line-height: 19px;
+  }
+  .zf-setting-desc {
+    font-weight: 600;
+    font-size: 13px;
+    line-height: 17px;
+    color: var(--color-zf-muted-300);
+  }
+
+  /* Slider: label left, value right in the data face, the range below. */
+  .zf-slider {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 0;
+  }
+  .zf-slider-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    font-weight: 800;
+    font-size: 14px;
+  }
+  .zf-slider-value {
+    font-family: var(--font-zf-data);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .zf-range {
+    --fill: 0%;
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 28px;
+    margin: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+  .zf-range:focus-visible {
+    outline: 3px solid var(--color-zf-focus-ring);
+    outline-offset: 2px;
+  }
+  .zf-range::-webkit-slider-runnable-track {
+    height: 8px;
+    background: linear-gradient(
+      to right,
+      var(--color-zf-signal-400) 0 var(--fill),
+      var(--color-zf-line-600) var(--fill) 100%
+    );
+  }
+  .zf-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 22px;
+    margin-top: -7px;
+    background: var(--color-zf-signal-400);
+    border: 3px solid var(--color-zf-ink-900);
+  }
+  .zf-range::-moz-range-track {
+    height: 8px;
+    background: var(--color-zf-line-600);
+  }
+  .zf-range::-moz-range-progress {
+    height: 8px;
+    background: var(--color-zf-signal-400);
+  }
+  .zf-range::-moz-range-thumb {
+    width: 12px;
+    height: 16px;
+    border-radius: 0;
+    background: var(--color-zf-signal-400);
+    border: 3px solid var(--color-zf-ink-900);
+  }
+  .zf-range:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  /* Select and number fields beside a setting row. */
+  .zf-select-wrap {
+    position: relative;
+    flex-shrink: 0;
+    min-width: 0;
+  }
+  .zf-select {
+    -webkit-appearance: none;
+    appearance: none;
+    min-height: var(--zf-control-min);
+    max-width: 100%;
+    padding: 0 40px 0 12px;
+    border: 2px solid var(--color-zf-line-500);
+    border-radius: 0;
+    background: var(--color-zf-ink-800);
+    color: var(--color-zf-cream-100);
+    font-family: var(--font-zf-body);
+    font-weight: 800;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .zf-select:focus-visible,
+  .zf-number:focus-visible,
+  .zf-color:focus-visible {
+    outline: 3px solid var(--color-zf-focus-ring);
+    outline-offset: 2px;
+  }
+  .zf-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .zf-select option {
+    background: var(--color-zf-ink-800);
+    color: var(--color-zf-cream-100);
+  }
+  .zf-select-wrap > .zf-icon {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--color-zf-signal-400);
+  }
+  .zf-number {
+    width: 104px;
+    min-height: var(--zf-control-min);
+    padding: 0 10px;
+    border: 2px solid var(--color-zf-cream-100);
+    border-radius: 0;
+    background: var(--color-zf-cream-100);
+    color: var(--color-zf-ink-900);
+    font-family: var(--font-zf-data);
+    font-weight: 700;
+    font-size: 16px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .zf-color {
+    width: 52px;
+    height: 40px;
+    flex-shrink: 0;
+    padding: 2px;
+    border: 2px solid var(--color-zf-cream-100);
+    border-radius: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  /* KeyBindRow: the cap is a button; reset and unbind sit after it. */
+  .zf-keybind-cap {
+    --zf-border: var(--color-zf-signal-400);
+    --zf-fill: var(--color-zf-ink-800);
+    --zf-ink: var(--color-zf-signal-400);
+    min-width: 52px;
+    min-height: 40px;
+    padding: 0 12px 3px;
+    border: 0;
+    border-bottom: 5px solid var(--color-zf-signal-400);
+    font-family: var(--font-zf-data);
+    font-weight: 700;
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .zf-keybind-cap[data-listening] {
+    --zf-fill: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-ink-900);
+  }
+  .zf-keybind-cap[data-unbound] {
+    --zf-border: var(--color-zf-line-500);
+    --zf-ink: var(--color-zf-muted-400);
+    border-bottom-color: var(--color-zf-line-500);
+  }
+  .zf-icon-btn {
+    --zf-border: var(--color-zf-line-600);
+    --zf-ink: var(--color-zf-muted-300);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 0;
+    margin: 0;
+  }
+  .zf-icon-btn:disabled {
+    opacity: 0.35;
+  }
+  .zf-icon-btn-danger:not(:disabled):hover {
+    --zf-border: var(--color-zf-horde-300);
+    --zf-ink: var(--color-zf-horde-300);
+  }
+}
+
+/* ---- Phase 3: Settings, Help, Troubleshooting, Language ------------------ */
+
+@layer components {
+  /* Settings: a column of a tab's tiles, then the reset row and the strip. */
+  .zf-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .zf-panel-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+    gap: 16px;
+    align-items: start;
+  }
+  .zf-chip-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+    gap: 8px;
+  }
+  .zf-reset-row {
+    display: flex;
+    justify-content: flex-start;
+    margin-top: auto;
+    padding-top: 8px;
+  }
+  .zf-strip-done {
+    flex: 1 1 280px;
+  }
+  .zf-strip-hint {
+    font-family: var(--font-zf-body);
+    font-weight: 800;
+    font-size: 13px;
+    line-height: 18px;
+    letter-spacing: 0.04em;
+  }
+  .zf-volume-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .zf-volume-row > setting-slider {
+    flex: 1 1 auto;
+  }
+  .zf-volume-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+    gap: 8px 32px;
+  }
+  .zf-indent {
+    padding-inline-start: 24px;
+  }
+
+  /* Language: one framed radio per language. */
+  .zf-langs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+    gap: 8px;
+  }
+  .zf-lang {
+    --zf-border: var(--color-zf-line-600);
+    --zf-fill: var(--color-zf-tile-fill);
+    --zf-ink: var(--color-zf-cream-100);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 60px;
+    padding: 8px 14px;
+    border: 0;
+    margin: 0;
+    text-align: start;
+    font-family: var(--font-zf-body);
+  }
+  .zf-lang img {
+    width: 32px;
+    height: 24px;
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+  .zf-lang-names {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .zf-lang-native {
+    font-weight: 800;
+    font-size: 16px;
+    line-height: 20px;
+    overflow-wrap: anywhere;
+  }
+  .zf-lang-en {
+    font-weight: 600;
+    font-size: 12px;
+    line-height: 16px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-zf-muted-300);
+  }
+  .zf-lang[aria-checked="true"] {
+    --zf-fill: var(--color-zf-signal-400);
+    --zf-border: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-ink-900);
+  }
+  .zf-lang[aria-checked="true"] .zf-lang-en {
+    color: var(--color-zf-ink-900);
+  }
+
+  /* Help: the hotkey list and the build list. */
+  .zf-hotkeys {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+    column-gap: 32px;
+  }
+  .zf-hotkeys > .zf-row:last-child {
+    border-bottom: 1px solid var(--color-zf-line-700);
+  }
+  .zf-hotkeys .zf-row-label {
+    font-weight: 600;
+  }
+  .zf-help-feature {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .zf-help-feature > .zf-help-figures {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 0 0 auto;
+    max-width: 220px;
+  }
+  .zf-help-feature > .zf-help-text {
+    flex: 1 1 260px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+  .zf-build-row {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 4px 12px;
+    align-items: start;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--color-zf-line-700);
+  }
+  .zf-build-row:last-child {
+    border-bottom: 0;
+  }
+  .zf-build-row img {
+    width: 28px;
+    height: 28px;
+  }
+  .zf-icon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+  }
+  .zf-icon-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    text-align: center;
+  }
+  .zf-icon-card img {
+    height: 96px;
+    width: auto;
+    object-fit: contain;
+  }
+}
+
+@media (max-width: 639.98px) {
+  .zf-tabs {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(var(--zf-tab-count, 4), minmax(0, 1fr));
+  }
+  .zf-tab {
+    min-width: 0;
+    min-height: 48px;
+    padding: 0 2px;
+    font-size: 20px;
+  }
+  .zf-page-head-aside {
+    width: 100%;
+  }
+  .zf-strip-hint {
+    display: none;
+  }
+  .zf-volume-row {
+    gap: 10px;
+  }
+}
+
+/* ---- Phase 3: the overlay frame (o-modal) and ConfirmDialog -------------- */
+
+@layer components {
+  /* The in-game copy of a menu page: a framed panel over a dark scrim. */
+  .zf-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    background: rgb(17 17 17 / 0.82);
+    color: var(--color-zf-cream-100);
+    font-family: var(--font-zf-body);
+  }
+  .zf-overlay-panel {
+    --zf-cut: var(--zf-cut-lg);
+    --zf-bw: var(--zf-border-3);
+    --zf-fill: var(--color-zf-ink-900);
+    --zf-border: var(--color-zf-signal-400);
+    display: flex;
+    flex-direction: column;
+    width: min(1280px, 100%);
+    max-height: 100%;
+    min-height: 0;
+  }
+  .zf-overlay-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 3px;
+  }
+  .zf-overlay-scroll .zf-page-inner {
+    padding-bottom: 24px;
+  }
+  .zf-overlay-scroll .zf-page-title {
+    font-size: clamp(48px, 5vw, 80px);
+  }
+
+  .zf-dialog-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 10020;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgb(17 17 17 / 0.85);
+    color: var(--color-zf-cream-100);
+    font-family: var(--font-zf-body);
+  }
+  .zf-dialog {
+    --zf-cut: var(--zf-cut-lg);
+    --zf-bw: var(--zf-border-3);
+    --zf-fill: var(--color-zf-ink-900);
+    --zf-border: var(--color-zf-signal-400);
+    width: 100%;
+    max-width: 440px;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .zf-dialog-wide {
+    max-width: 520px;
+  }
+  .zf-dialog-danger {
+    --zf-border: var(--color-zf-horde-500);
+  }
+  .zf-dialog-title {
+    margin: 0;
+    padding-right: 40px;
+    font-family: var(--font-zf-display);
+    font-weight: 900;
+    font-size: 36px;
+    line-height: 0.95;
+    text-transform: uppercase;
+    color: var(--color-zf-signal-400);
+  }
+  .zf-dialog-danger .zf-dialog-title {
+    color: var(--color-zf-horde-300);
+  }
+  .zf-dialog-message {
+    margin: 0;
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 22px;
+    white-space: pre-line;
+  }
+  .zf-dialog-text {
+    width: 100%;
+    min-height: 64px;
+    padding: 10px 12px;
+    border: 2px solid var(--color-zf-cream-100);
+    border-radius: 0;
+    background: var(--color-zf-cream-100);
+    color: var(--color-zf-ink-900);
+    font-family: var(--font-zf-body);
+    font-weight: 600;
+    font-size: 15px;
+    resize: none;
+  }
+  .zf-dialog-text:focus-visible {
+    outline: 3px solid var(--color-zf-focus-ring);
+    outline-offset: 2px;
+  }
+  .zf-dialog-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .zf-dialog-actions > .zf-ring {
+    flex: 1 1 0;
+  }
+  .zf-dialog-actions .zf-btn {
+    width: 100%;
+  }
+  .zf-dialog-close {
+    position: absolute;
+    top: 12px;
+    right: 18px;
+  }
+}
+
+@media (max-width: 1023.98px) {
+  /* Phone and tablet: the in-game panel takes the whole screen. */
+  .zf-overlay {
+    padding: 0;
+  }
+  .zf-overlay-panel {
+    width: 100%;
+    height: 100%;
+    clip-path: none;
+    --zf-bw: 0px;
+  }
+  .zf-overlay-panel::before {
+    display: none;
+  }
+}
+
+@layer components {
+  .zf-advanced-heading {
+    margin: 18px 0 2px;
+    color: var(--color-zf-signal-400);
+  }
+  graphics-advanced-settings {
+    display: flex;
+    flex-direction: column;
+  }
+  /* Graphics presets: one stencil radio per preset, saved ones included. */
+  .zf-preset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+    gap: 8px;
+  }
+  .zf-preset-grid .zf-option {
+    min-height: 56px;
+    font-size: 28px;
+    overflow-wrap: anywhere;
+  }
+  .zf-preset-saved {
+    display: flex;
+    gap: 6px;
+  }
+  .zf-preset-saved > .zf-ring:first-child {
+    flex: 1 1 auto;
+  }
+  .zf-preset-saved > .zf-ring:last-child {
+    flex: 0 0 auto;
+  }
+  .zf-preset-saved .zf-icon-btn {
+    height: 56px;
+    width: 44px;
+  }
+  .zf-option[data-custom] {
+    font-family: var(--font-zf-display);
+  }
+  .zf-option[data-custom][aria-checked="false"] {
+    --zf-ink: var(--color-zf-muted-400);
+  }
+  /* Save, copy and import a configuration. */
+  .zf-tools {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .zf-tools-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+  .zf-tools-row > :first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .zf-tools .zf-field {
+    min-height: var(--zf-control-min);
+    font-size: 16px;
+  }
+  .zf-tools textarea.zf-field {
+    min-height: 88px;
+    padding: 10px 12px;
+    font-family: var(--font-zf-data);
+    font-weight: 700;
+    font-size: 13px;
+    resize: vertical;
+  }
+  .zf-tools-label {
+    font-weight: 800;
+    font-size: 14px;
+  }
+}
+
+@layer components {
+  /* A heading over a group of tiles (Help: INTERFACE). */
+  .zf-section-title {
+    margin: 12px 0 0;
+    font-family: var(--font-zf-display);
+    font-weight: 900;
+    font-size: 44px;
+    line-height: 0.9;
+    text-transform: uppercase;
+    color: var(--color-zf-cream-100);
+  }
+}
+
+@layer components {
+  .zf-btn-sm {
+    white-space: nowrap;
+  }
+  .zf-tools-row {
+    flex-wrap: wrap;
+  }
+  .zf-keybind-cap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .zf-keybind-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));
+  }
+}
+
+@media (max-width: 639.98px) {
+  /* Settings' strip on phone is DONE alone, across the width. */
+  .zf-settings-strip .zf-strip-items {
+    display: none;
+  }
+  .zf-settings-strip .zf-strip-action {
+    flex: 1 1 auto;
+  }
+}
+
+@layer components {
+  /* The thick bottom edge is the cap's side: centre the label above it. */
+  .zf-keybind-cap,
+  .zf-keycap {
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 1;
+  }
+}

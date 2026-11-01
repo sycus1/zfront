@@ -1,31 +1,53 @@
-import { html, LitElement, TemplateResult } from "lit";
+import { assetUrl } from "@openfront/shared/AssetUrls";
+import { html, LitElement, nothing, TemplateResult } from "lit";
 import { property, query, state } from "lit/decorators.js";
 import { modalRouter } from "../ModalRouter";
+import { translateText } from "../Utils";
 import "./baseComponents/Modal";
-import type { OModal, OModalTab } from "./baseComponents/Modal";
+import type { OModal } from "./baseComponents/Modal";
 import "./ConfirmDialog";
+import {
+  type TabDef,
+  zfBackButton,
+  zfMapBackdrop,
+  zfPageHeader,
+  zfPageTitle,
+  zfTabs,
+} from "./nightshift/Primitives";
+
+export type OModalTab = TabDef;
 
 /**
- * Static-ish configuration for the <o-modal> shell.
- * Subclasses return a fresh object from modalConfig(); avoid heavy work — it's
- * read on every render() and during open()/setActiveTab().
+ * Static-ish configuration for the page. Subclasses return a fresh object
+ * from modalConfig(); avoid heavy work — it's read on every render() and
+ * during open()/setActiveTab().
  */
 export interface ModalConfig {
-  title?: string;
   tabs?: OModalTab[];
-  hideHeader?: boolean;
-  hideCloseButton?: boolean;
-  alwaysMaximized?: boolean;
-  maxWidth?: string;
-  hideTabs?: boolean;
+}
+
+/** The map behind a menu page that has no map of its own. */
+const DEFAULT_BACKDROP = "images/maps/bath.png";
+
+interface PendingConfirm {
+  heading: string;
+  message: string;
+  confirmText: string;
+  variant: "danger" | "warning";
+  resolve: (ok: boolean) => void;
 }
 
 /**
  * Base class for modal components.
  *
- * BaseModal renders the <o-modal> shell itself — subclasses provide content
- * via renderContent() (or renderTab() for tabbed modals) and declare
- * configuration via modalConfig().
+ * BaseModal draws the Night Shift page itself: back button, stencil title,
+ * tabs, the body and the page's actions. Subclasses provide pageTitle(),
+ * renderBody(tab) and optionally renderTitleAside() / renderActions(), and
+ * declare their tabs via modalConfig().
+ *
+ * An `inline` page fills the menu's content area (.zf-page over a map
+ * backdrop); otherwise — the in-game copy of Settings — the same page sits
+ * in an <o-modal> panel over the game.
  *
  * Lifecycle:
  *   open(args?)  → onOpen(args) hook → shell visible
@@ -33,7 +55,8 @@ export interface ModalConfig {
  *
  * Tabs (optional):
  *   Return a non-empty tabs[] from modalConfig(). BaseModal owns activeTab
- *   state and dispatches rendering to renderTab(key). Subclasses can opt in
+ *   state, draws the tabs beside the title and dispatches rendering to
+ *   renderBody(key). Subclasses can opt in
  *   to onTabEnter(key) for per-tab lifecycle (e.g. lazy load).
  */
 export abstract class BaseModal extends LitElement {
@@ -41,11 +64,8 @@ export abstract class BaseModal extends LitElement {
   @state() protected activeTab = "";
   @property({ type: Boolean }) inline = false;
 
-  // Pending close confirmation; when set, renders the inline confirm dialog.
-  @state() private closeConfirm: {
-    message: string;
-    resolve: (ok: boolean) => void;
-  } | null = null;
+  // Pending confirmation; when set, renders the confirm dialog.
+  @state() private pendingConfirm: PendingConfirm | null = null;
 
   // Re-entrancy guard: showPage() (for inline modals) re-invokes .open()
   // with no args after we call it. We must not re-run onOpen(undefined)
@@ -55,8 +75,6 @@ export abstract class BaseModal extends LitElement {
   @query("o-modal") protected modalEl?: OModal;
 
   // ---- Subclass configuration ----
-  // Override modalConfig() to configure the rendered <o-modal>. Defaults match
-  // the most common shape (custom in-content header, no built-in close button).
 
   protected modalConfig(): ModalConfig {
     return {};
@@ -69,9 +87,31 @@ export abstract class BaseModal extends LitElement {
    */
   protected routerName?: string;
 
-  /** Render slot="header" content. Default: no header slot. */
-  protected renderHeaderSlot(): TemplateResult | null {
-    return null;
+  /** The page title, in stencil capitals. */
+  protected pageTitle(): string {
+    return "";
+  }
+
+  /** Where the back button goes, in capitals beside its arrow. */
+  protected backLabel(): string {
+    return this.inline
+      ? translateText("zf_play.back_menu")
+      : translateText("common.back");
+  }
+
+  /** Beside the title on a page without tabs (e.g. a COPY button). */
+  protected renderTitleAside(): TemplateResult | typeof nothing {
+    return nothing;
+  }
+
+  /** The end of the page, under the body (e.g. Settings' DONE strip). */
+  protected renderActions(): TemplateResult | typeof nothing {
+    return nothing;
+  }
+
+  /** The map behind an inline page. */
+  protected backdropImage(): string {
+    return assetUrl(DEFAULT_BACKDROP);
   }
 
   /**
@@ -106,16 +146,34 @@ export abstract class BaseModal extends LitElement {
    * confirmBeforeClose() to gate closing behind a confirm/cancel prompt.
    */
   protected confirmClose(message: string): Promise<boolean> {
-    // Don't stack a second prompt if one is already open.
-    if (this.closeConfirm) return Promise.resolve(false);
+    return this.askConfirm({ message, variant: "warning" });
+  }
+
+  /**
+   * Ask before doing something that cannot be undone, e.g. a reset. Resolves
+   * to the player's choice; a second prompt while one is open resolves false.
+   */
+  protected askConfirm(opts: {
+    message: string;
+    heading?: string;
+    confirmText?: string;
+    variant?: "danger" | "warning";
+  }): Promise<boolean> {
+    if (this.pendingConfirm) return Promise.resolve(false);
     return new Promise((resolve) => {
-      this.closeConfirm = { message, resolve };
+      this.pendingConfirm = {
+        heading: opts.heading ?? "",
+        message: opts.message,
+        confirmText: opts.confirmText ?? "",
+        variant: opts.variant ?? "danger",
+        resolve,
+      };
     });
   }
 
-  private settleCloseConfirm(ok: boolean) {
-    const pending = this.closeConfirm;
-    this.closeConfirm = null;
+  private settleConfirm(ok: boolean) {
+    const pending = this.pendingConfirm;
+    this.pendingConfirm = null;
     pending?.resolve(ok);
   }
 
@@ -134,34 +192,74 @@ export abstract class BaseModal extends LitElement {
     }
   }
 
-  render(): TemplateResult {
-    const cfg = this.modalConfig();
-    const tabs = cfg.tabs ?? [];
-    const body = this.renderBody(this.activeTab);
-    const headerSlot = this.renderHeaderSlot();
+  /** A per-instance id prefix: Settings exists twice (page and in-game). */
+  private idBase(): string {
+    return this.id || this.localName;
+  }
 
-    return html`
-      <o-modal
-        title=${cfg.title ?? ""}
-        ?inline=${this.inline}
-        ?hideHeader=${cfg.hideHeader ?? true}
-        ?hideCloseButton=${cfg.hideCloseButton ?? true}
-        ?alwaysMaximized=${cfg.alwaysMaximized ?? false}
-        maxWidth=${cfg.maxWidth ?? ""}
-        .tabs=${cfg.hideTabs ? [] : tabs}
-        .activeTab=${this.activeTab}
-        .onTabChange=${(key: string) => this.setActiveTab(key)}
+  private renderPage(): TemplateResult {
+    const tabs = this.modalConfig().tabs ?? [];
+    const base = this.idBase();
+    const titleId = `${base}-title`;
+    const panelId = `${base}-panel`;
+    const tabbed = tabs.length > 1;
+    const aside = this.renderTitleAside();
+    return html`<div class="zf-page-inner">
+      ${zfPageHeader(
+        zfBackButton({
+          label: this.backLabel(),
+          onClick: () => this.close(),
+        }),
+      )}
+      <div class="zf-page-head">
+        ${zfPageTitle(titleId, this.pageTitle())}
+        ${
+          tabbed
+            ? zfTabs({
+                label: this.pageTitle(),
+                tabs,
+                active: this.activeTab,
+                panelId,
+                onSelect: (key) => this.setActiveTab(key),
+              })
+            : nothing
+        }
+        ${
+          aside === nothing
+            ? nothing
+            : html`<div class="zf-page-head-aside">${aside}</div>`
+        }
+      </div>
+      <div
+        id=${panelId}
+        class="zf-panel"
+        role=${tabbed ? "tabpanel" : "group"}
+        aria-labelledby=${tabbed ? `${panelId}-tab-${this.activeTab}` : titleId}
       >
-        ${headerSlot ? html`<div slot="header">${headerSlot}</div>` : null}
-        ${body}
-      </o-modal>
+        ${this.renderBody(this.activeTab)}
+      </div>
+      ${this.renderActions()}
+    </div>`;
+  }
+
+  render(): TemplateResult {
+    const page = this.renderPage();
+    const frame = this.inline
+      ? html`<section class="zf-page" aria-labelledby="${this.idBase()}-title">
+          ${zfMapBackdrop(this.backdropImage(), 0.8)} ${page}
+        </section>`
+      : html`<o-modal .label=${this.pageTitle()}>${page}</o-modal>`;
+    return html`
+      ${frame}
       ${
-        this.closeConfirm
+        this.pendingConfirm
           ? html`<confirm-dialog
-              .message=${this.closeConfirm.message}
-              variant="warning"
-              @confirm=${() => this.settleCloseConfirm(true)}
-              @cancel=${() => this.settleCloseConfirm(false)}
+              .heading=${this.pendingConfirm.heading}
+              .message=${this.pendingConfirm.message}
+              .confirmText=${this.pendingConfirm.confirmText}
+              .variant=${this.pendingConfirm.variant}
+              @confirm=${() => this.settleConfirm(true)}
+              @cancel=${() => this.settleConfirm(false)}
             ></confirm-dialog>`
           : null
       }
@@ -233,7 +331,7 @@ export abstract class BaseModal extends LitElement {
   public close(args?: Record<string, unknown>): void {
     // If closing was triggered elsewhere while a confirm prompt is pending,
     // dismiss it (removes the dialog and resolves the awaiting guard as false).
-    this.settleCloseConfirm(false);
+    this.settleConfirm(false);
     this.unregisterEscapeHandler();
     this.onClose(args);
 
@@ -287,7 +385,7 @@ export abstract class BaseModal extends LitElement {
   }
 
   disconnectedCallback() {
-    this.settleCloseConfirm(false);
+    this.settleConfirm(false);
     this.unregisterEscapeHandler();
     super.disconnectedCallback();
   }
@@ -295,6 +393,11 @@ export abstract class BaseModal extends LitElement {
   private handleKeyDown = async (e: KeyboardEvent) => {
     if (e.key === "Escape" && this.isModalOpen) {
       e.preventDefault();
+      // Escape answers an open confirm prompt first.
+      if (this.pendingConfirm) {
+        this.settleConfirm(false);
+        return;
+      }
       const confirmed = await this.confirmBeforeClose();
       // Bail if a parallel close() already closed us while we awaited.
       if (!confirmed || !this.isModalOpen) {
@@ -313,48 +416,4 @@ export abstract class BaseModal extends LitElement {
     this.isModalOpen = false;
     window.removeEventListener("keydown", this.handleKeyDown);
   }
-
-  protected renderLoadingSpinner(
-    message?: string,
-    spinnerColor: "blue" | "green" | "yellow" | "white" = "blue",
-  ): TemplateResult {
-    return renderLoadingSpinner(message, spinnerColor);
-  }
-}
-
-const spinnerColorClasses: Record<string, string> = {
-  blue: "border-blue-500/30 border-t-blue-500",
-  green: "border-green-500/30 border-t-green-500",
-  yellow: "border-yellow-500/30 border-t-yellow-500",
-  white: "border-white/20 border-t-white",
-};
-
-/**
- * Renders a standardized loading spinner with optional custom message.
- * Use this for consistent loading states across all modals.
- */
-export function renderLoadingSpinner(
-  message?: string,
-  spinnerColor: "blue" | "green" | "yellow" | "white" = "blue",
-): TemplateResult {
-  return html`
-    <div
-      class="flex flex-col items-center justify-center p-12 text-white h-full min-h-[400px]"
-    >
-      <div
-        class="w-12 h-12 border-4 ${
-          spinnerColorClasses[spinnerColor]
-        } rounded-full animate-spin mb-4"
-      ></div>
-      ${
-        message
-          ? html`<p
-              class="text-white/60 font-medium tracking-wide animate-pulse"
-            >
-              ${message}
-            </p>`
-          : ""
-      }
-    </div>
-  `;
 }

@@ -160,32 +160,26 @@
         inline
         class="hidden flex-1 min-h-0 w-full page-content relative z-50 [&.block]:flex [&.block]:flex-col"
       ></single-player-modal>
-      <!-- The inline pages not yet restyled. Shown only while one of them is
-           open: the main menu and the Night Shift pages take the full width
-           on their own. -->
-      <main-layout class="hidden has-[.page-content:not(.hidden)]:contents">
-        <user-setting
-          id="page-settings"
-          inline
-          class="hidden w-full h-full page-content relative z-50"
-        ></user-setting>
-        <troubleshooting-modal
-          id="page-troubleshooting"
-          inline
-          class="hidden w-full h-full page-content relative z-50"
-        ></troubleshooting-modal>
-
-        <help-modal
-          id="page-help"
-          inline
-          class="hidden w-full h-full page-content relative z-50"
-        ></help-modal>
-        <language-modal
-          id="page-language"
-          inline
-          class="hidden w-full h-full page-content relative z-50"
-        ></language-modal>
-      </main-layout>
+      <user-setting
+        id="page-settings"
+        inline
+        class="hidden flex-1 min-h-0 w-full page-content relative z-50 [&.block]:flex [&.block]:flex-col"
+      ></user-setting>
+      <troubleshooting-modal
+        id="page-troubleshooting"
+        inline
+        class="hidden flex-1 min-h-0 w-full page-content relative z-50 [&.block]:flex [&.block]:flex-col"
+      ></troubleshooting-modal>
+      <help-modal
+        id="page-help"
+        inline
+        class="hidden flex-1 min-h-0 w-full page-content relative z-50 [&.block]:flex [&.block]:flex-col"
+      ></help-modal>
+      <language-modal
+        id="page-language"
+        inline
+        class="hidden flex-1 min-h-0 w-full page-content relative z-50 [&.block]:flex [&.block]:flex-col"
+      ></language-modal>
 
       <div class="[.in-game_&]:hidden mt-auto flex flex-col shrink-0">
         <page-footer></page-footer>

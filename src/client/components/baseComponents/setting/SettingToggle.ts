@@ -1,6 +1,14 @@
-import { LitElement, html } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { ifDefined } from "lit/directives/if-defined.js";
 
+/**
+ * An on/off setting (Night Shift). By default a row: label and description
+ * left, the square switch right. With `chip` it is a SwitchChip: the label
+ * and switch in a clipped chip, the description as a tooltip and for screen
+ * readers. Either way the control is a real checkbox (role=switch), so
+ * `change` bubbles from it as before.
+ */
 @customElement("setting-toggle")
 export class SettingToggle extends LitElement {
   @property() label = "Setting";
@@ -10,6 +18,8 @@ export class SettingToggle extends LitElement {
   @property({ type: Boolean }) easter = false;
   /** Dependent settings use this while their parent setting is off. */
   @property({ type: Boolean, reflect: true }) disabled = false;
+  /** Draw as a SwitchChip (for a tile of switches). */
+  @property({ type: Boolean, reflect: true }) chip = false;
 
   createRenderRoot() {
     return this;
@@ -24,45 +34,53 @@ export class SettingToggle extends LitElement {
     this.checked = input.checked;
   }
 
+  private input() {
+    return html`<input
+      type="checkbox"
+      role="switch"
+      class="zf-sr-only"
+      id=${this.id}
+      .checked=${this.checked}
+      ?disabled=${this.disabled}
+      @change=${this.handleChange}
+    />`;
+  }
+
+  private switchMark() {
+    return html`<span class="zf-switch" aria-hidden="true"
+      ><span></span
+    ></span>`;
+  }
+
   render() {
-    const rainbowClass = this.easter
-      ? "bg-[linear-gradient(270deg,#990033,#996600,#336600,#008080,#1c3f99,#5e0099,#990033)] bg-[length:1400%_1400%] animate-rainbow-bg text-white hover:bg-[linear-gradient(270deg,#990033,#996600,#336600,#008080,#1c3f99,#5e0099,#990033)]"
-      : "";
-
-    return html`
-      <label
-        class="flex flex-row items-center justify-between w-full p-4 bg-white/5 border border-white/10 rounded-xl transition-all gap-4 ${
-          this.disabled
-            ? "opacity-50 cursor-not-allowed"
-            : "hover:bg-white/10 cursor-pointer"
-        } ${rainbowClass}"
-      >
-        <div class="flex flex-col flex-1 min-w-0 mr-4">
-          <div class="text-white font-bold text-base block mb-1">
-            ${this.label}
-          </div>
-          <div class="text-white/50 text-sm leading-snug">
-            ${this.description}
-          </div>
-        </div>
-
-        <div class="relative inline-block w-[52px] h-[28px] shrink-0">
-          <input
-            type="checkbox"
-            class="opacity-0 w-0 h-0 peer"
-            id=${this.id}
-            .checked=${this.checked}
-            ?disabled=${this.disabled}
-            @change=${this.handleChange}
-          />
-          <span
-            class="absolute inset-0 bg-black/60 border border-white/10 transition-all duration-300 rounded-full
-            before:absolute before:content-[''] before:h-5 before:w-5 before:left-[3px] before:top-[3px]
-            before:bg-white/40 before:transition-all before:duration-300 before:rounded-full before:shadow-sm hover:before:bg-white/60
-            peer-checked:bg-blue-600 peer-checked:border-blue-500 peer-checked:before:translate-x-[24px] peer-checked:before:bg-white"
-          ></span>
-        </div>
-      </label>
-    `;
+    if (this.chip) {
+      return html`<div class="zf-ring">
+        <label
+          class="zf-chip zf-check zf-frame zf-sweep"
+          title=${ifDefined(this.description || undefined)}
+        >
+          ${this.input()}
+          <span>${this.label}</span>
+          ${
+            this.description
+              ? html`<span class="zf-sr-only">${this.description}</span>`
+              : nothing
+          }
+          ${this.switchMark()}
+        </label>
+      </div>`;
+    }
+    return html`<label class="zf-setting zf-check">
+      ${this.input()}
+      <span class="zf-setting-text">
+        <span class="zf-setting-label">${this.label}</span>
+        ${
+          this.description
+            ? html`<span class="zf-setting-desc">${this.description}</span>`
+            : nothing
+        }
+      </span>
+      ${this.switchMark()}
+    </label>`;
   }
 }

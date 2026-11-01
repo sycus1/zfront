@@ -24,6 +24,12 @@ const PATHS = {
   outpost: "M6 21V4M6 4h11l-3 4 3 4H6",
   pause: "M8 5v14M16 5v14",
   more: "M5 12h.01M12 12h.01M19 12h.01",
+  copy: "M8 8h12v12H8zM4 16V4h12",
+  play: "M7 4l13 8-13 8z",
+  info: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7v1",
+  keyboard: "M2 6h20v12H2zM6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10",
+  unlink: "M9 15l-2 2a3 3 0 0 1-4-4l3-3M15 9l2-2a3 3 0 0 1 4 4l-3 3M4 4l16 16",
+  "chevron-down": "M6 9l6 6 6-6",
 } as const;
 
 export type IconName = keyof typeof PATHS;

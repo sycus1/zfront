@@ -6,11 +6,12 @@ import {
 } from "../GraphicsPresets";
 import { UserSettings } from "../UserSettings";
 import { translateText } from "../Utils";
+import { zfButton } from "./nightshift/Primitives";
 
 /**
  * Save / copy / import for the whole graphics configuration.
  *
- * Sits at the top level of the Graphics tab, beside the preset dropdown rather
+ * Sits at the top level of the Graphics tab, beside the preset picker rather
  * than inside the Advanced fold: saving what you just tuned is not itself a
  * tuning control, and a player who never expands Advanced should still find it.
  *
@@ -99,89 +100,90 @@ export class GraphicsPresetTools extends LitElement {
 
   render() {
     return html`
-      <div
-        class="flex flex-col w-full p-4 bg-white/5 border border-white/10 rounded-xl gap-3"
-      >
-        <div class="flex gap-3 items-center w-full">
-          <input
-            type="text"
-            id="graphics-preset-name"
-            aria-label=${translateText(
-              "graphics_setting.preset_name_placeholder",
-            )}
-            .value=${this.presetName}
-            placeholder=${translateText(
-              "graphics_setting.preset_name_placeholder",
-            )}
-            spellcheck="false"
-            maxlength="40"
-            @input=${this.onPresetNameInput}
-            class="flex-1 min-w-0 px-2 py-1.5 bg-black/40 border border-white/20 rounded-lg text-sm text-white"
-          />
-          <button
-            id="graphics-save-preset"
-            class="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-sm text-white disabled:opacity-50"
-            ?disabled=${this.presetName.trim() === ""}
-            @click=${this.onSavePreset}
-          >
-            ${translateText("graphics_setting.save_preset_label")}
-          </button>
-        </div>
-      </div>
-
-      <button
-        id="graphics-copy-json"
-        class="flex flex-row items-center justify-between w-full p-4 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all gap-4 text-left"
-        @click=${this.onCopyJson}
-      >
-        <div class="flex flex-col flex-1 min-w-0 mr-4">
-          <div class="text-white font-bold text-base block mb-1">
-            ${translateText("graphics_setting.copy_json_label")}
+      <div class="zf-tools">
+        <div class="zf-tools-row">
+          <div class="zf-ring">
+            <input
+              type="text"
+              id="graphics-preset-name"
+              class="zf-field zf-frame"
+              aria-label=${translateText(
+                "graphics_setting.preset_name_placeholder",
+              )}
+              .value=${this.presetName}
+              placeholder=${translateText(
+                "graphics_setting.preset_name_placeholder",
+              )}
+              spellcheck="false"
+              maxlength="40"
+              @input=${this.onPresetNameInput}
+            />
           </div>
-          <div class="text-white/50 text-sm leading-snug">
+          ${zfButton({
+            id: "graphics-save-preset",
+            label: translateText("graphics_setting.save_preset_label"),
+            variant: "outline-signal",
+            size: "sm",
+            disabled: this.presetName.trim() === "",
+            onClick: () => this.onSavePreset(),
+          })}
+        </div>
+
+        <div class="zf-tools-row">
+          <p class="zf-setting-desc" style="margin: 0; align-self: center">
             ${translateText("graphics_setting.copy_json_desc")}
+          </p>
+          ${zfButton({
+            id: "graphics-copy-json",
+            label: this.copiedJson
+              ? translateText("common.copied")
+              : translateText("graphics_setting.copy_json_label"),
+            icon: this.copiedJson ? "check" : "copy",
+            size: "sm",
+            onClick: () => void this.onCopyJson(),
+          })}
+        </div>
+
+        <div class="zf-text-field">
+          <label for="graphics-import-json" class="zf-tools-label">
+            ${translateText("graphics_setting.import_json_label")}
+          </label>
+          <span class="zf-setting-desc">
+            ${translateText("graphics_setting.import_json_desc")}
+          </span>
+          <div class="zf-ring">
+            <textarea
+              id="graphics-import-json"
+              class="zf-field zf-frame"
+              rows="3"
+              .value=${this.importText}
+              spellcheck="false"
+              aria-invalid=${this.importError ? "true" : "false"}
+              @input=${this.onImportTextInput}
+            ></textarea>
+          </div>
+          ${
+            this.importError
+              ? html`<div
+                  id="graphics-import-error"
+                  class="zf-field-error zf-frame"
+                  role="alert"
+                >
+                  ${translateText("graphics_setting.import_json_invalid")}
+                </div>`
+              : nothing
+          }
+          <div style="display: flex">
+            ${zfButton({
+              id: "graphics-import-apply",
+              label: translateText("graphics_setting.import_json_apply"),
+              variant: "outline-signal",
+              size: "sm",
+              disabled: this.importText.trim() === "",
+              onClick: () => this.onImportApply(),
+            })}
           </div>
         </div>
-        <div class="text-white/50 text-sm shrink-0">
-          ${this.copiedJson ? translateText("common.copied") : ""}
-        </div>
-      </button>
-
-      <div
-        class="flex flex-col w-full p-4 bg-white/5 border border-white/10 rounded-xl gap-2"
-      >
-        <div class="text-white font-bold text-base">
-          ${translateText("graphics_setting.import_json_label")}
-        </div>
-        <div class="text-white/50 text-sm leading-snug">
-          ${translateText("graphics_setting.import_json_desc")}
-        </div>
-        <textarea
-          id="graphics-import-json"
-          aria-label=${translateText("graphics_setting.import_json_label")}
-          rows="3"
-          .value=${this.importText}
-          spellcheck="false"
-          @input=${this.onImportTextInput}
-          class="w-full px-2 py-1.5 bg-black/40 border ${
-            this.importError ? "border-red-500" : "border-white/20"
-          } rounded-lg text-sm text-white font-mono"
-        ></textarea>
-        ${
-          this.importError
-            ? html`<div id="graphics-import-error" class="text-sm text-red-400">
-                ${translateText("graphics_setting.import_json_invalid")}
-              </div>`
-            : nothing
-        }
-        <button
-          id="graphics-import-apply"
-          class="self-start px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-sm text-white disabled:opacity-50"
-          ?disabled=${this.importText.trim() === ""}
-          @click=${this.onImportApply}
-        >
-          ${translateText("graphics_setting.import_json_apply")}
-        </button>
       </div>
     `;
   }

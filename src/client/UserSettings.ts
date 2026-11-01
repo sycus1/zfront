@@ -176,6 +176,27 @@ const AUDIO_RESET_KEYS: readonly string[] = [
  * whatever the player picks after the reset is theirs and survives.
  */
 const AUDIO_RESET_VERSION = 1;
+/**
+ * Every key the Settings page's Gameplay tab writes, for "Reset Gameplay to
+ * Defaults". The legacy ghostPricePill key is dropped too: cursorCostLabel
+ * falls back to it.
+ */
+const GAMEPLAY_RESET_KEYS: readonly string[] = [
+  "settings.alertFrame",
+  "settings.cursorCostLabel",
+  "settings.ghostPricePill",
+  "settings.snapBuildPreview",
+  "settings.leftClickOpensMenu",
+  "settings.anonymousNames",
+  "settings.lobbyIdVisibility",
+  "settings.lobbyStartAlerts",
+  "settings.goToPlayer",
+  "settings.helpMessages",
+  "settings.attackingTroopsOverlay",
+  "settings.attackRatio",
+  "settings.attackRatioIncrement",
+];
+
 const AUDIO_RESET_VERSION_KEY = "settings.audio.resetVersion";
 
 /** Every key that means "this player has chosen an audio volume before". */
@@ -971,6 +992,64 @@ export class UserSettings {
       "settings.audio.alertsWhenUnfocused",
       String(this.alertsWhenUnfocused()),
     );
+  }
+
+  /**
+   * Back to the defaults for every Gameplay-tab setting. As with
+   * resetAudio(), each change event carries the value the key now resolves
+   * to, so listeners that parse `detail` follow the reset.
+   */
+  resetGameplay(): void {
+    for (const key of GAMEPLAY_RESET_KEYS) {
+      this.removeCached(key, false);
+    }
+    const resolved: Record<string, string> = {
+      "settings.alertFrame": String(this.alertFrame()),
+      "settings.cursorCostLabel": String(this.cursorCostLabel()),
+      "settings.snapBuildPreview": String(this.snapBuildPreview()),
+      "settings.leftClickOpensMenu": String(this.leftClickOpensMenu()),
+      "settings.anonymousNames": String(this.anonymousNames()),
+      "settings.lobbyIdVisibility": String(this.lobbyIdVisibility()),
+      "settings.lobbyStartAlerts": String(this.lobbyStartAlerts()),
+      "settings.goToPlayer": String(this.goToPlayer()),
+      "settings.helpMessages": String(this.helpMessages()),
+      "settings.attackingTroopsOverlay": String(this.attackingTroopsOverlay()),
+      "settings.attackRatio": String(this.attackRatio()),
+      "settings.attackRatioIncrement": String(this.attackRatioIncrement()),
+    };
+    for (const [key, value] of Object.entries(resolved)) {
+      this.emitChange(key, value);
+    }
+  }
+
+  /**
+   * Back to the defaults for every Graphics-tab setting: the graphics
+   * overrides (so the Default preset), HUD opacity, emojis, the performance
+   * overlay and map layers. The player's saved presets are kept: they are
+   * things the player made, not settings.
+   */
+  resetGraphics(): void {
+    for (const key of [
+      "settings.hudOpacity",
+      "settings.emojis",
+      PERFORMANCE_OVERLAY_KEY,
+      MAP_LAYERS_KEY,
+    ]) {
+      this.removeCached(key, false);
+    }
+    this.emitChange("settings.hudOpacity", String(this.hudOpacity()));
+    this.emitChange("settings.emojis", String(this.emojis()));
+    this.emitChange(PERFORMANCE_OVERLAY_KEY, String(this.performanceOverlay()));
+    // No event of its own for MAP_LAYERS_KEY: everything that follows it also
+    // follows GRAPHICS_KEY, announced last, once both are back to default —
+    // a separate event would push the layers to the renderer twice, the
+    // first time with the old overrides.
+    this.setGraphicsOverrides({});
+  }
+
+  /** Every action back on its default key (nothing rebound or unbound). */
+  resetKeybinds(): void {
+    this.setKeybinds({});
   }
 
   /**

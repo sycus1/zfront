@@ -26,17 +26,20 @@ export function zfPrimaryButton(opts: {
   onClick: () => void;
   disabled?: boolean;
   busy?: boolean;
+  icon?: IconName;
+  id?: string;
 }): TemplateResult {
   return html`<div class="zf-ring">
     <button
       type="button"
+      id=${ifDefined(opts.id)}
       class="zf-btn zf-btn-ink zf-btn-lg zf-frame zf-sweep"
       ?disabled=${opts.disabled}
       aria-busy=${opts.busy ? "true" : "false"}
       @click=${opts.onClick}
     >
       <span>${opts.label}</span>
-      ${zfIcon("arrow-right", 36, 3)}
+      ${zfIcon(opts.icon ?? "arrow-right", 36, 3)}
     </button>
   </div>`;
 }
@@ -336,4 +339,145 @@ export function zfMapBackdrop(image: string, shade = 0.72): TemplateResult {
     .src=${image}
     .shade=${shade}
   ></zf-map-backdrop>`;
+}
+
+export interface TabDef {
+  key: string;
+  label: string;
+}
+
+/**
+ * Switches between the sections of one page (Settings: GAMEPLAY, GRAPHICS,
+ * AUDIO, KEYBINDS). Stencil capitals beside the page title on desktop; on
+ * phone the tabs share the width in equal columns and never scroll.
+ * Left/Right arrows move between tabs, per the ARIA tabs pattern.
+ */
+export function zfTabs(opts: {
+  label: string;
+  tabs: TabDef[];
+  active: string;
+  /** id of the tabpanel the tabs control. */
+  panelId: string;
+  onSelect: (key: string) => void;
+}): TemplateResult {
+  const keys = opts.tabs.map((t) => t.key);
+  const onKeyDown = (e: KeyboardEvent) => {
+    const step =
+      e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : undefined;
+    const index = keys.indexOf(opts.active);
+    let next: number | undefined;
+    if (step !== undefined) {
+      next = (index + step + keys.length) % keys.length;
+    } else if (e.key === "Home") {
+      next = 0;
+    } else if (e.key === "End") {
+      next = keys.length - 1;
+    }
+    if (next === undefined) return;
+    e.preventDefault();
+    opts.onSelect(keys[next]);
+    const row = (e.currentTarget as HTMLElement | null) ?? null;
+    queueMicrotask(() =>
+      row?.querySelector<HTMLElement>(`[data-key="${keys[next!]}"]`)?.focus(),
+    );
+  };
+  return html`<div
+    role="tablist"
+    aria-label=${opts.label}
+    class="zf-tabs"
+    style="--zf-tab-count: ${opts.tabs.length}"
+    @keydown=${onKeyDown}
+  >
+    ${opts.tabs.map((t) => {
+      const on = t.key === opts.active;
+      return html`<div class="zf-ring">
+        <button
+          type="button"
+          role="tab"
+          id="${opts.panelId}-tab-${t.key}"
+          data-key=${t.key}
+          aria-selected=${on ? "true" : "false"}
+          aria-controls=${opts.panelId}
+          tabindex=${on ? "0" : "-1"}
+          class="zf-tab zf-frame zf-sweep"
+          @click=${() => opts.onSelect(t.key)}
+        >
+          ${t.label}
+        </button>
+      </div>`;
+    })}
+  </div>`;
+}
+
+export type ButtonVariant =
+  | "signal"
+  | "outline"
+  | "outline-signal"
+  | "danger"
+  | "danger-solid";
+
+/**
+ * A secondary action: stencil capitals (md) or small spaced capitals (sm).
+ * `danger` is for destructive actions only (Reset to Defaults, Delete).
+ */
+export function zfButton(opts: {
+  label: string;
+  onClick: (e: MouseEvent) => void;
+  variant?: ButtonVariant;
+  size?: "sm" | "md";
+  icon?: IconName;
+  id?: string;
+  disabled?: boolean;
+  title?: string;
+  ariaLabel?: string;
+}): TemplateResult {
+  const size = opts.size ?? "md";
+  return html`<div class="zf-ring">
+    <button
+      type="button"
+      id=${ifDefined(opts.id)}
+      class="zf-btn zf-btn-${size} zf-btn-${opts.variant ?? "outline"} zf-frame zf-sweep"
+      ?disabled=${opts.disabled}
+      title=${ifDefined(opts.title)}
+      aria-label=${ifDefined(opts.ariaLabel)}
+      @click=${opts.onClick}
+    >
+      ${opts.icon ? zfIcon(opts.icon, size === "sm" ? 16 : 22, 3) : nothing}
+      <span>${opts.label}</span>
+    </button>
+  </div>`;
+}
+
+/** A keyboard key, as a raised cap in the data face. */
+export function zfKeyCap(label: string): TemplateResult {
+  // Key names stay left-to-right inside RTL locales.
+  return html`<kbd dir="ltr" class="zf-keycap zf-frame">${label}</kbd>`;
+}
+
+/** A tip: line border, cream text, a signal icon. */
+export function zfNote(text: string, icon: IconName = "info"): TemplateResult {
+  return html`<p class="zf-note zf-frame">
+    ${zfIcon(icon, 18, 3)}<span>${text}</span>
+  </p>`;
+}
+
+/**
+ * Something has gone wrong or is about to: the only place red text appears.
+ * A stencil title and one plain sentence.
+ */
+export function zfAlert(opts: {
+  title: string;
+  text: string;
+  live?: boolean;
+}): TemplateResult {
+  return html`<div
+    class="zf-alert zf-frame"
+    role=${ifDefined(opts.live ? "alert" : undefined)}
+  >
+    ${zfIcon("warning", 26, 3)}
+    <div>
+      <strong class="zf-alert-title">${opts.title}</strong>
+      <span>${opts.text}</span>
+    </div>
+  </div>`;
 }

@@ -1,5 +1,6 @@
-import { html, LitElement } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { ifDefined } from "lit/directives/if-defined.js";
 import {
   BUILTIN_PRESETS,
   migrateLegacyGraphicsSettings,
@@ -14,14 +15,15 @@ import {
   UserSettings,
 } from "../UserSettings";
 import { translateText } from "../Utils";
+import { zfIcon } from "./nightshift/Icon";
 
 const CUSTOM_VALUE = "custom";
 
 /**
- * Dropdown that applies a graphics preset (built-ins + the player's saved
- * ones) wholesale. Shows a disabled "Custom" entry while the current
- * overrides match no preset, and a delete button when a saved preset is
- * selected. Self-contained: reads/writes UserSettings directly and re-renders
+ * Applies a graphics preset (built-ins + the player's saved ones) wholesale:
+ * a Night Shift OptionGroup, one stencil radio per preset. Shows a checked
+ * "Custom" entry while the current overrides match no preset, and a delete
+ * button beside a saved preset while it is selected. Self-contained: reads/writes UserSettings directly and re-renders
  * on the settings-changed events, so hosts just drop the element in.
  */
 @customElement("graphics-preset-selector")
@@ -96,8 +98,7 @@ export class GraphicsPresetSelector extends LitElement {
     return CUSTOM_VALUE;
   }
 
-  private onSelect(event: Event) {
-    const value = (event.target as HTMLSelectElement).value;
+  private onSelect(value: string) {
     const overrides = this.overridesForValue(value);
     if (overrides !== undefined) {
       // Snapshot pre-preset custom settings before the first wholesale
@@ -122,52 +123,85 @@ export class GraphicsPresetSelector extends LitElement {
     this.userSettings.setGraphicsPresets(presets);
   }
 
+  private option(value: string, label: string, title: string | undefined) {
+    const on = this.selectedValue() === value;
+    return html`<div class="zf-ring">
+      <button
+        type="button"
+        role="radio"
+        aria-checked=${on ? "true" : "false"}
+        data-value=${value}
+        title=${ifDefined(title)}
+        class="zf-option zf-frame zf-sweep"
+        @click=${() => this.onSelect(value)}
+      >
+        ${label}
+      </button>
+    </div>`;
+  }
+
   render() {
     const selected = this.selectedValue();
     const userPresets = Object.keys(this.userSettings.graphicsPresets());
+    // One stencil radio per preset. CUSTOM is shown, checked, only while the
+    // overrides match no preset; it cannot be picked.
     return html`
-      <div class="flex gap-2 items-center">
-        <select
-          @change=${this.onSelect}
-          class="flex-1 min-w-0 px-2 py-1.5 bg-slate-900 border border-slate-500 rounded-sm text-sm text-white cursor-pointer"
-        >
-          ${
-            selected === CUSTOM_VALUE
-              ? html`<option value=${CUSTOM_VALUE} .selected=${true} disabled>
-                  ${translateText("graphics_setting.preset_custom")}
-                </option>`
-              : null
-          }
-          ${BUILTIN_PRESETS.map(
-            (preset) =>
-              html`<option
-                value=${`builtin:${preset.nameKey}`}
-                .selected=${selected === `builtin:${preset.nameKey}`}
-              >
-                ${translateText(preset.nameKey)}
-              </option>`,
-          )}
-          ${userPresets.map(
-            (name) =>
-              html`<option
-                value=${`user:${name}`}
-                .selected=${selected === `user:${name}`}
-              >
-                ${name}
-              </option>`,
-          )}
-        </select>
+      <div
+        class="zf-preset-grid"
+        role="radiogroup"
+        aria-label=${translateText("user_setting.graphics_preset_label")}
+      >
+        ${BUILTIN_PRESETS.map((preset) =>
+          this.option(
+            `builtin:${preset.nameKey}`,
+            translateText(preset.nameKey),
+            translateText(preset.descKey),
+          ),
+        )}
+        ${userPresets.map(
+          (name) =>
+            html`<div class="zf-preset-saved">
+              ${this.option(`user:${name}`, name, undefined)}
+              ${
+                selected === `user:${name}`
+                  ? html`<div class="zf-ring">
+                      <button
+                        type="button"
+                        class="zf-icon-btn zf-icon-btn-danger zf-frame zf-sweep"
+                        aria-label=${translateText(
+                          "graphics_setting.preset_delete",
+                          { name },
+                        )}
+                        title=${translateText(
+                          "graphics_setting.preset_delete",
+                          {
+                            name,
+                          },
+                        )}
+                        @click=${this.onDelete}
+                      >
+                        ${zfIcon("close", 18, 3)}
+                      </button>
+                    </div>`
+                  : nothing
+              }
+            </div>`,
+        )}
         ${
-          selected.startsWith("user:")
-            ? html`
+          selected === CUSTOM_VALUE
+            ? html`<div class="zf-ring">
                 <button
-                  class="px-2 py-1 text-slate-400 hover:text-white"
-                  @click=${this.onDelete}
+                  type="button"
+                  role="radio"
+                  aria-checked="true"
+                  aria-disabled="true"
+                  data-custom
+                  class="zf-option zf-frame"
                 >
-                  ✕
+                  ${translateText("graphics_setting.preset_custom")}
                 </button>
-              `
-            : null
+              </div>`
+            : nothing
         }
       </div>
     `;
