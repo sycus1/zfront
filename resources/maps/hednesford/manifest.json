@@ -1,0 +1,30 @@
+{
+  "categories": ["new", "europe"],
+  "id": "Hednesford",
+  "layers": [
+    {
+      "id": "roads",
+      "placement": "land"
+    }
+  ],
+  "map": {
+    "height": 400,
+    "num_land_tiles": 159903,
+    "width": 400
+  },
+  "map16x": {
+    "height": 100,
+    "num_land_tiles": 9988,
+    "width": 100
+  },
+  "map4x": {
+    "height": 200,
+    "num_land_tiles": 39967,
+    "width": 200
+  },
+  "metres_per_tile": 3,
+  "multiplayer_frequency": 0,
+  "name": "Hednesford",
+  "nations": [],
+  "translation_key": "map.hednesford"
+}

@@ -5,6 +5,8 @@
 export enum GameMapType {
   Bath = "Bath", // map-generator/assets/maps/bath/info.json
   Britannia = "Britannia", // map-generator/assets/maps/britannia/info.json
+  Cannock = "Cannock", // map-generator/assets/maps/cannock/info.json
+  Hednesford = "Hednesford", // map-generator/assets/maps/hednesford/info.json
   Sheffield = "Sheffield", // map-generator/assets/maps/sheffield/info.json
   Whitby = "Whitby", // map-generator/assets/maps/whitby/info.json
 }
@@ -142,6 +144,32 @@ export const maps: readonly MapInfo[] = [
     specialFrequency: -1,
     defaultNationCount: 20,
     themes: ["europe"],
+  },
+  {
+    id: "Cannock",
+    type: GameMapType.Cannock,
+    translationKey: "map.cannock",
+    categories: ["new", "europe"],
+    multiplayerFrequency: 0,
+    ffaFrequency: -1,
+    teamFrequency: -1,
+    specialFrequency: -1,
+    defaultNationCount: 0,
+    layers: [{ id: "roads", placement: "land" }],
+    metresPerTile: 3,
+  },
+  {
+    id: "Hednesford",
+    type: GameMapType.Hednesford,
+    translationKey: "map.hednesford",
+    categories: ["new", "europe"],
+    multiplayerFrequency: 0,
+    ffaFrequency: -1,
+    teamFrequency: -1,
+    specialFrequency: -1,
+    defaultNationCount: 0,
+    layers: [{ id: "roads", placement: "land" }],
+    metresPerTile: 3,
   },
   {
     id: "Sheffield",

@@ -1,0 +1,15 @@
+{
+  "id": "Hednesford",
+  "name": "Hednesford",
+  "translation_key": "map.hednesford",
+  "categories": ["new", "europe"],
+  "multiplayer_frequency": 0,
+  "layers": [
+    {
+      "id": "roads",
+      "placement": "land"
+    }
+  ],
+  "nations": [],
+  "metres_per_tile": 3
+}

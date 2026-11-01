@@ -467,6 +467,19 @@ _2026-11-01._ Dan found no reason to expand past an Outpost or two for wall anch
 
 `balance:horde` has a `districts` strategy: `turrets`, plus an Outpost in a Wild district towards each announced wave whenever it may hold another. It shows where each wave landed (mean distance from the HQ) and districts held. With `--zone 0`, `turrets` and `districts` both win Bath, Sheffield and Whitby. With Outposts held, waves on that side land about 140-180 tiles out instead of about 110-130, and Outposts start being overrun in waves 9 and 10. With no Outposts, districts on and off give the same results except Whitby, where `turrets` now wins (it lost wave 10) and `spans` keeps more HQ.
 
+## Cannock and Hednesford
+
+_2026-11-01._ Dan asked for a Cannock map, or Hednesford. Both are made the same way as Bath, Sheffield and Whitby (`scripts/realmap`, 1.2 km square at 3 m a tile): Cannock centred on the town centre and its ring road (52.6905, -2.0300), Hednesford on Market Street, the station and Hednesford Park (52.7108, -2.0005). Cannock is 19% buildings, Hednesford 13%; neither has much water. They ship on the jittered district grid from #41; hand-painted district maps come with the district-maps work.
+
+Tuned with the four defended strategies that build no walls (`turrets`, `scavenge`, `mortars`, `districts`) and `lone`, at seven HQ spots per town (the centre and six spots 90 tiles out), `--zone 0`. At current settings the other towns win 17 (Bath), 13 (Sheffield) and 26 (Whitby) of those 28 games. Cannock is a cliff between a first wave of 150 at 46% growth (23 of 28) and 165 at 47% (9); Hednesford is a little easier than Cannock.
+
+| Map        | first wave | growth | wins of 28 | losses                                                   |
+| ---------- | ---------- | ------ | ---------- | -------------------------------------------------------- |
+| Cannock    | 155        | 46%    | 18         | `scavenge`, `mortars`, waves 8-10                        |
+| Hednesford | 160        | 47%    | 16         | `scavenge`, `mortars` waves 7-10, `turrets` once wave 10 |
+
+A lone first turret holds wave 1 at every spot on both, and `districts` wins every game, holding 2-5 districts and pushing landings out from about 115 to 150-180 tiles, as on the other towns.
+
 ## Prerequisites
 
 - npm 12.1 or later. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`. The machine currently has npm 11.19.

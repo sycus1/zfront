@@ -19,5 +19,19 @@
     "lon": -0.6148,
     "sizeKm": 1.2,
     "metresPerTile": 3
+  },
+  "cannock": {
+    "name": "Cannock",
+    "lat": 52.6905,
+    "lon": -2.03,
+    "sizeKm": 1.2,
+    "metresPerTile": 3
+  },
+  "hednesford": {
+    "name": "Hednesford",
+    "lat": 52.7108,
+    "lon": -2.0005,
+    "sizeKm": 1.2,
+    "metresPerTile": 3
   }
 }

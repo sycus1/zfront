@@ -1,0 +1,30 @@
+{
+  "categories": ["new", "europe"],
+  "id": "Cannock",
+  "layers": [
+    {
+      "id": "roads",
+      "placement": "land"
+    }
+  ],
+  "map": {
+    "height": 400,
+    "num_land_tiles": 160000,
+    "width": 400
+  },
+  "map16x": {
+    "height": 100,
+    "num_land_tiles": 10000,
+    "width": 100
+  },
+  "map4x": {
+    "height": 200,
+    "num_land_tiles": 40000,
+    "width": 200
+  },
+  "metres_per_tile": 3,
+  "multiplayer_frequency": 0,
+  "name": "Cannock",
+  "nations": [],
+  "translation_key": "map.cannock"
+}
