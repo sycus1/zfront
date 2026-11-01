@@ -50,7 +50,7 @@ const STYLE = `
   position: absolute; transform: translate(-50%, -50%);
   display: flex; align-items: center; justify-content: center;
   min-width: 30px; height: 22px; padding: 0 6px; border-radius: 9999px;
-  font: 600 11px/1 system-ui, sans-serif; color: #fff; white-space: nowrap;
+  font: 600 11px/1 system-ui, sans-serif; white-space: nowrap;
   background: currentColor; border: 1.5px solid rgba(255, 255, 255, 0.9);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
   pointer-events: auto; cursor: pointer; user-select: none;
