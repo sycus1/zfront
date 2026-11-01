@@ -394,6 +394,77 @@ export function resolveKeybindLabel(
   return formatKeyForDisplay(valueCode);
 }
 
+/** Short key-cap names, as on the Night Shift boards (CTRL, SPACE, ↑). */
+const KEY_CAP_NAMES: Record<string, string> = {
+  " ": "SPACE",
+  Space: "SPACE",
+  Control: "CTRL",
+  ControlLeft: "CTRL",
+  ControlRight: "CTRL",
+  Shift: "SHIFT",
+  ShiftLeft: "SHIFT",
+  ShiftRight: "SHIFT",
+  Escape: "ESC",
+  Esc: "ESC",
+  Enter: "ENTER",
+  Tab: "TAB",
+  Backspace: "BKSP",
+  Delete: "DEL",
+  Insert: "INS",
+  Home: "HOME",
+  End: "END",
+  PageUp: "PG UP",
+  PageDown: "PG DN",
+  CapsLock: "CAPS",
+  ArrowUp: "↑",
+  ArrowDown: "↓",
+  ArrowLeft: "←",
+  ArrowRight: "→",
+  Minus: "-",
+  Equal: "=",
+  Period: ".",
+  Comma: ",",
+  Slash: "/",
+  Backslash: "\\",
+  Semicolon: ";",
+  Quote: "'",
+  BracketLeft: "[",
+  BracketRight: "]",
+  Backquote: "`",
+  NumpadAdd: "NUM +",
+  NumpadSubtract: "NUM -",
+  NumpadMultiply: "NUM *",
+  NumpadDivide: "NUM /",
+  NumpadDecimal: "NUM .",
+  NumpadEnter: "NUM ENTER",
+};
+
+/**
+ * The text on a key cap: a key code (`ControlLeft`, `KeyA`, `Shift+Digit1`)
+ * or an already-resolved label (`a`, `Shift+A`, the layout's character) in
+ * the short capital form the Night Shift caps use — CTRL, SPACE, ESC, ↑,
+ * NUM +, SHIFT + A. Alt and Meta follow the platform: OPT and CMD on a Mac,
+ * ALT and WIN elsewhere. Toasts and overlays keep formatKeyForDisplay().
+ */
+export function keyCapLabel(value: string, isMac = false): string {
+  if (!value || value === "Null") return "";
+  const shiftPrefix = getKeybindShiftPrefix();
+  for (const prefix of new Set(["Shift+", shiftPrefix])) {
+    if (value.length > prefix.length && value.startsWith(prefix)) {
+      return `SHIFT + ${keyCapLabel(value.slice(prefix.length), isMac)}`;
+    }
+  }
+  if (KEY_CAP_NAMES[value] !== undefined) return KEY_CAP_NAMES[value];
+  if (/^(Alt|AltLeft|AltRight)$/.test(value)) return isMac ? "OPT" : "ALT";
+  if (/^(Meta|MetaLeft|MetaRight|OS|OSLeft|OSRight)$/.test(value)) {
+    return isMac ? "CMD" : "WIN";
+  }
+  if (/^Key[A-Z]$/.test(value)) return value.slice(3);
+  if (/^Digit\d$/.test(value)) return value.slice(5);
+  if (/^Numpad\d$/.test(value)) return `NUM ${value.slice(6)}`;
+  return value.toUpperCase();
+}
+
 export function formatKeyForDisplay(value: string): string {
   // Handle empty string
   if (!value) return "";

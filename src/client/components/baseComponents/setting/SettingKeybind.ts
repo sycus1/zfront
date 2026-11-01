@@ -1,7 +1,8 @@
 import { html, LitElement, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { ifDefined } from "lit/directives/if-defined.js";
-import { formatKeyForDisplay, translateText } from "../../../../client/Utils";
+import { keyCapLabel, translateText } from "../../../../client/Utils";
+import { Platform } from "../../../Platform";
 import { zfIcon } from "../../nightshift/Icon";
 
 @customElement("setting-keybind")
@@ -87,7 +88,7 @@ export class SettingKeybind extends LitElement {
 
   private displayKey(key: string): string {
     if (!key || key === "Null") return translateText("common.none");
-    return formatKeyForDisplay(key);
+    return keyCapLabel(key, Platform.isMac);
   }
 
   private startListening() {
