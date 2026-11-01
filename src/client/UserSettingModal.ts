@@ -2,7 +2,7 @@ import type { MapLayer } from "@openfront/engine-api/game/MapFiles";
 import { html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import {
-  formatKeyForDisplay,
+  keyCapLabel,
   resolveKeybindLabel,
   translateText,
 } from "../client/Utils";
@@ -21,8 +21,10 @@ import "./components/GraphicsAdvancedSettings";
 import type { GraphicsAdvancedSettings } from "./components/GraphicsAdvancedSettings";
 import "./components/GraphicsPresetSelector";
 import "./components/GraphicsPresetTools";
+import { zfIcon } from "./components/nightshift/Icon";
 import {
   zfButton,
+  zfKeyCap,
   zfNote,
   zfPrimaryButton,
   zfTile,
@@ -560,38 +562,25 @@ export class UserSettingModal extends BaseModal {
       value !== "Null" &&
       !isAllowedSharedModifier
     ) {
-      const displayKey = formatKeyForDisplay(key || value);
       window.dispatchEvent(
         new CustomEvent("show-message", {
           detail: {
             message: html`
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-6 w-6 text-red-500 inline-block align-middle mr-2"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
-              <span class="font-medium">
-                ${(() => {
-                  const placeholder = "__KEY__";
-                  const message = translateText(
-                    "user_setting.keybind_conflict_error",
-                    { key: placeholder },
-                  );
-                  const [prefix, suffix] = message.split(placeholder);
-                  return html`${prefix}<span
-                      class="font-mono font-bold bg-white/10 px-1.5 py-0.5 rounded text-red-200 mx-1 border border-white/10"
-                      >${displayKey}</span
-                    >${suffix || ""}`;
-                })()}
+              <span class="inline-flex items-center gap-2 text-zf-horde-300">
+                ${zfIcon("warning", 22, 2.8)}
+                <span>
+                  ${(() => {
+                    const placeholder = "__KEY__";
+                    const message = translateText(
+                      "user_setting.keybind_conflict_error",
+                      { key: placeholder },
+                    );
+                    const [prefix, suffix] = message.split(placeholder);
+                    return html`${prefix}${zfKeyCap(
+                      keyCapLabel(key || value, Platform.isMac),
+                    )}${suffix || ""}`;
+                  })()}
+                </span>
               </span>
             `,
             color: "red",
@@ -655,8 +644,9 @@ export class UserSettingModal extends BaseModal {
     this.showEasterEggSettings = true;
     const popup = document.createElement("div");
     popup.className =
-      "fixed top-10 left-1/2 p-4 px-6 bg-black/80 text-white text-xl rounded-xl animate-fadePop z-[9999]";
-    popup.textContent = "🎉 You found a secret setting!";
+      "zf-frame fixed top-10 left-1/2 px-6 py-4 font-zf-display font-black text-3xl uppercase text-zf-signal-400 [--zf-fill:var(--color-zf-ink-900)] [--zf-border:var(--color-zf-signal-400)] animate-fadePop z-[9999]";
+    popup.setAttribute("role", "status");
+    popup.textContent = translateText("user_setting.easter_found");
     document.body.appendChild(popup);
 
     setTimeout(() => {

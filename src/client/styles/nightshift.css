@@ -2243,3 +2243,727 @@
     line-height: 1;
   }
 }
+
+/* ---- Phase 4: the in-game HUD -------------------------------------------- */
+
+/*
+ * Framed panels over the map (the "A2 compact bar" board): dark, 90% opaque,
+ * with a 2px line border and the clipped corner. Big numbers are JetBrains
+ * Mono, labels small spaced capitals, alerts stencil. Below 1024px the HUD
+ * switches to the phone board: a header bar across the top and the build
+ * strip across the bottom.
+ */
+@layer components {
+  .zf-hud {
+    --zf-cut: var(--zf-cut-lg);
+    --zf-fill: rgb(17 17 17 / 0.9);
+    --zf-border: var(--color-zf-line-600);
+    --zf-ink: var(--color-zf-cream-100);
+    font-family: var(--font-zf-body);
+    pointer-events: auto;
+  }
+  .zf-hud-sm {
+    --zf-cut: var(--zf-cut-sm);
+  }
+  .zf-hud-danger {
+    --zf-border: var(--color-zf-horde-500);
+    --zf-ink: var(--color-zf-horde-300);
+  }
+  .zf-hud-label {
+    font-family: var(--font-zf-body);
+    font-weight: 800;
+    font-size: 12px;
+    line-height: 1;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-zf-muted-300);
+    white-space: nowrap;
+  }
+  .zf-hud-label-signal {
+    color: var(--color-zf-signal-400);
+  }
+  .zf-num {
+    font-family: var(--font-zf-data);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .zf-stencil {
+    font-family: var(--font-zf-display);
+    font-weight: 900;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .zf-hud-muted {
+    color: var(--color-zf-muted-400);
+  }
+
+  /* HQ health as ten blocks; red once it is low. */
+  .zf-hq-bar {
+    display: flex;
+    gap: 3px;
+  }
+  .zf-hq-bar > span {
+    width: 12px;
+    height: 16px;
+    background: var(--color-zf-line-600);
+  }
+  .zf-hq-bar > .zf-on {
+    background: var(--color-zf-signal-400);
+  }
+  .zf-hq-bar-low > .zf-on {
+    background: var(--color-zf-horde-500);
+  }
+
+  /* The wave panel, top centre. */
+  .zf-wave {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    z-index: 1001;
+    width: min(640px, calc(100vw - 32px));
+    transform: translateX(-50%);
+    user-select: none;
+  }
+  .zf-wave-top {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    padding: 14px 20px 12px;
+  }
+  .zf-wave-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .zf-wave-num {
+    font-size: 46px;
+    color: var(--color-zf-signal-400);
+  }
+  .zf-wave-alive {
+    font-size: 28px;
+  }
+  .zf-wave-hq {
+    margin-left: auto;
+    align-items: flex-end;
+    gap: 6px;
+  }
+  .zf-wave-next {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 20px 14px;
+    border-top: 1px solid var(--color-zf-line-700);
+  }
+  .zf-wave-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .zf-wave-when {
+    font-size: 18px;
+  }
+  .zf-wave-from {
+    font-weight: 800;
+    font-size: 14px;
+  }
+  .zf-wave-size {
+    margin-left: auto;
+    font-size: 14px;
+    color: var(--color-zf-muted-300);
+  }
+  .zf-wave-note {
+    font-weight: 800;
+    font-size: 14px;
+    color: var(--color-zf-signal-400);
+  }
+  .zf-wave-note-danger {
+    color: var(--color-zf-horde-300);
+  }
+  .zf-wave-final {
+    color: var(--color-zf-horde-300);
+  }
+  .zf-wave-header-only {
+    display: none;
+  }
+  .zf-call-wave {
+    --zf-fill: var(--color-zf-signal-400);
+    --zf-border: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-ink-900);
+    --zf-sweep-a: var(--color-zf-ink-900);
+    --zf-sweep-b: var(--color-zf-signal-400);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    min-height: 48px;
+    padding: 0 14px;
+    border: 0;
+    font-size: 24px;
+  }
+  .zf-call-wave .zf-num {
+    font-size: 14px;
+  }
+
+  /* HQ UNDER ATTACK, under the wave panel. */
+  .zf-hq-alert {
+    --zf-fill: var(--color-zf-ink-900);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 12px auto 0;
+    width: fit-content;
+    padding: 12px 18px;
+  }
+  .zf-hq-alert .zf-stencil {
+    font-size: 30px;
+  }
+
+  /* Gold, top left. */
+  .zf-gold {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 1001;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 18px;
+  }
+  .zf-gold-value {
+    font-size: 30px;
+    color: var(--color-zf-signal-400);
+  }
+  .zf-gold-gain {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    font-size: 13px;
+    color: var(--color-zf-signal-400);
+    animation: zf-gold-gain 250ms ease-out;
+  }
+  @keyframes zf-gold-gain {
+    from {
+      transform: translateY(4px);
+      opacity: 0;
+    }
+  }
+
+  /* Troops and the attack ratio, bottom left. */
+  .zf-troops {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 340px;
+    padding: 12px 16px 10px;
+  }
+  .zf-troops-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .zf-troops-bar {
+    position: relative;
+    height: 10px;
+    background: var(--color-zf-line-600);
+    overflow: hidden;
+  }
+  .zf-troops-bar > span {
+    position: absolute;
+    inset: 0;
+    transform-origin: left;
+    transition: transform 200ms ease-out;
+  }
+  .zf-troops-home {
+    background: var(--color-zf-signal-400);
+  }
+  .zf-troops-out {
+    background: var(--color-zf-cream-100);
+    opacity: 0.55;
+  }
+  .zf-troops-count {
+    font-size: 18px;
+  }
+  .zf-troops-rate {
+    font-size: 13px;
+    color: var(--color-zf-signal-400);
+  }
+  .zf-troops-rate-down {
+    color: var(--color-zf-muted-300);
+  }
+  .zf-troops .zf-range {
+    height: 22px;
+  }
+  .zf-troops-note {
+    font-weight: 700;
+    font-size: 13px;
+    line-height: 1.3;
+  }
+  .zf-troops-note-warn {
+    color: var(--color-zf-horde-300);
+  }
+
+  /* The build strip, bottom centre, with the selected building's tag. */
+  .zf-build {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    pointer-events: none;
+  }
+  .zf-build-tag {
+    --zf-fill: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-ink-900);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: min(440px, calc(100vw - 16px));
+    padding: 6px 12px;
+  }
+  .zf-build-tag-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .zf-build-tag .zf-stencil {
+    font-size: 22px;
+  }
+  .zf-build-tag-level {
+    font-weight: 800;
+    font-size: 12px;
+  }
+  .zf-build-tag-desc {
+    font-weight: 700;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  .zf-build-strip {
+    display: flex;
+    gap: 4px;
+    padding: 6px;
+    pointer-events: auto;
+  }
+  .zf-build-btn {
+    --zf-ink: var(--color-zf-cream-100);
+    --zf-invert-fill: var(--color-zf-signal-400);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+    width: 56px;
+    min-height: 76px;
+    padding: 12px 0 6px;
+    border: 0;
+  }
+  .zf-build-btn[aria-pressed="true"] {
+    --zf-fill: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-ink-900);
+    --zf-sweep-a: var(--color-zf-ink-900);
+    --zf-sweep-b: var(--color-zf-signal-400);
+  }
+  .zf-build-btn img {
+    width: 26px;
+    height: 26px;
+    filter: brightness(0) invert(1);
+  }
+  .zf-build-btn[aria-pressed="true"] img {
+    filter: brightness(0);
+  }
+  .zf-build-key {
+    position: absolute;
+    top: 3px;
+    left: 4px;
+    font-size: 10px;
+    color: var(--color-zf-muted-400);
+  }
+  .zf-build-cost {
+    font-size: 12px;
+    color: var(--color-zf-signal-400);
+  }
+  .zf-build-btn[aria-pressed="true"] .zf-build-key,
+  .zf-build-btn[aria-pressed="true"] .zf-build-cost {
+    color: var(--color-zf-ink-900);
+  }
+  .zf-build-btn.zf-cannot-afford {
+    opacity: 0.4;
+  }
+
+  /* Pause, speed, settings, fullscreen, exit: bottom right. */
+  .zf-hud-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    pointer-events: auto;
+  }
+  .zf-hud-btn {
+    --zf-fill: rgb(17 17 17 / 0.9);
+    --zf-border: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-signal-400);
+    --zf-invert-fill: var(--color-zf-signal-400);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    padding: 0;
+    border: 0;
+  }
+  .zf-hud-btn-wide {
+    width: 64px;
+    font-size: 18px;
+  }
+  .zf-hud-btn[aria-pressed="true"] {
+    --zf-fill: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-ink-900);
+    --zf-sweep-a: var(--color-zf-ink-900);
+    --zf-sweep-b: var(--color-zf-signal-400);
+  }
+  .zf-hud-timer {
+    display: inline-flex;
+    align-items: center;
+    height: 52px;
+    padding: 0 12px;
+    font-size: 16px;
+  }
+  .zf-hud-timer-last-minute {
+    --zf-border: var(--color-zf-horde-500);
+    --zf-ink: var(--color-zf-horde-300);
+  }
+  .zf-speed-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+  }
+  .zf-speed-options {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .zf-speed-option {
+    --zf-border: var(--color-zf-line-600);
+    --zf-ink: var(--color-zf-cream-100);
+    --zf-invert-fill: var(--color-zf-signal-400);
+    min-width: 56px;
+    min-height: 44px;
+    padding: 0 8px;
+    border: 0;
+    font-size: 14px;
+  }
+  .zf-speed-option[aria-pressed="true"] {
+    --zf-fill: var(--color-zf-signal-400);
+    --zf-border: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-ink-900);
+    --zf-sweep-a: var(--color-zf-ink-900);
+    --zf-sweep-b: var(--color-zf-signal-400);
+  }
+
+  /* A small setting or unit name, as in the in-game menu's modifiers. */
+  .zf-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border: 2px solid var(--color-zf-line-600);
+    font-family: var(--font-zf-body);
+    font-weight: 800;
+    font-size: 12px;
+    line-height: 1.2;
+    color: var(--color-zf-muted-300);
+  }
+  .zf-tag-signal {
+    border-color: var(--color-zf-signal-400);
+    color: var(--color-zf-signal-400);
+  }
+
+  /* The in-game menu: a column of framed rows, each an icon, a title and a
+     line about it. */
+  .zf-game-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .zf-game-menu-item {
+    --zf-border: var(--color-zf-line-600);
+    --zf-ink: var(--color-zf-cream-100);
+    --zf-invert-fill: var(--color-zf-signal-400);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 12px 14px;
+    border: 0;
+    text-align: left;
+    text-decoration: none;
+    font-family: var(--font-zf-body);
+  }
+  .zf-game-menu-item > .zf-icon {
+    flex-shrink: 0;
+    color: var(--color-zf-signal-400);
+  }
+  .zf-game-menu-item-danger {
+    --zf-border: var(--color-zf-horde-500);
+    --zf-ink: var(--color-zf-horde-300);
+  }
+  .zf-game-menu-item-danger > .zf-icon {
+    color: var(--color-zf-horde-300);
+  }
+  .zf-game-menu-text {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .zf-game-menu-title {
+    font-weight: 800;
+    font-size: 15px;
+  }
+  .zf-game-menu-desc {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--color-zf-muted-300);
+  }
+  .zf-game-menu-item-danger .zf-game-menu-desc {
+    color: var(--color-zf-muted-300);
+  }
+  .zf-game-menu-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-zf-line-700);
+  }
+
+  /* The events feed: top right on wide screens, framed rows. */
+  .zf-events {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 300px;
+    max-height: 40vh;
+    overflow-y: auto;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    pointer-events: auto;
+  }
+  .zf-event {
+    --zf-cut: var(--zf-cut-sm);
+    padding: 10px 14px;
+    font-weight: 700;
+    font-size: 14px;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+  .zf-event-danger {
+    --zf-border: var(--color-zf-horde-500);
+    --zf-ink: var(--color-zf-horde-300);
+  }
+  .zf-event-good {
+    --zf-border: var(--color-zf-signal-400);
+  }
+  .zf-event-important {
+    font-size: 16px;
+  }
+  .zf-event button {
+    all: unset;
+    cursor: pointer;
+  }
+  .zf-event button:focus-visible {
+    outline: 3px solid var(--color-zf-focus-ring);
+  }
+  .zf-event img {
+    display: inline;
+    height: 1.2em;
+    vertical-align: middle;
+  }
+}
+
+/* The bottom HUD container (index.html): clear of the notch and home bar,
+   and 16px off the screen edges on desktop. */
+.zf-hud-bottom {
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+@media (min-width: 1024px) {
+  .zf-hud-bottom {
+    padding: 0 max(16px, env(safe-area-inset-right))
+      max(16px, env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
+  }
+}
+
+@media (min-width: 1280px) {
+  .zf-events-dock {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 1000;
+  }
+}
+
+/* Phone and tablet: the HudPhone board. */
+@media (max-width: 1023.98px) {
+  .zf-wave {
+    top: 0;
+    width: 100%;
+  }
+  .zf-wave-panel {
+    --zf-fill: transparent;
+    --zf-border: transparent;
+    clip-path: none;
+  }
+  .zf-wave-panel::before {
+    display: none;
+  }
+  .zf-wave-top {
+    gap: 12px;
+    padding: 10px 12px 8px;
+    background: rgb(17 17 17 / 0.9);
+    border-bottom: 4px solid transparent;
+    border-image: repeating-linear-gradient(
+        -45deg,
+        var(--color-zf-signal-400) 0 6px,
+        var(--color-zf-ink-900) 6px 12px
+      )
+      4;
+  }
+  .zf-wave-num {
+    font-size: 24px;
+  }
+  .zf-wave-hq {
+    flex: 1 1 auto;
+    margin-left: 0;
+    align-items: flex-start;
+  }
+  .zf-hq-bar {
+    align-self: stretch;
+    gap: 2px;
+  }
+  .zf-hq-bar > span {
+    width: auto;
+    flex: 1 1 0;
+    max-width: 14px;
+    height: 12px;
+  }
+  .zf-wave .zf-hud-label {
+    font-size: 10px;
+  }
+  .zf-wave-alive-stat {
+    display: none;
+  }
+  .zf-wave-header-only {
+    display: flex;
+  }
+  .zf-wave-gold {
+    font-size: 20px;
+    color: var(--color-zf-signal-400);
+  }
+  .zf-wave-pause {
+    width: 44px;
+    height: 44px;
+    --zf-fill: transparent;
+  }
+  .zf-wave-next {
+    --zf-cut: var(--zf-cut-lg);
+    margin: 8px 12px 0;
+    padding: 12px;
+    border-top: 0;
+    background: rgb(17 17 17 / 0.9);
+    box-shadow: inset 0 0 0 2px var(--color-zf-line-600);
+    clip-path: polygon(
+      0 0,
+      calc(100% - var(--zf-cut)) 0,
+      100% var(--zf-cut),
+      100% 100%,
+      0 100%
+    );
+  }
+  .zf-wave-row {
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+  .zf-wave-size {
+    margin-left: 0;
+    font-size: 13px;
+  }
+  .zf-hq-alert .zf-stencil {
+    font-size: 24px;
+  }
+
+  .zf-troops {
+    width: auto;
+    margin: 0 8px;
+    padding: 8px 12px;
+  }
+  .zf-build {
+    align-items: stretch;
+  }
+  .zf-build-tag {
+    align-self: flex-start;
+    margin-left: 8px;
+  }
+  .zf-build-strip {
+    display: grid;
+    grid-template-columns: repeat(var(--zf-build-count, 7), minmax(0, 1fr));
+    padding: 6px 8px 12px;
+    background: rgb(17 17 17 / 0.92);
+    border-top: 4px solid var(--color-zf-signal-400);
+    clip-path: none;
+    box-shadow: none;
+  }
+  .zf-build-strip::before {
+    display: none;
+  }
+  .zf-build-btn {
+    width: auto;
+    min-width: 0;
+    min-height: 64px;
+    padding: 8px 0 6px;
+    gap: 5px;
+  }
+  .zf-build-key {
+    display: none;
+  }
+  .zf-build-cost {
+    font-size: 11px;
+  }
+  .zf-hud-controls {
+    gap: 6px;
+  }
+  .zf-hud-btn {
+    width: 44px;
+    height: 44px;
+  }
+  .zf-hud-btn-wide {
+    width: 52px;
+    font-size: 15px;
+  }
+  .zf-hud-timer {
+    height: 44px;
+    font-size: 14px;
+  }
+  .zf-events {
+    width: auto;
+    max-width: calc(100vw - 16px);
+    max-height: 18vh;
+  }
+  .zf-event {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zf-gold-gain {
+    animation: none;
+  }
+  .zf-troops-bar > span {
+    transition: none;
+  }
+}

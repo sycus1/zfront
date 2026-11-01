@@ -8,6 +8,7 @@ import {
   TargetPlayerUpdate,
   UnitIncomingUpdate,
 } from "@openfront/engine-api/game/GameUpdates";
+import type { HordeFrame } from "@openfront/engine-api/game/GameUpdates";
 import { EventBus } from "@openfront/shared/EventBus";
 import { html, LitElement } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
@@ -24,11 +25,15 @@ import { renderNumber, renderTroops } from "@openfront/engine-lib/Format";
 import { PlaySoundEffectEvent } from "../../sound/Sounds";
 import { UIState } from "../../UIState";
 import { getMessageTypeClasses, translateText } from "../../Utils";
+import { fromEverySide, sectorDirections, waveStarted } from "../HordeHudModel";
 
 interface GameEvent {
   description: string;
   unsafeDescription?: boolean;
-  type: MessageType;
+  /** zfront: "horde" for the client's own wave announcements. */
+  type: MessageType | "horde";
+  /** A horde event that is a threat (the final wave): shown in red. */
+  danger?: boolean;
   highlight?: boolean;
   /** Show in the small feed even if the type is normally tier 1. */
   minor?: boolean;
@@ -50,7 +55,8 @@ const TIER_1_TYPES: ReadonlySet<MessageType> = new Set([
   MessageType.DONATION_RECEIVED,
 ]);
 
-const isTier1 = (type: MessageType): boolean => TIER_1_TYPES.has(type);
+const isTier1 = (type: MessageType | "horde"): boolean =>
+  type !== "horde" && TIER_1_TYPES.has(type);
 
 @customElement("events-display")
 export class EventsDisplay extends LitElement implements Controller {
@@ -65,21 +71,16 @@ export class EventsDisplay extends LitElement implements Controller {
   @state() private _isVisible: boolean = false;
 
   @query(".events-container")
-  private _eventsContainer?: HTMLDivElement;
+  private _eventsContainer?: HTMLOListElement;
   private _shouldScrollToBottom = true;
 
-  @query(".important-events-container")
-  private _importantEventsContainer?: HTMLDivElement;
-  private _shouldScrollImportantToBottom = true;
+  /** zfront: the last horde frame, to see when a wave starts. */
+  private lastHorde: HordeFrame | null = null;
 
   updated(changed: Map<string, unknown>) {
     super.updated(changed);
     if (this._eventsContainer && this._shouldScrollToBottom) {
       this._eventsContainer.scrollTop = this._eventsContainer.scrollHeight;
-    }
-    if (this._importantEventsContainer && this._shouldScrollImportantToBottom) {
-      this._importantEventsContainer.scrollTop =
-        this._importantEventsContainer.scrollHeight;
     }
   }
 
@@ -139,14 +140,6 @@ export class EventsDisplay extends LitElement implements Controller {
       this._shouldScrollToBottom = true;
     }
 
-    if (this._importantEventsContainer) {
-      const el = this._importantEventsContainer;
-      this._shouldScrollImportantToBottom =
-        el.scrollHeight - el.scrollTop - el.clientHeight < 5;
-    } else {
-      this._shouldScrollImportantToBottom = true;
-    }
-
     if (!this._isVisible && !this.game.inSpawnPhase()) {
       this._isVisible = true;
       this.requestUpdate();
@@ -160,6 +153,8 @@ export class EventsDisplay extends LitElement implements Controller {
       }
       return;
     }
+
+    this.checkHordeWave();
 
     const updates = this.game.updatesSinceLastTick();
     if (updates) {
@@ -199,6 +194,34 @@ export class EventsDisplay extends LitElement implements Controller {
     }
 
     this.requestUpdate();
+  }
+
+  /** zfront: "Wave 7 started from W, S" as each wave begins. */
+  private checkHordeWave() {
+    const horde = this.game.hordeStatus?.() ?? null;
+    if (horde === null) return;
+    const started = waveStarted(this.lastHorde, horde);
+    this.lastHorde = horde;
+    if (started === null) return;
+    const description =
+      started.sectors === 0 && !started.final
+        ? translateText("events_display.wave_started", { wave: started.wave })
+        : fromEverySide(started.sectors, started.final)
+          ? translateText("events_display.wave_started_everywhere", {
+              wave: started.wave,
+            })
+          : translateText("events_display.wave_started_from", {
+              wave: started.wave,
+              directions: sectorDirections(started.sectors)
+                .map((d) => translateText(`horde_direction.${d}`))
+                .join(", "),
+            });
+    this.addEvent({
+      description,
+      type: "horde",
+      danger: started.final,
+      createdAt: this.game.ticks(),
+    });
   }
 
   private addEvent(event: GameEvent) {
@@ -478,36 +501,38 @@ export class EventsDisplay extends LitElement implements Controller {
       : event.description;
   }
 
-  private renderEventRow(event: GameEvent) {
+  private eventTone(event: GameEvent): string {
+    if (event.type === "horde") return event.danger ? "zf-event-danger" : "";
+    return getMessageTypeClasses(event.type);
+  }
+
+  private renderEventRow(event: GameEvent, important: boolean) {
     return html`
-      <tr>
-        <td
-          class="lg:px-2 lg:py-1 p-1 text-left ${getMessageTypeClasses(
-            event.type,
-          )}"
-        >
-          ${
-            event.focusID
+      <li
+        class="zf-event zf-hud zf-frame ${this.eventTone(event)} ${
+          important ? "zf-event-important" : ""
+        }"
+      >
+        ${
+          event.focusID
+            ? this.renderButton({
+                content: this.getEventDescription(event),
+                onClick: () => {
+                  if (event.focusID) this.emitGoToPlayerEvent(event.focusID);
+                },
+                className: "text-left",
+              })
+            : event.unitView
               ? this.renderButton({
                   content: this.getEventDescription(event),
                   onClick: () => {
-                    if (event.focusID) this.emitGoToPlayerEvent(event.focusID);
+                    if (event.unitView) this.emitGoToUnitEvent(event.unitView);
                   },
                   className: "text-left",
                 })
-              : event.unitView
-                ? this.renderButton({
-                    content: this.getEventDescription(event),
-                    onClick: () => {
-                      if (event.unitView)
-                        this.emitGoToUnitEvent(event.unitView);
-                    },
-                    className: "text-left",
-                  })
-                : this.getEventDescription(event)
-          }
-        </td>
-      </tr>
+              : this.getEventDescription(event)
+        }
+      </li>
     `;
   }
 
@@ -531,43 +556,17 @@ export class EventsDisplay extends LitElement implements Controller {
       return html``;
     }
 
+    // The latest few events, then the important ones (incoming attacks,
+    // chat), which stay until they expire.
     return html`
-      <div class="flex flex-col gap-1 w-full min-[1200px]:w-96">
-        ${
-          tier2Events.length > 0
-            ? html`
-                <div
-                  class="bg-gray-800/92 backdrop-blur-sm max-h-[12vh] lg:max-h-[22vh] overflow-y-auto rounded-lg opacity-90 events-container"
-                >
-                  <table
-                    class="w-full border-collapse text-white text-xs lg:text-sm pointer-events-auto"
-                  >
-                    <tbody>
-                      ${tier2Events.map((event) => this.renderEventRow(event))}
-                    </tbody>
-                  </table>
-                </div>
-              `
-            : ""
-        }
-        ${
-          tier1Events.length > 0
-            ? html`
-                <div
-                  class="bg-gray-800 backdrop-blur-sm max-h-[30vh] lg:max-h-[40vh] overflow-y-auto rounded-lg shadow-lg border-l-4 border-red-500 important-events-container"
-                >
-                  <table
-                    class="w-full border-collapse text-white text-base lg:text-lg font-medium pointer-events-auto"
-                  >
-                    <tbody>
-                      ${tier1Events.map((event) => this.renderEventRow(event))}
-                    </tbody>
-                  </table>
-                </div>
-              `
-            : ""
-        }
-      </div>
+      <ol
+        class="zf-events events-container"
+        aria-label=${translateText("events_display.label")}
+        aria-live="polite"
+      >
+        ${tier2Events.map((event) => this.renderEventRow(event, false))}
+        ${tier1Events.map((event) => this.renderEventRow(event, true))}
+      </ol>
     `;
   }
 

@@ -39,8 +39,9 @@ import { ShowPlayerChatEvent } from "./ChatModal";
 import { ShowPlayerEmojiMenuEvent } from "./EmojiTable";
 import { ImmunityBarVisibleEvent } from "./ImmunityTimer";
 import { CloseRadialMenuEvent } from "./RadialMenu";
-import "./RelationSmiley";
 import { SpawnBarVisibleEvent } from "./SpawnTimer";
+import "./RelationSmiley";
+import { unitTypeName } from "./UnitDisplay";
 const soldierIconAquarius = assetUrl("images/SoldierIconAquarius.svg");
 const warshipIcon = assetUrl("images/BattleshipIconWhite.svg");
 const emojiIcon = assetUrl("images/EmojiIconWhite.svg");
@@ -329,7 +330,7 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
   private displayUnitCount(player: PlayerView, type: UnitType, icon: string) {
     return !this.game.config().isUnitDisabled(type)
       ? html`<div
-          class="flex items-center justify-center gap-0.5 lg:gap-1 p-0.5 lg:p-1 border rounded-md border-gray-500 text-[10px] lg:text-xs w-9 lg:w-12 h-6 lg:h-7"
+          class="flex items-center justify-center gap-0.5 lg:gap-1 p-0.5 lg:p-1 border border-zf-line-600 text-[10px] lg:text-xs w-9 lg:w-12 h-6 lg:h-7"
           translate="no"
         >
           <img
@@ -349,7 +350,9 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
     return html`<span class="flex items-center gap-1 shrink-0">
       ${icons.map((icon) =>
         icon.kind === EMOJI_ICON_KIND && icon.text
-          ? html`<span class="h-4 w-4 font-mono text-sm shrink-0" translate="no"
+          ? html`<span
+              class="h-4 w-4 font-zf-data text-sm shrink-0"
+              translate="no"
               >${icon.text}</span
             >`
           : icon.kind === IMAGE_ICON_KIND && icon.src
@@ -443,7 +446,7 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
     const key = keybind ? formatKeyForDisplay(keybind) : "";
     // Icon only, with the key as a corner badge, to keep the panel narrow.
     return html`<button
-      class="relative flex items-center justify-center size-6.5 border rounded-md border-gray-500 hover:bg-white/10 cursor-pointer"
+      class="relative flex items-center justify-center size-6.5 border border-zf-line-600 hover:bg-white/10 cursor-pointer"
       title=${title}
       @click=${(e: MouseEvent) => {
         e.stopPropagation();
@@ -455,7 +458,7 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
       ${
         key
           ? html`<span
-              class="pointer-events-none absolute -bottom-1 -right-1 px-0.5 rounded-sm bg-gray-800 text-[9px] leading-tight font-mono text-gray-300"
+              class="pointer-events-none absolute -bottom-1 -right-1 px-0.5 bg-zf-ink-900 text-[9px] leading-tight font-zf-data text-zf-muted-300"
               translate="no"
               >${key}</span
             >`
@@ -536,7 +539,7 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
         <div class="flex flex-col gap-1 shrink-0 w-28 md:w-36">
           <div class="flex items-center gap-1">
             <div
-              class="flex items-center justify-center px-1 py-0.5 border rounded-md border-yellow-400 font-bold text-yellow-400 text-sm lg:gap-1"
+              class="flex items-center justify-center px-1 py-0.5 border border-zf-signal-400 font-zf-data font-bold text-zf-signal-400 text-sm lg:gap-1"
               translate="no"
             >
               <img src=${goldCoinIcon} width="13" height="13" />
@@ -586,7 +589,7 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
             }
             <div class="shrink min-w-0">
               <span
-                class="font-mono inline-block leading-[1.2] wrap-anywhere"
+                class="font-zf-data inline-block leading-[1.2] wrap-anywhere"
                 style="font-size: ${fontSize}"
                 >${player.displayName()}</span
               >
@@ -598,11 +601,11 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
                     class="flex flex-col items-center leading-tight shrink-0"
                   >
                     <span
-                      class="text-gray-400 text-xs font-mono font-normal whitespace-nowrap"
+                      class="text-zf-muted-300 text-xs font-zf-data font-normal whitespace-nowrap"
                       >${playerType}</span
                     >
                     <span
-                      class="text-xs font-mono font-normal text-gray-400 whitespace-nowrap"
+                      class="text-xs font-zf-data font-normal text-zf-muted-300 whitespace-nowrap"
                       >[<span
                         style="color: ${themeProvider
                           .current()
@@ -613,7 +616,7 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
                     >
                   </div>`
                 : html`<span
-                    class="text-gray-400 text-xs font-mono font-normal shrink-0 whitespace-nowrap"
+                    class="text-zf-muted-300 text-xs font-zf-data font-normal shrink-0 whitespace-nowrap"
                     >${playerType}</span
                   >`
             }
@@ -702,15 +705,15 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
 
     return html`
       <div
-        class="w-full h-5 lg:h-6 border border-gray-600 rounded-md bg-gray-900/60 overflow-hidden relative"
+        class="w-full h-5 lg:h-6 border border-zf-line-600 bg-zf-line-600 overflow-hidden relative"
       >
         <div class="relative h-full">
           <div
-            class="absolute inset-y-0 left-0 w-full origin-left bg-sky-700 transition-transform duration-200 ease-out"
+            class="absolute inset-y-0 left-0 w-full origin-left bg-zf-cream-100/55 transition-transform duration-200 ease-out"
             style="transform: scaleX(${greenPercent / 100});"
           ></div>
           <div
-            class="absolute inset-y-0 left-0 w-full origin-left bg-malibu-blue transition-transform duration-200 ease-out"
+            class="absolute inset-y-0 left-0 w-full origin-left bg-zf-signal-400 transition-transform duration-200 ease-out"
             style="transform: translateX(${greenPercent}%) scaleX(${
               orangePercent / 100
             });"
@@ -746,27 +749,33 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
       false;
 
     return html`
-      <div class="p-2">
-        <div class="font-bold mb-1 ${isAlly ? "text-green-500" : "text-white"}">
+      <div class="flex flex-col gap-1 px-4 py-3">
+        <div class="font-bold text-sm ${isAlly ? "text-zf-signal-400" : ""}">
           ${unit.owner().displayName()}
         </div>
-        <div class="mt-1">
-          <div class="text-sm opacity-80">${unit.type()}</div>
-          ${
-            unit.hasHealth()
-              ? html` <div class="text-sm">Health: ${unit.health()}</div> `
-              : ""
-          }
-          ${
-            unit.type() === UnitType.TransportShip
-              ? html`
-                  <div class="text-sm">
-                    Troops: ${renderTroops(unit.troops())}
-                  </div>
-                `
-              : ""
-          }
+        <div class="font-zf-display font-black text-2xl leading-none uppercase">
+          ${unitTypeName(unit.type())}
         </div>
+        ${
+          unit.hasHealth()
+            ? html`<div class="flex justify-between gap-4 text-sm font-bold">
+                <span class="text-zf-muted-300"
+                  >${translateText("player_info_overlay.health")}</span
+                >
+                <span class="font-zf-data">${renderNumber(unit.health())}</span>
+              </div>`
+            : ""
+        }
+        ${
+          unit.type() === UnitType.TransportShip
+            ? html`<div class="flex justify-between gap-4 text-sm font-bold">
+                <span class="text-zf-muted-300"
+                  >${translateText("player_info_overlay.troops")}</span
+                >
+                <span class="font-zf-data">${renderTroops(unit.troops())}</span>
+              </div>`
+            : ""
+        }
       </div>
     `;
   }
@@ -779,18 +788,26 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
     const containerClasses = this._isInfoVisible
       ? "opacity-100 visible"
       : "opacity-0 invisible pointer-events-none";
+    // zfront: in a horde game the wave panel holds the top centre, so the
+    // card sits top left instead, where the leaderboard was (under the gold
+    // box on desktop, under the wave header on phone).
+    const horde = this.game?.config().horde() === true;
+    const position = horde
+      ? "top-[236px] left-2 right-2 lg:top-[104px] lg:left-4 lg:right-auto"
+      : "top-0 left-0 right-0 sm:left-1/2 sm:right-auto sm:-translate-x-1/2";
+    const width = this.showShortcutButtons() ? "sm:w-[598px]" : "sm:w-[500px]";
 
     return html`
       <div
-        class="fixed top-0 left-0 right-0 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-[1001]"
-        style="margin-top: ${this.barOffset}px;"
+        class="fixed ${position} z-[1001]"
+        style="margin-top: ${horde ? 0 : this.barOffset}px;"
         @click=${() => this.hide()}
         @contextmenu=${(e: MouseEvent) => e.preventDefault()}
       >
         <div
-          class="bg-gray-800/92 backdrop-blur-sm shadow-xs min-[1200px]:rounded-lg sm:rounded-b-lg shadow-lg text-white text-lg lg:text-base w-full ${
-            this.showShortcutButtons() ? "sm:w-[598px]" : "sm:w-[500px]"
-          } overflow-hidden ${containerClasses}"
+          class="zf-hud zf-frame text-lg lg:text-base w-full ${
+            horde ? "lg:w-[500px]" : width
+          } ${containerClasses}"
           @mouseenter=${this.onPanelEnter}
           @mouseleave=${this.onPanelLeave}
         >

@@ -3,6 +3,8 @@ import { renderNumber } from "@openfront/engine-lib/Format";
 import { EventBus } from "@openfront/shared/EventBus";
 import { LitElement, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { zfIcon } from "../../components/nightshift/Icon";
+import { zfButton } from "../../components/nightshift/Primitives";
 import { Controller } from "../../Controller";
 import { KeyboardLayoutController } from "../../KeyboardLayout";
 import { Platform } from "../../Platform";
@@ -384,32 +386,37 @@ export class TutorialPanel extends LitElement implements Controller {
     return html`
       <div
         dir=${textDirection()}
-        class="pointer-events-auto w-full sm:rounded-lg bg-gray-800/92 backdrop-blur-sm shadow-lg text-white text-base p-2 sm:mb-1"
+        class="zf-hud zf-frame w-full flex flex-col gap-2 px-4 py-3 text-[15px] font-semibold leading-snug"
         @contextmenu=${(e: MouseEvent) => e.preventDefault()}
       >
-        <div class="flex items-center justify-between gap-2 mb-1">
-          <span
-            class="font-bold text-cyber-yellow uppercase tracking-wide text-sm"
+        <div class="flex items-center justify-between gap-2">
+          <span class="zf-hud-label zf-hud-label-signal"
             >${translateText("tutorial.title")}</span
           >
-          <span class="flex items-center gap-2 text-sm text-gray-300">
+          <span class="flex items-center gap-2 text-sm text-zf-muted-300">
             ${this.confirmingClose ? nothing : this.renderHeaderActions()}
             ${
               this.ctx && !this.progress.finished()
-                ? translateText("tutorial.step_counter", {
-                    current: this.progress.position(this.ctx),
-                    total: this.progress.total(this.ctx),
-                  })
+                ? html`<span class="zf-num text-[13px]"
+                    >${translateText("tutorial.step_counter", {
+                      current: this.progress.position(this.ctx),
+                      total: this.progress.total(this.ctx),
+                    })}</span
+                  >`
                 : nothing
             }
-            <button
-              class="text-gray-400 hover:text-white text-base leading-none px-1"
-              title=${translateText("tutorial.close")}
-              aria-label=${translateText("tutorial.close")}
-              @click=${() => (this.confirmingClose = !this.confirmingClose)}
-            >
-              ✕
-            </button>
+            <span class="zf-ring">
+              <button
+                type="button"
+                class="zf-icon-btn zf-frame zf-sweep"
+                title=${translateText("tutorial.close")}
+                aria-label=${translateText("tutorial.close")}
+                aria-expanded=${this.confirmingClose ? "true" : "false"}
+                @click=${() => (this.confirmingClose = !this.confirmingClose)}
+              >
+                ${zfIcon("close", 16, 3)}
+              </button>
+            </span>
           </span>
         </div>
         ${this.confirmingClose ? this.renderCloseChoice() : this.renderStep()}
@@ -430,69 +437,69 @@ export class TutorialPanel extends LitElement implements Controller {
     return html`
       ${
         step.manual
-          ? html`<button
-              class="rounded bg-malibu-blue hover:bg-aquarius px-2 py-0.5 font-semibold text-white"
-              @click=${() => this.progress.acknowledge()}
-            >
-              ${translateText("tutorial.got_it")}
-            </button>`
+          ? zfButton({
+              label: translateText("tutorial.got_it"),
+              variant: "signal",
+              size: "sm",
+              onClick: () => this.progress.acknowledge(),
+            })
           : nothing
       }
       ${
         goTo
-          ? html`<button
-              class="rounded bg-malibu-blue hover:bg-aquarius px-2 py-0.5 font-semibold text-white"
-              @click=${() => this.eventBus.emit(new GoToPlayerEvent(goTo))}
-            >
-              ${translateText("tutorial.go_to")}
-            </button>`
+          ? zfButton({
+              label: translateText("tutorial.go_to"),
+              variant: "outline-signal",
+              size: "sm",
+              onClick: () => this.eventBus.emit(new GoToPlayerEvent(goTo)),
+            })
           : nothing
       }
-      <button
-        class="text-gray-400 hover:text-white underline"
-        @click=${() => this.progress.skip()}
-      >
-        ${translateText("tutorial.skip")}
-      </button>
+      ${zfButton({
+        label: translateText("tutorial.skip"),
+        size: "sm",
+        onClick: () => this.progress.skip(),
+      })}
     `;
   }
 
   private renderCloseChoice() {
     return html`
-      <div class="flex flex-col gap-1.5">
-        <button
-          class="rounded-md border border-gray-500 hover:bg-gray-700 px-2 py-1"
-          @click=${() => this.setActive(false)}
-        >
-          ${translateText("tutorial.hide_for_game")}
-        </button>
-        <button
-          class="rounded-md border border-gray-500 hover:bg-gray-700 px-2 py-1"
-          @click=${() => this.dismissForever()}
-        >
-          ${translateText("tutorial.never_show")}
-        </button>
+      <div class="flex flex-col gap-2">
+        ${zfButton({
+          label: translateText("tutorial.hide_for_game"),
+          size: "sm",
+          onClick: () => this.setActive(false),
+        })}
+        ${zfButton({
+          label: translateText("tutorial.never_show"),
+          size: "sm",
+          variant: "danger",
+          onClick: () => this.dismissForever(),
+        })}
       </div>
     `;
   }
 
   private renderStep() {
     if (this.completeTicks !== null) {
-      return html`<p>${translateText("tutorial.complete")}</p>`;
+      return html`<p class="m-0">${translateText("tutorial.complete")}</p>`;
     }
     const step = this.progress.current();
     if (step === null) return nothing;
     const done = this.progress.stepDone();
     return html`
-      <p class="flex gap-1.5 ${done ? "text-green-400" : ""}">
+      <p class="m-0 flex gap-2 ${done ? "text-zf-signal-400" : ""}">
         ${
           step.bullets && !done
             ? nothing
-            : html`<span class="shrink-0">${done ? "✓" : "•"}</span>`
+            : html`<span class="shrink-0 pt-0.5 text-zf-signal-400"
+                >${zfIcon(done ? "check" : "arrow-right", 16, 3)}</span
+              >`
         }
         ${
           step.bullets
-            ? html`<ul class="list-disc ms-4 flex flex-col gap-1">
+            ? html`<ul class="zf-list m-0 flex flex-col gap-1">
                 ${step.bullets.map(
                   // dir=auto keeps step text on its content's side while the
                   // panel chrome mirrors — untranslated steps (English fallback)

@@ -10,8 +10,7 @@ import { renderDuration, translateText } from "../../client/Utils";
 
 // The homepage lobby card's modifier pill, one size down: a lobby can run a
 // dozen settings and they all have to fit beside the preview.
-export const LOBBY_SETTING_TAG =
-  "rounded bg-malibu-blue px-1.5 py-0.5 text-[11px] font-bold tracking-widest text-white";
+export const LOBBY_SETTING_TAG = "zf-tag";
 
 const DISABLED_UNIT_KEYS: Record<string, string> = {
   City: "unit_type.city",
@@ -183,27 +182,21 @@ export function lobbySettingTagText(setting: {
     : `${label}: ${setting.value}`;
 }
 
-/** The units the lobby turned off, as a red box; null when none are. */
+/** The units the lobby turned off, as a titled row of tags; null when none are. */
 export function disabledUnitsBox(
   c: GameConfig,
   className: string,
 ): TemplateResult | null {
   if (!c.disabledUnits?.length) return null;
   return html`
-    <div
-      data-disabled-units
-      class="${className} p-3 bg-red-500/10 border border-red-500/20 rounded-lg"
-    >
-      <div
-        class="text-xs font-bold text-red-400 uppercase tracking-widest mb-2"
-      >
+    <div data-disabled-units class="${className} flex flex-col gap-2">
+      <div class="zf-hud-label">
         ${translateText("private_lobby.disabled_units")}
       </div>
       <div class="flex flex-wrap gap-2">
         ${c.disabledUnits.map((unit) => {
           const key = DISABLED_UNIT_KEYS[unit];
-          return html`<span
-            class="px-2 py-1 bg-red-500/20 text-red-200 text-xs rounded font-bold border border-red-500/30"
+          return html`<span class="zf-tag"
             >${key ? translateText(key) : unit}</span
           >`;
         })}
@@ -212,7 +205,7 @@ export function disabledUnitsBox(
   `;
 }
 
-/** The lobby host's cheats, as a yellow box; null when there are none. */
+/** The lobby host's cheats, as yellow tags; null when there are none. */
 export function hostCheatsBox(
   c: GameConfig,
   className: string,
@@ -234,22 +227,13 @@ export function hostCheatsBox(
     );
   if (cheats.length === 0) return null;
   return html`
-    <div
-      data-host-cheats
-      class="${className} p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg"
-    >
-      <div
-        class="text-xs font-bold text-yellow-400 uppercase tracking-widest mb-2"
-      >
+    <div data-host-cheats class="${className} flex flex-col gap-2">
+      <div class="zf-hud-label zf-hud-label-signal">
         ${translateText("private_lobby.host_cheats")}
       </div>
       <div class="flex flex-wrap gap-2">
         ${cheats.map(
-          (cheat) =>
-            html`<span
-              class="px-2 py-1 bg-yellow-500/20 text-yellow-200 text-xs rounded font-bold border border-yellow-500/30"
-              >${cheat}</span
-            >`,
+          (cheat) => html`<span class="zf-tag zf-tag-signal">${cheat}</span>`,
         )}
       </div>
     </div>

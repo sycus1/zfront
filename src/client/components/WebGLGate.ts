@@ -110,32 +110,35 @@ export class WebGLGate extends LitElement {
     const notes = limited ? LIMITED_NOTES : SAFARI_NOTES;
 
     return html`
-      <div
-        class="fixed inset-0 z-[10000] flex items-center justify-center bg-black/85 p-5"
-      >
+      <div class="zf-dialog-scrim" style="z-index: 10000">
         <div
-          class="w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 sm:p-8 rounded-xl bg-surface text-white shadow-2xl"
+          class="zf-dialog zf-dialog-wide zf-dialog-danger zf-frame max-h-[85vh] overflow-y-auto"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="webgl-gate-title"
         >
-          <h2 class="text-xl font-bold mb-3">${title}</h2>
-          <p class="text-sm leading-relaxed text-white/85 mb-5">${intro}</p>
+          <h2 id="webgl-gate-title" class="zf-dialog-title uppercase">
+            ${title}
+          </h2>
+          <p class="zf-dialog-message">${intro}</p>
           ${sections.map(
             (section) => html`
-              <section class="mb-5">
-                <h3 class="text-sm font-bold text-white mb-1.5">
+              <section class="flex flex-col gap-1.5">
+                <h3 class="zf-tile-title m-0 text-zf-signal-400">
                   ${section.title}
                 </h3>
                 <ol
-                  class="pl-5 list-decimal text-sm leading-relaxed text-white/85 space-y-1.5"
+                  class="m-0 pl-5 list-decimal text-sm font-semibold leading-relaxed space-y-1.5"
                 >
                   ${section.steps.map((step) => html`<li>${step}</li>`)}
                 </ol>
               </section>
             `,
           )}
-          <section class="mb-0">
-            <h3 class="text-sm font-bold text-white mb-1.5">${notesTitle}</h3>
+          <section class="flex flex-col gap-1.5">
+            <h3 class="zf-tile-title m-0 text-zf-signal-400">${notesTitle}</h3>
             <ul
-              class="pl-5 list-disc text-sm leading-relaxed text-white/85 space-y-1.5"
+              class="m-0 pl-5 list-disc text-sm font-semibold leading-relaxed space-y-1.5"
             >
               ${notes.map((note) => html`<li>${note}</li>`)}
             </ul>
@@ -143,12 +146,15 @@ export class WebGLGate extends LitElement {
           ${
             limited
               ? html`
-                  <button
-                    class="mt-5 w-full py-2.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-bold text-white transition-colors"
-                    @click=${() => this.remove()}
-                  >
-                    Continue anyway
-                  </button>
+                  <div class="zf-ring">
+                    <button
+                      type="button"
+                      class="zf-btn zf-btn-md zf-btn-outline zf-frame zf-sweep"
+                      @click=${() => this.remove()}
+                    >
+                      <span>Continue anyway</span>
+                    </button>
+                  </div>
                 `
               : null
           }

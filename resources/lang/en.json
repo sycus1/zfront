@@ -185,9 +185,12 @@
   },
   "control_panel": {
     "army_limit_warning": "You're near your army limit! Consider sending troops to teammates.",
+    "attack": "Attack ratio",
     "attack_ratio": "{percent}%\n({troops})",
+    "gold": "Gold",
     "low_troops_warning": "You are very low on troops - You should always keep some troops for defense.",
-    "teammate_afk_neighbor_info": "You can attack disconnected teammates."
+    "teammate_afk_neighbor_info": "You can attack disconnected teammates.",
+    "troops": "Troops"
   },
   "cosmetics": {
     "type_flag": "Flag"
@@ -291,6 +294,7 @@
     "crate_lost": "The horde got to your supply crate first",
     "hydrogen_bomb_detonated": "{name} - hydrogen bomb detonated",
     "hydrogen_bomb_inbound": "{name} - hydrogen bomb inbound",
+    "label": "Events",
     "mirv_inbound": "⚠️⚠️⚠️ {name} - MIRV INBOUND ⚠️⚠️⚠️",
     "missile_intercepted": "SAM intercepted {unit}",
     "naval_invasion_inbound": "Naval invasion incoming from {name} ({troops})",
@@ -308,11 +312,22 @@
     "unit_destroyed": "Your {unit} was destroyed",
     "unit_voluntarily_deleted": "Unit voluntarily deleted",
     "wave_called": "Wave {wave} called early: +{gold} gold",
-    "wave_cleared": "Wave {wave} cleared: +{gold} gold"
+    "wave_cleared": "Wave {wave} cleared: +{gold} gold",
+    "wave_started": "Wave {wave} started",
+    "wave_started_everywhere": "Wave {wave} started from every side",
+    "wave_started_from": "Wave {wave} started from {directions}"
   },
   "fullscreen": {
     "enter": "Enter fullscreen",
     "exit": "Exit fullscreen"
+  },
+  "game_controls": {
+    "exit": "Exit game",
+    "label": "Game controls",
+    "pause": "Pause",
+    "resume": "Resume",
+    "settings": "Settings",
+    "speed": "Game speed: {speed}"
   },
   "game_mode": {
     "ffa": "Free for All",
@@ -569,23 +584,28 @@
     "w": "W"
   },
   "horde_hud": {
-    "alive": "{count} zombies",
+    "alive": "Alive",
     "build_time": "Build time: {time}",
-    "call_wave": "Send it now (+{gold} gold)",
+    "call_wave": "Send it now",
+    "call_wave_gold": "+{gold} gold",
     "clear_first": "Clear this wave: {count} to go",
     "clear_to_win": "Clear the final wave to win: {count} to go",
+    "endless": "Endless",
     "final_after_clear": "Final wave after the clear and a break",
     "final_wave": "Final wave in {time}",
     "from": "From {directions}",
     "from_everywhere": "From every side",
+    "gold": "Gold",
     "hq": "HQ",
+    "hq_health": "HQ health",
+    "hq_under_attack": "HQ under attack",
+    "next": "Next",
     "next_after_clear": "Wave {wave} after the clear and a break",
     "next_size": "{count} zombies, {elites} elites",
     "next_wave": "Wave {wave} in {time}",
     "victory_in": "Hold on: victory in {time}",
-    "wave": "Wave {wave}",
-    "wave_endless": "Wave {wave} (endless)",
-    "wave_of": "Wave {wave} / {total}"
+    "wave": "Wave",
+    "wave_status": "Wave status"
   },
   "horde_result": {
     "killed": "Zombies killed",
@@ -759,6 +779,10 @@
     "tick_layers_table_header": "avg / max",
     "tps": "TPS:",
     "tps_avg_60s": "Avg:"
+  },
+  "player_info_overlay": {
+    "health": "Health",
+    "troops": "Troops"
   },
   "player_panel": {
     "arc_down": "Downward arc",
@@ -960,6 +984,12 @@
     },
     "title": "Tutorial"
   },
+  "unit_display": {
+    "build": "Build",
+    "item": "{name}, {cost} gold",
+    "item_key": "{name}, {cost} gold, key {key}",
+    "level": "Level 1 of {max}"
+  },
   "unit_type": {
     "atom_bomb": "Atom Bomb",
     "boat": "Boat",
@@ -1062,6 +1092,7 @@
     "development_only": "Development Only",
     "easter_bug_count_desc": "How many bugs you're okay with (0–1000, emotionally)",
     "easter_bug_count_label": "Bug Count",
+    "easter_found": "You found a secret setting!",
     "easter_writing_speed_desc": "Adjust how fast you pretend to code (x1–x100)",
     "easter_writing_speed_label": "Writing Speed Multiplier",
     "emoji_menu": "Emoji Menu",
@@ -1133,6 +1164,7 @@
     "select_all_warships_desc": "Select all of your warships on the map.",
     "snap_build_preview_desc": "Move the build preview to the tile the structure will actually be built on",
     "snap_build_preview_label": "Snap Build Preview",
+    "source_code": "Source code",
     "special_effects_desc": "Toggle special effects. Deactivate to improve performances",
     "special_effects_label": "Special effects",
     "swap_direction": "Swap Rocket Direction",
