@@ -1,27 +1,25 @@
 import { GameType } from "@openfront/engine-api/game/GameTypes";
-import { assetUrl } from "@openfront/shared/AssetUrls";
 import { EventBus } from "@openfront/shared/EventBus";
-import { html, LitElement } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import "../../components/DoomsdayClockPanel";
+import { zfIcon } from "../../components/nightshift/Icon";
 import "../../components/OvertimePanel";
 import { Controller } from "../../Controller";
 import { showInGameConfirm } from "../../InGameModal";
-import { TogglePauseIntentEvent } from "../../InputHandler";
+import {
+  ReplaySpeedChangeEvent,
+  TogglePauseIntentEvent,
+} from "../../InputHandler";
 import { PauseGameIntentEvent, SendWinnerEvent } from "../../Transport";
+import {
+  defaultReplaySpeedMultiplier,
+  ReplaySpeedMultiplier,
+} from "../../utilities/ReplaySpeedMultiplier";
 import { homeHref, showToast, translateText } from "../../Utils";
 import { GameView } from "../../view";
-import { ImmunityBarVisibleEvent } from "./ImmunityTimer";
-import { ShowReplayPanelEvent } from "./ReplayPanel";
+import { ShowReplayPanelEvent, speedLabel } from "./ReplayPanel";
 import { ShowSettingsModalEvent } from "./SettingsModal";
-import { SpawnBarVisibleEvent } from "./SpawnTimer";
-const exitIcon = assetUrl("images/ExitIconWhite.svg");
-const FastForwardIconSolid = assetUrl("images/FastForwardIconSolidWhite.svg");
-const pauseIcon = assetUrl("images/PauseIconWhite.svg");
-const playIcon = assetUrl("images/PlayIconWhite.svg");
-const settingsIcon = assetUrl("images/SettingIconWhite.svg");
-const fullscreenIcon = assetUrl("images/FullscreenIconWhite.svg");
-const exitFullscreenIcon = assetUrl("images/ExitFullscreenIconWhite.svg");
 
 const LAST_MINUTE_SECONDS = 60;
 const FLASH_TIMER_SECONDS = 30;
@@ -51,18 +49,19 @@ export class GameRightSidebar extends LitElement implements Controller {
   @state()
   private timer: number = 0;
 
+  @state()
+  private speed: ReplaySpeedMultiplier = defaultReplaySpeedMultiplier;
+
   private readonly hideFullscreenButton = false;
   private hasWinner = false;
   private isLobbyCreator = false;
   private isPrivateLobby = false;
   private hasShownOneMinuteWarning = false;
-  private spawnBarVisible = false;
-  private immunityBarVisible = false;
 
   createRenderRoot() {
-    // Stack the timer bar + mode readouts flush against the right screen edge.
+    // The control group, with the end-game mode readouts stacked above it.
     this.style.display = "flex";
-    this.style.flexDirection = "column";
+    this.style.flexDirection = "column-reverse";
     this.style.alignItems = "flex-end";
     this.style.gap = "6px";
     return this;
@@ -79,13 +78,8 @@ export class GameRightSidebar extends LitElement implements Controller {
     // LocalServer opens a resumed game paused.
     this.isPaused = this.game.resumedFromSave();
 
-    this.eventBus.on(SpawnBarVisibleEvent, (e) => {
-      this.spawnBarVisible = e.visible;
-      this.updateParentOffset();
-    });
-    this.eventBus.on(ImmunityBarVisibleEvent, (e) => {
-      this.immunityBarVisible = e.visible;
-      this.updateParentOffset();
+    this.eventBus.on(ReplaySpeedChangeEvent, (e) => {
+      this.speed = e.replaySpeedMultiplier;
     });
 
     this.eventBus.on(SendWinnerEvent, () => {
@@ -189,15 +183,6 @@ export class GameRightSidebar extends LitElement implements Controller {
     }
   }
 
-  private updateParentOffset(): void {
-    const offset =
-      (this.spawnBarVisible ? 7 : 0) + (this.immunityBarVisible ? 7 : 0);
-    const parent = this.parentElement as HTMLElement;
-    if (parent) {
-      parent.style.marginTop = `${offset}px`;
-    }
-  }
-
   private secondsToHms = (d: number): string => {
     const pad = (n: number) => (n < 10 ? `0${n}` : n);
 
@@ -278,85 +263,68 @@ export class GameRightSidebar extends LitElement implements Controller {
 
     return html`
       <style>
-        @keyframes game-end-timer-text-flash {
-          0%,
-          100% {
-            color: rgb(248 113 113);
-          }
-          50% {
-            color: white;
-          }
-        }
         @keyframes game-end-timer-sidebar-flash {
           0%,
           100% {
-            background-color: rgb(0 0 0 / 0.92);
+            --zf-fill: rgb(17 17 17 / 0.9);
           }
           50% {
-            background-color: rgb(185 28 28 / 0.96);
+            --zf-fill: var(--color-zf-horde-500);
           }
         }
-        .game-end-timer-last-minute {
-          color: rgb(248 113 113);
-        }
+        .game-end-timer-last-minute,
         .game-end-timer-flash {
-          animation: game-end-timer-text-flash 1s ease-in-out infinite;
+          --zf-border: var(--color-zf-horde-500);
+          color: var(--color-zf-horde-300);
         }
-        .game-end-timer-sidebar-flash {
-          animation: game-end-timer-sidebar-flash 1s ease-in-out infinite;
+        .game-end-timer-sidebar-flash .zf-hud-timer {
+          animation: game-end-timer-sidebar-flash 1s steps(1) infinite;
         }
         @media (prefers-reduced-motion: reduce) {
-          .game-end-timer-flash {
+          .game-end-timer-sidebar-flash .zf-hud-timer {
             animation: none;
-            color: white;
-          }
-          .game-end-timer-sidebar-flash {
-            animation: none;
-            background-color: rgb(185 28 28 / 0.96);
+            --zf-fill: var(--color-zf-horde-500);
           }
         }
       </style>
       <aside
-        class=${`w-fit flex flex-row items-center gap-3 py-2 px-3 bg-gray-800/92 backdrop-blur-sm shadow-xs rounded-bl-lg transition-transform duration-300 ease-out transform text-white ${shouldFlashSidebar ? "game-end-timer-sidebar-flash" : ""} ${
-          this._isVisible ? "translate-x-0" : "translate-x-full"
+        class=${`zf-hud-controls ${shouldFlashSidebar ? "game-end-timer-sidebar-flash" : ""} ${
+          this._isVisible ? "" : "hidden"
         }`}
+        aria-label=${translateText("game_controls.label")}
         @contextmenu=${(e: Event) => e.preventDefault()}
       >
-        <!-- In-game time -->
-        <div data-game-timer class=${timerClass}>
-          ${this.secondsToHms(this.timer)}
-        </div>
-
-        <!-- Buttons -->
+        <span
+          class="zf-hud zf-hud-sm zf-frame zf-num zf-hud-timer ${timerClass}"
+          data-game-timer
+          role="timer"
+          >${this.secondsToHms(this.timer)}</span
+        >
         ${this.maybeRenderReplayButtons()}
-
-        <div class="cursor-pointer" @click=${this.onSettingsButtonClick}>
-          <img src=${settingsIcon} alt="settings" width="20" height="20" />
-        </div>
-
+        ${this.controlButton(
+          translateText("game_controls.settings"),
+          zfIcon("gear", 24),
+          this.onSettingsButtonClick,
+        )}
         ${
           document.fullscreenEnabled && !this.hideFullscreenButton
-            ? html`<div
-                class="cursor-pointer"
-                @click=${this.onFullscreenButtonClick}
-              >
-                <img
-                  src=${this.isFullscreen ? exitFullscreenIcon : fullscreenIcon}
-                  alt=${
-                    this.isFullscreen
-                      ? translateText("fullscreen.exit")
-                      : translateText("fullscreen.enter")
-                  }
-                  width="20"
-                  height="20"
-                />
-              </div>`
-            : ""
+            ? this.controlButton(
+                this.isFullscreen
+                  ? translateText("fullscreen.exit")
+                  : translateText("fullscreen.enter"),
+                zfIcon(
+                  this.isFullscreen ? "fullscreen-exit" : "fullscreen",
+                  24,
+                ),
+                this.onFullscreenButtonClick,
+              )
+            : nothing
         }
-
-        <div class="cursor-pointer" @click=${this.onExitButtonClick}>
-          <img src=${exitIcon} alt="exit" width="20" height="20" />
-        </div>
+        ${this.controlButton(
+          translateText("game_controls.exit"),
+          zfIcon("exit", 24),
+          this.onExitButtonClick,
+        )}
       </aside>
       <doomsday-clock-panel
         .game=${this.game}
@@ -371,41 +339,58 @@ export class GameRightSidebar extends LitElement implements Controller {
     `;
   }
 
+  private controlButton(
+    label: string,
+    content: unknown,
+    onClick: () => void,
+    opts: { pressed?: boolean; className?: string; wide?: boolean } = {},
+  ) {
+    return html`<span class="zf-ring ${opts.className ?? ""}">
+      <button
+        type="button"
+        class="zf-frame zf-sweep zf-hud-btn ${opts.wide ? "zf-hud-btn-wide zf-num" : ""}"
+        aria-label=${label}
+        aria-pressed=${opts.pressed === undefined ? nothing : String(opts.pressed)}
+        @click=${() => onClick.call(this)}
+      >
+        ${content}
+      </button>
+    </span>`;
+  }
+
   maybeRenderReplayButtons() {
     const isReplayOrSingleplayer =
       this._isSinglePlayer || this.game?.config()?.isReplay();
     const showPauseButton =
       isReplayOrSingleplayer ||
       (this.isLobbyCreator && !this.game.config().listed);
+    // zfront: on phone a horde game's header carries the pause button.
+    const horde = this.game.config().gameConfig().horde === true;
 
     return html`
       ${
-        isReplayOrSingleplayer
-          ? html`
-              <div class="cursor-pointer" @click=${this.toggleReplayPanel}>
-                <img
-                  src=${FastForwardIconSolid}
-                  alt="replay"
-                  width="20"
-                  height="20"
-                />
-              </div>
-            `
-          : ""
+        showPauseButton
+          ? this.controlButton(
+              this.isPaused
+                ? translateText("game_controls.resume")
+                : translateText("game_controls.pause"),
+              zfIcon(this.isPaused ? "play" : "pause", 24),
+              this.onPauseButtonClick,
+              { className: horde ? "max-lg:hidden" : "" },
+            )
+          : nothing
       }
       ${
-        showPauseButton
-          ? html`
-              <div class="cursor-pointer" @click=${this.onPauseButtonClick}>
-                <img
-                  src=${this.isPaused ? playIcon : pauseIcon}
-                  alt="play/pause"
-                  width="20"
-                  height="20"
-                />
-              </div>
-            `
-          : ""
+        isReplayOrSingleplayer
+          ? this.controlButton(
+              translateText("game_controls.speed", {
+                speed: speedLabel(this.speed),
+              }),
+              speedLabel(this.speed),
+              this.toggleReplayPanel,
+              { pressed: this._isReplayVisible, wide: true },
+            )
+          : nothing
       }
     `;
   }

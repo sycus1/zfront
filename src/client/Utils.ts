@@ -670,17 +670,21 @@ export function getTranslatedPlayerTeamLabel(team: Team | null): string {
   return translated === translationKey ? team : translated;
 }
 
+/**
+ * zfront: the Night Shift tone of an events-feed row (styles/nightshift.css):
+ * red for losses and threats, a yellow border for wins, plain otherwise.
+ */
 export const severityColors: Record<string, string> = {
-  fail: "text-red-400",
-  warn: "text-yellow-400",
-  success: "text-green-400",
-  info: "text-gray-200",
-  blue: "text-blue-400",
-  white: "text-white",
+  fail: "zf-event-danger",
+  warn: "zf-event-danger",
+  success: "zf-event-good",
+  info: "zf-event-plain",
+  blue: "zf-event-plain",
+  white: "zf-event-plain",
 };
 
 /**
- * Maps a message type to the Tailwind text-color class of its severity.
+ * Maps a message type to the events-feed tone class of its severity.
  */
 export function getMessageTypeClasses(type: MessageType): string {
   switch (type) {

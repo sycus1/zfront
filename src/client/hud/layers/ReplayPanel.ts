@@ -70,40 +70,54 @@ export class ReplayPanel extends LitElement implements Controller {
 
     return html`
       <div
-        class="p-2 bg-gray-800/92 backdrop-blur-sm shadow-xs rounded-l-lg"
+        class="zf-speed-menu zf-hud zf-frame"
+        role="group"
+        aria-labelledby="zf-speed-title"
         @contextmenu=${(e: Event) => e.preventDefault()}
       >
-        <label class="block mb-2 text-white" translate="no">
+        <span id="zf-speed-title" class="zf-hud-label" translate="no">
           ${
             this.game?.config()?.isReplay()
               ? translateText("replay_panel.replay_speed")
               : translateText("replay_panel.game_speed")
           }
-        </label>
-        <div class="grid grid-cols-4 gap-2">
-          ${this.renderSpeedButton(ReplaySpeedMultiplier.slow, "×0.5")}
-          ${this.renderSpeedButton(ReplaySpeedMultiplier.normal, "×1")}
-          ${this.renderSpeedButton(ReplaySpeedMultiplier.fast, "×2")}
-          ${this.renderSpeedButton(
-            ReplaySpeedMultiplier.fastest,
-            translateText("replay_panel.fastest_game_speed"),
-          )}
+        </span>
+        <div class="zf-speed-options">
+          ${this.renderSpeedButton(ReplaySpeedMultiplier.slow)}
+          ${this.renderSpeedButton(ReplaySpeedMultiplier.normal)}
+          ${this.renderSpeedButton(ReplaySpeedMultiplier.fast)}
+          ${this.renderSpeedButton(ReplaySpeedMultiplier.fastest)}
         </div>
       </div>
     `;
   }
 
-  private renderSpeedButton(value: ReplaySpeedMultiplier, label: string) {
-    const backgroundColor =
-      this._replaySpeedMultiplier === value ? "bg-malibu-blue" : "";
-
+  private renderSpeedButton(value: ReplaySpeedMultiplier) {
     return html`
-      <button
-        class="py-0.5 px-1 text-sm text-white rounded-sm border transition border-gray-500 ${backgroundColor} hover:border-gray-200"
-        @click=${() => this.onReplaySpeedChange(value)}
-      >
-        ${label}
-      </button>
+      <span class="zf-ring">
+        <button
+          type="button"
+          class="zf-frame zf-sweep zf-num zf-speed-option"
+          aria-pressed=${this._replaySpeedMultiplier === value ? "true" : "false"}
+          @click=${() => this.onReplaySpeedChange(value)}
+        >
+          ${speedLabel(value)}
+        </button>
+      </span>
     `;
+  }
+}
+
+/** A game speed as its button shows it: 0.5×, 1×, 2×, MAX. */
+export function speedLabel(value: ReplaySpeedMultiplier): string {
+  switch (value) {
+    case ReplaySpeedMultiplier.slow:
+      return "0.5×";
+    case ReplaySpeedMultiplier.normal:
+      return "1×";
+    case ReplaySpeedMultiplier.fast:
+      return "2×";
+    case ReplaySpeedMultiplier.fastest:
+      return translateText("replay_panel.fastest_game_speed");
   }
 }

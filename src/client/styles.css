@@ -681,33 +681,31 @@ news-button .active button::after {
   animation: newsPulse 1.5s ease-in-out infinite;
 }
 
-/* Pulsing ring the in-game tutorial puts around the HUD element it's describing. */
+/* The in-game tutorial points at the HUD element it is describing with a
+   pulsing yellow outline. Outlines are clipped by a clipped corner, so it
+   goes on an unclipped element (the build buttons' .zf-ring). */
 .tutorial-highlight {
-  border-radius: 0.375rem;
+  outline: 3px solid var(--color-zf-signal-400);
+  outline-offset: 2px;
   animation: tutorialHighlight 1.2s ease-in-out infinite;
 }
 
-/* Hotbar buttons get the loud treatment: enlarged, gold-tinted, with a
-   bobbing arrow pointing at them. The control panel's wide bars keep just
-   the ring above (scaling them would break the layout). */
+/* Build buttons also get an arrow pointing down at them. */
 unit-display .tutorial-highlight {
   position: relative;
   z-index: 10;
-  transform: scale(1.3);
-  transform-origin: bottom center;
-  border-color: #ffd700 !important;
-  background: rgba(255, 215, 0, 0.25);
 }
 
 unit-display .tutorial-highlight::after {
-  content: "▼";
+  content: "";
   position: absolute;
-  bottom: calc(100% + 3px);
+  bottom: calc(100% + 6px);
   left: 50%;
-  color: #ffd700;
-  font-size: 15px;
-  line-height: 1;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 10px solid var(--color-zf-signal-400);
   animation: tutorialArrowBob 0.8s ease-in-out infinite;
   pointer-events: none;
 }
@@ -726,15 +724,18 @@ unit-display .tutorial-highlight::after {
 @keyframes tutorialHighlight {
   0%,
   100% {
-    box-shadow:
-      0 0 0 2px #ffd700,
-      0 0 8px rgba(255, 215, 0, 0.5);
+    outline-offset: 2px;
   }
 
   50% {
-    box-shadow:
-      0 0 0 4px #ffd700,
-      0 0 16px rgba(255, 215, 0, 0.9);
+    outline-offset: 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tutorial-highlight,
+  unit-display .tutorial-highlight::after {
+    animation: none;
   }
 }
 

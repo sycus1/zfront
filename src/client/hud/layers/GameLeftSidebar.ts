@@ -2,7 +2,7 @@ import { GameMode, type Team } from "@openfront/engine-api/game/GameTypes";
 import { assetUrl } from "@openfront/shared/AssetUrls";
 import type { EventBus } from "@openfront/shared/EventBus";
 import { Colord } from "colord";
-import { html, LitElement } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { Controller } from "../../Controller";
 import { Platform } from "../../Platform";
@@ -110,6 +110,9 @@ export class GameLeftSidebar extends LitElement implements Controller {
   }
 
   render() {
+    // zfront: a horde game is played alone, so its leaderboard would only
+    // ever list the player; the gold box and wave panel take its place.
+    if (this.game?.config().gameConfig().horde === true) return nothing;
     return html`
       <aside
         class=${`fixed top-0 left-0 z-900 flex flex-col max-h-[calc(100vh-80px)] overflow-y-auto p-2 bg-gray-800/92 backdrop-blur-sm shadow-xs rounded-br-lg ${this.isPlayerStatsShown || this.isTeamStatsShown ? "max-[400px]:w-full max-[400px]:rounded-none" : ""} transition-all duration-300 ease-out transform ${

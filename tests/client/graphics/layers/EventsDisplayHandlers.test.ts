@@ -100,6 +100,56 @@ describe("EventsDisplay handlers", () => {
     (ed as unknown as Ed).game = game;
   });
 
+  describe("horde waves", () => {
+    it("announces each wave as it starts, with the sides it comes from", () => {
+      let frame: Record<string, unknown> = {
+        wave: 3,
+        nextWave: 4,
+        nextWaveSectors: 0b0100_0001,
+        nextWaveFinal: false,
+      };
+      game.hordeStatus = () => frame;
+      ed.tick();
+      expect(events()).toHaveLength(0);
+
+      frame = { wave: 4, nextWave: 5, nextWaveSectors: 0, nextWaveFinal: true };
+      ed.tick();
+      expect(events()).toHaveLength(1);
+      // Wave 4 comes from where frame 3 announced it: N and W.
+      expect(events()[0].description).toContain(
+        "events_display.wave_started_from",
+      );
+      expect(events()[0].description).toContain(
+        "horde_direction.n, horde_direction.w",
+      );
+
+      // The same frame again is not a new wave.
+      ed.tick();
+      expect(events()).toHaveLength(1);
+
+      // The final wave comes from every side, and is shown in red.
+      frame = {
+        wave: 5,
+        nextWave: 0,
+        nextWaveSectors: 0,
+        nextWaveFinal: false,
+      };
+      ed.tick();
+      expect(events()).toHaveLength(2);
+      expect(events()[1].description).toContain(
+        "events_display.wave_started_everywhere",
+      );
+      expect((events()[1] as { danger?: boolean }).danger).toBe(true);
+    });
+
+    it("stays quiet outside horde games", () => {
+      game.hordeStatus = () => null;
+      ed.tick();
+      ed.tick();
+      expect(events()).toHaveLength(0);
+    });
+  });
+
   describe("tick", () => {
     it("dispatches queued updates through updateMap", () => {
       game.updatesSinceLastTick = () => ({

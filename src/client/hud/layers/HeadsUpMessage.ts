@@ -2,6 +2,7 @@ import { GameMode, GameType } from "@openfront/engine-api/game/GameTypes";
 import { GameUpdateType } from "@openfront/engine-api/game/GameUpdates";
 import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { zfButton } from "../../components/nightshift/Primitives";
 import { Controller } from "../../Controller";
 import { translateText } from "../../Utils";
 import { GameView } from "../../view";
@@ -240,7 +241,7 @@ export class HeadsUpMessage extends LitElement implements Controller {
                 <div
                   data-game-toast
                   data-game-input-pass-through
-                  class="fixed top-6 left-1/2 -translate-x-1/2 z-[1002]
+                  class="fixed top-[30%] left-1/2 -translate-x-1/2 z-[1002]
                        max-w-[90vw] pointer-events-auto touch-none select-none
                        cursor-grab active:cursor-grabbing"
                   @pointerdown=${this.onToastPointerDown}
@@ -251,8 +252,13 @@ export class HeadsUpMessage extends LitElement implements Controller {
                 >
                   <div
                     data-game-toast-content
-                    class="px-6 py-4 rounded-xl animate-fade-in-out"
-                    style="min-width: 200px; text-align: center;
+                    role=${this.toastColor === "red" ? "alert" : "status"}
+                    class="zf-hud zf-frame ${
+                      this.toastColor === "red"
+                        ? "zf-hud-danger"
+                        : "[--zf-border:var(--color-zf-signal-400)]"
+                    } px-6 py-4 text-center text-base font-bold animate-fade-in-out"
+                    style="min-width: 200px;
                   transform: translate3d(${this.toastDragOffset.x}px, ${
                       this.toastDragOffset.y
                     }px, 0);
@@ -260,30 +266,11 @@ export class HeadsUpMessage extends LitElement implements Controller {
                       this.toastPointerId === null
                         ? "transform 180ms cubic-bezier(0.4, 0, 0.2, 1)"
                         : "none"
-                    };
-                  background: ${
-                      this.toastColor === "red"
-                        ? "rgba(239,68,68,0.1)"
-                        : "rgba(34,197,94,0.1)"
-                    };
-                  border: 1px solid ${
-                      this.toastColor === "red"
-                        ? "rgba(239,68,68,0.5)"
-                        : "rgba(34,197,94,0.5)"
-                    };
-                  color: white;
-                  box-shadow: 0 0 30px 0 ${
-                      this.toastColor === "red"
-                        ? "rgba(239,68,68,0.3)"
-                        : "rgba(34,197,94,0.3)"
-                    };
-                  backdrop-filter: blur(12px);"
+                    };"
                   >
                     ${
                       typeof this.toastMessage === "string"
-                        ? html`<span class="font-medium"
-                            >${this.toastMessage}</span
-                          >`
+                        ? html`<span>${this.toastMessage}</span>`
                         : this.toastMessage
                     }
                   </div>
@@ -295,12 +282,11 @@ export class HeadsUpMessage extends LitElement implements Controller {
           this.isVisible
             ? html`
                 <div
-                  class="fixed top-[15%] left-1/2 -translate-x-1/2 z-[799]
-                            inline-flex items-center justify-center min-h-8 lg:min-h-10
-                            w-fit max-w-[90vw]
-                            bg-gray-800/70 rounded-md lg:rounded-lg
-                            backdrop-blur-xs text-white text-md lg:text-xl px-3 lg:px-4 py-1
-                            text-center break-words"
+                  class="zf-hud zf-frame pointer-events-none fixed top-[40%] left-1/2 -translate-x-1/2 z-[799]
+                            inline-flex items-center justify-center min-h-10
+                            w-fit max-w-[90vw] px-5 py-3
+                            text-lg lg:text-xl font-bold text-center break-words"
+                  role="status"
                   style="word-wrap: break-word; hyphens: auto;"
                   @contextmenu=${(e: MouseEvent) => e.preventDefault()}
                 >
@@ -318,22 +304,20 @@ export class HeadsUpMessage extends LitElement implements Controller {
           !this.hasClosedCollusionWarning
             ? html`
                 <div
-                  class="fixed top-[25%] left-1/2 -translate-x-1/2 z-[799]
-                            inline-flex flex-col items-center justify-center min-h-8 lg:min-h-10
-                            w-fit max-w-[90vw]
-                            bg-amber-500/70 rounded-md lg:rounded-lg
-                            backdrop-blur-xs text-white text-md lg:text-xl px-3 lg:px-4 py-3
-                            text-center break-words"
+                  class="zf-hud zf-frame fixed top-[25%] left-1/2 -translate-x-1/2 z-[799]
+                            inline-flex flex-col items-center justify-center gap-3
+                            w-fit max-w-[90vw] px-5 py-4
+                            [--zf-border:var(--color-zf-signal-400)]
+                            text-lg font-bold text-center break-words"
                   style="word-wrap: break-word; hyphens: auto; pointer-events: auto;"
                   @contextmenu=${(e: MouseEvent) => e.preventDefault()}
                 >
                   <div>${translateText("heads_up_message.ffa_collusion")}</div>
-                  <button
-                    class="mt-2 px-3 py-1 rounded bg-black/20 hover:bg-black/30 text-sm"
-                    @click=${this.onCloseCollusionWarning}
-                  >
-                    ${translateText("heads_up_message.dont_show_again")}
-                  </button>
+                  ${zfButton({
+                    label: translateText("heads_up_message.dont_show_again"),
+                    size: "sm",
+                    onClick: this.onCloseCollusionWarning,
+                  })}
                 </div>
               `
             : null

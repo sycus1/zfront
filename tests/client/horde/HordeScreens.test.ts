@@ -7,6 +7,7 @@ import {
   HordeHud,
 } from "../../../src/client/hud/layers/HordeHud";
 import { WinModal } from "../../../src/client/hud/layers/WinModal";
+import { TogglePauseIntentEvent } from "../../../src/client/InputHandler";
 import {
   hordeBlobs,
   MAX_BLOB_LABELS,
@@ -82,6 +83,7 @@ function hordeGame(opts: {
       clientID: () => "me",
       isAlive: () => false,
       hasSpawned: () => true,
+      gold: () => 412_000n,
     }),
     inSpawnPhase: () => false,
     updatesSinceLastTick: () => ({
@@ -102,15 +104,92 @@ describe("HordeHud", () => {
     hud.tick();
     await hud.updateComplete;
 
-    expect(hud.querySelector("[data-horde-wave]")?.textContent).toContain(
-      "horde_hud.wave_of",
-    );
+    const wave = hud.querySelector("[data-horde-wave]")?.textContent ?? "";
+    expect(wave).toContain("04");
+    expect(wave).toContain("/ 10");
     expect(hud.querySelector("[data-horde-hq]")?.textContent?.trim()).toBe(
       "30%",
     );
     expect(
       hud.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow"),
     ).toBe("30");
+    // Three of ten blocks lit, in red at 30%.
+    const bar = hud.querySelector(".zf-hq-bar");
+    expect(bar?.classList).toContain("zf-hq-bar-low");
+    expect(bar?.querySelectorAll(".zf-on")).toHaveLength(3);
+  });
+
+  it("marks waves past the total as endless", async () => {
+    const hud = new HordeHud();
+    hud.game = hordeGame({ status: frame({ wave: 12, wavesToWin: 10 }) });
+    document.body.append(hud);
+    hud.tick();
+    await hud.updateComplete;
+
+    const wave = hud.querySelector("[data-horde-wave]")?.textContent ?? "";
+    expect(wave).toContain("12");
+    expect(wave).toContain("horde_hud.endless");
+  });
+
+  it("shows HQ UNDER ATTACK after the HQ loses health, then drops it", async () => {
+    vi.useFakeTimers();
+    try {
+      const status = { current: frame({ hqHp: 40_000 }) };
+      const hud = new HordeHud();
+      hud.game = {
+        ...hordeGame({ status: null }),
+        hordeStatus: () => status.current,
+      } as GameView;
+      document.body.append(hud);
+      hud.tick();
+      await hud.updateComplete;
+      expect(hud.querySelector("[data-horde-hq-alert]")).toBeNull();
+
+      status.current = frame({ hqHp: 39_000 });
+      hud.tick();
+      await hud.updateComplete;
+      const alert = hud.querySelector("[data-horde-hq-alert]");
+      expect(alert?.getAttribute("role")).toBe("alert");
+      expect(alert?.textContent).toContain("horde_hud.hq_under_attack");
+
+      // No more hits: it goes after a few seconds.
+      vi.advanceTimersByTime(5000);
+      status.current = frame({ hqHp: 39_000 });
+      hud.tick();
+      await hud.updateComplete;
+      expect(hud.querySelector("[data-horde-hq-alert]")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("points the compass at the sides the wave comes from", async () => {
+    const hud = new HordeHud();
+    hud.game = hordeGame({ status: frame() });
+    document.body.append(hud);
+    hud.tick();
+    await hud.updateComplete;
+
+    const arrows = Array.from(hud.querySelectorAll("svg[role=img] polygon"));
+    expect(arrows).toHaveLength(8);
+    const red = arrows.map((a) => a.getAttribute("fill")?.includes("horde"));
+    // Sectors 0b101: north and east.
+    expect(red).toEqual([true, false, true, false, false, false, false, false]);
+  });
+
+  it("asks to toggle pause from the phone header", async () => {
+    const hud = new HordeHud();
+    const bus = new EventBus();
+    const toggles: TogglePauseIntentEvent[] = [];
+    bus.on(TogglePauseIntentEvent, (e) => toggles.push(e));
+    hud.game = hordeGame({ status: frame() });
+    hud.eventBus = bus;
+    document.body.append(hud);
+    hud.tick();
+    await hud.updateComplete;
+
+    hud.querySelector<HTMLButtonElement>(".zf-wave-pause")!.click();
+    expect(toggles).toHaveLength(1);
   });
 
   it("announces the next wave's countdown, directions and size", async () => {

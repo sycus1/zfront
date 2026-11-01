@@ -30,6 +30,11 @@ const PATHS = {
   keyboard: "M2 6h20v12H2zM6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10",
   unlink: "M9 15l-2 2a3 3 0 0 1-4-4l3-3M15 9l2-2a3 3 0 0 1 4 4l-3 3M4 4l16 16",
   "chevron-down": "M6 9l6 6 6-6",
+  fullscreen: "M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5",
+  "fullscreen-exit": "M9 4v5H4M15 4v5h5M20 15h-5v5M4 15h5v5",
+  exit: "M10 4H4v16h6M14 8l4 4-4 4M18 12H9",
+  map: "M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15M15 6v15",
+  code: "M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16",
 } as const;
 
 export type IconName = keyof typeof PATHS;

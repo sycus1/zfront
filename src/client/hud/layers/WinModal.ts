@@ -44,35 +44,38 @@ export class WinModal extends LitElement implements Controller {
   }
 
   render() {
+    if (!this.isVisible) return html`<div class="hidden"></div>`;
+    const lost = this.hordeResult !== null && !this.hordeResult.won;
     return html`
-      <div
-        class="${
-          this.isVisible
-            ? "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-800/70 p-4 md:p-6 shrink-0 rounded-lg z-[10010] shadow-2xl backdrop-blur-xs text-white w-[min(90vw,700px)] max-w-[90%] max-h-[90dvh] overflow-hidden flex flex-col"
-            : "hidden"
-        }"
-      >
-        <h2 class="m-0 mb-4 text-[26px] text-center text-white shrink-0">
-          ${this._title || ""}
-        </h2>
-        ${this.hordeResult ? this.renderHordeResult(this.hordeResult) : nothing}
-        <!-- Leaving is the quieter action, on the left; staying in the game
-             is the main one, on the right. -->
-        <div class="mt-4 flex flex-wrap justify-between gap-2.5 shrink-0">
-          ${this.actionButton(
-            "bg-white/10 hover:bg-white/20",
-            translateText("win_modal.exit"),
-            () => this._handleExit(),
-            "exit",
-          )}
-          ${this.actionButton(
-            "bg-malibu-blue hover:bg-aquarius",
-            this.game?.myPlayer()?.isAlive()
-              ? translateText("win_modal.keep")
-              : translateText("win_modal.spectate"),
-            () => this.hide(),
-            "keep",
-          )}
+      <div class="zf-dialog-scrim" style="z-index: 10010">
+        <div
+          class="zf-dialog zf-dialog-wide zf-frame ${lost ? "zf-dialog-danger" : ""} max-h-[90dvh] overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="win-modal-title"
+        >
+          <h2 id="win-modal-title" class="zf-dialog-title uppercase">
+            ${this._title || ""}
+          </h2>
+          ${this.hordeResult ? this.renderHordeResult(this.hordeResult) : nothing}
+          <!-- Leaving is the quieter action, on the left; staying in the game
+               is the main one, on the right. -->
+          <div class="zf-dialog-actions">
+            ${this.actionButton(
+              "outline",
+              translateText("win_modal.exit"),
+              () => this._handleExit(),
+              "exit",
+            )}
+            ${this.actionButton(
+              "signal",
+              this.game?.myPlayer()?.isAlive()
+                ? translateText("win_modal.keep")
+                : translateText("win_modal.spectate"),
+              () => this.hide(),
+              "keep",
+            )}
+          </div>
         </div>
       </div>
     `;
@@ -89,14 +92,14 @@ export class WinModal extends LitElement implements Controller {
         })
       : translateText("horde_result.lost_summary", { wave: s?.wave ?? 0 });
     const row = (label: string, value: string, key: string) =>
-      html`<div class="flex justify-between gap-4 py-1" data-horde-stat=${key}>
-        <span class="text-white/70">${label}</span>
-        <span class="font-semibold tabular-nums">${value}</span>
+      html`<div class="zf-data-row" data-horde-stat=${key}>
+        <dt>${label}</dt>
+        <dd>${value}</dd>
       </div>`;
     return html`
-      <div class="shrink-0 text-center" data-horde-result>
-        <p class="m-0 mb-3 text-white/90">${summary}</p>
-        <div class="mx-auto max-w-xs text-left">
+      <div data-horde-result>
+        <p class="zf-dialog-message m-0 mb-2">${summary}</p>
+        <dl class="zf-data-rows">
           ${row(
             translateText("horde_result.waves"),
             s && s.wavesToWin > 0
@@ -114,25 +117,27 @@ export class WinModal extends LitElement implements Controller {
             String(s?.structuresDestroyed ?? 0),
             "structures",
           )}
-        </div>
+        </dl>
       </div>
     `;
   }
 
   private actionButton(
-    classes: string,
+    variant: "outline" | "signal",
     label: string,
     onClick: () => void,
     action: string,
   ) {
-    return html`<button
-      type="button"
-      data-win-action=${action}
-      class="flex-1 rounded-lg px-4 py-3 font-medium text-white transition-colors ${classes}"
-      @click=${onClick}
-    >
-      ${label}
-    </button>`;
+    return html`<div class="zf-ring flex-1">
+      <button
+        type="button"
+        data-win-action=${action}
+        class="zf-btn zf-btn-md zf-btn-${variant} zf-frame zf-sweep"
+        @click=${onClick}
+      >
+        <span>${label}</span>
+      </button>
+    </div>`;
   }
 
   show() {

@@ -1,9 +1,9 @@
 import { GameConfig } from "@openfront/engine-api/Schemas";
-import { assetUrl } from "@openfront/shared/AssetUrls";
 import { EventBus } from "@openfront/shared/EventBus";
-import { html, LitElement } from "lit";
+import { html, LitElement, nothing, type TemplateResult } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { PauseGameIntentEvent } from "src/client/Transport";
+import { type IconName, zfIcon } from "../../components/nightshift/Icon";
 import { Controller } from "../../Controller";
 import {
   AlternateViewEvent,
@@ -19,9 +19,9 @@ import {
 } from "../../utilities/LobbySettingsSummary";
 import { homeHref, translateText } from "../../Utils";
 import type { GameView } from "../../view/GameView";
-const exitIcon = assetUrl("images/ExitIconWhite.svg");
-const settingsIcon = assetUrl("images/SettingIconWhite.svg");
-const treeIcon = assetUrl("images/TreeIconWhite.svg");
+
+/** zfront's source, linked from the menu (AGPL-3.0 section 13). */
+const SOURCE_URL = "https://github.com/sycus1/zfront";
 
 export class ShowSettingsModalEvent {
   constructor(
@@ -181,23 +181,18 @@ export class SettingsModal extends LitElement implements Controller {
     const c = this.gameConfig;
     if (c === null) return null;
     const settings = notableLobbySettings(c, this.mapNationCount);
-    const disabledUnits = disabledUnitsBox(c, "mx-3 mt-2");
-    const hostCheats = hostCheatsBox(c, "mx-3 mt-2");
+    const disabledUnits = disabledUnitsBox(c, "mt-1");
+    const hostCheats = hostCheatsBox(c, "mt-1");
     if (settings.length === 0 && disabledUnits === null && hostCheats === null)
       return null;
     return html`
-      <div class="border-t border-slate-600 pt-3 mt-4" data-game-modifiers>
-        <div
-          class="px-3 py-1 text-xs font-semibold text-slate-400 uppercase tracking-wider"
-        >
+      <div class="zf-game-menu-section" data-game-modifiers>
+        <div class="zf-hud-label">
           ${translateText("user_setting.modifiers")}
         </div>
         ${
           settings.length > 0
-            ? html`<div
-                class="flex flex-wrap gap-1 px-3 pt-1 uppercase"
-                data-modifier-tags
-              >
+            ? html`<div class="flex flex-wrap gap-1.5" data-modifier-tags>
                 ${settings.map(
                   (s) =>
                     html`<span class=${LOBBY_SETTING_TAG}
@@ -212,6 +207,39 @@ export class SettingsModal extends LitElement implements Controller {
     `;
   }
 
+  /** One row of the menu: an icon, a title, a line about it. */
+  private menuItem(opts: {
+    icon: IconName;
+    title: string;
+    desc: string;
+    onClick: () => void;
+    end?: string;
+    danger?: boolean;
+    attrs?: string;
+  }): TemplateResult {
+    return html`<span class="zf-ring">
+      <button
+        type="button"
+        class="zf-game-menu-item zf-frame zf-sweep ${opts.danger ? "zf-game-menu-item-danger" : ""}"
+        ?data-open-settings=${opts.attrs === "open-settings"}
+        @click=${opts.onClick}
+      >
+        ${zfIcon(opts.icon, 22)}
+        <span class="zf-game-menu-text">
+          <span class="zf-game-menu-title">${opts.title}</span>
+          <span class="zf-game-menu-desc">${opts.desc}</span>
+        </span>
+        ${
+          opts.end
+            ? html`<span class="zf-num text-[13px] text-zf-signal-400"
+                >${opts.end}</span
+              >`
+            : nothing
+        }
+      </button>
+    </span>`;
+  }
+
   render() {
     if (!this.isVisible) {
       return null;
@@ -219,114 +247,88 @@ export class SettingsModal extends LitElement implements Controller {
 
     return html`
       <div
-        class="modal-overlay fixed inset-0 bg-black/60 backdrop-blur-xs z-2000 flex items-center justify-center p-4"
+        class="modal-overlay zf-dialog-scrim"
+        style="z-index: 2000"
         @contextmenu=${(e: Event) => e.preventDefault()}
       >
         <div
-          class="bg-slate-800 border border-slate-600 rounded-lg max-w-md w-full max-h-[80vh] overflow-y-auto"
+          class="zf-dialog zf-dialog-wide zf-frame max-h-[85vh] overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="game-menu-title"
         >
-          <div
-            class="flex items-center justify-between p-4 border-b border-slate-600"
-          >
-            <div class="flex items-center gap-2">
-              <img
-                src=${settingsIcon}
-                alt=""
-                width="24"
-                height="24"
-                class="align-middle"
-              />
-              <h2 class="text-xl font-semibold text-white">
-                ${translateText("user_setting.game_menu_title")}
-              </h2>
-            </div>
+          <h2 id="game-menu-title" class="zf-dialog-title uppercase">
+            ${translateText("user_setting.game_menu_title")}
+          </h2>
+          <span class="zf-ring zf-dialog-close">
             <button
-              class="text-slate-400 hover:text-white text-2xl font-bold leading-none"
-              @click=${this.closeModal}
+              type="button"
+              class="zf-icon-btn zf-frame zf-sweep"
+              aria-label=${translateText("common.close")}
+              @click=${() => this.closeModal()}
             >
-              ×
+              ${zfIcon("close", 18, 3)}
             </button>
-          </div>
+          </span>
 
-          <div class="p-4 flex flex-col gap-3">
-            <button
-              class="flex gap-3 items-center w-full text-left p-3 hover:bg-slate-700 rounded-sm text-white transition-colors"
-              data-open-settings
-              @click="${this.onOpenSettingsButtonClick}"
-            >
-              <img src=${settingsIcon} alt="" width="20" height="20" />
-              <div class="flex-1">
-                <div class="font-medium">
-                  ${translateText("user_setting.open_settings_label")}
-                </div>
-                <div class="text-sm text-slate-400">
-                  ${translateText("user_setting.open_settings_desc")}
-                </div>
-              </div>
-            </button>
-
-            <button
-              class="flex gap-3 items-center w-full text-left p-3 hover:bg-slate-700 rounded-sm text-white transition-colors"
-              @click="${this.onTerrainButtonClick}"
-            >
-              <img src=${treeIcon} alt="" width="20" height="20" />
-              <div class="flex-1">
-                <div class="font-medium">
-                  ${translateText("user_setting.toggle_terrain")}
-                </div>
-                <div class="text-sm text-slate-400">
-                  ${translateText("user_setting.toggle_view_desc")}
-                </div>
-              </div>
-              <div class="text-sm text-slate-400">
-                ${
-                  this.alternateView
-                    ? translateText("user_setting.on")
-                    : translateText("user_setting.off")
-                }
-              </div>
-            </button>
-
+          <div class="zf-game-menu">
+            ${this.menuItem({
+              icon: "gear",
+              title: translateText("user_setting.open_settings_label"),
+              desc: translateText("user_setting.open_settings_desc"),
+              onClick: this.onOpenSettingsButtonClick,
+              attrs: "open-settings",
+            })}
+            ${this.menuItem({
+              icon: "map",
+              title: translateText("user_setting.toggle_terrain"),
+              desc: translateText("user_setting.toggle_view_desc"),
+              onClick: this.onTerrainButtonClick,
+              end: this.alternateView
+                ? translateText("user_setting.on")
+                : translateText("user_setting.off"),
+            })}
             ${this.renderModifiers()}
 
-            <div class="border-t border-slate-600 pt-3 mt-4">
-              <div
-                class="px-3 py-1 text-xs font-semibold text-slate-400 uppercase tracking-wider"
-              >
+            <div class="zf-game-menu-section">
+              <div class="zf-hud-label">
                 ${translateText("user_setting.development_only")}
               </div>
-
-              <button
-                class="flex gap-3 items-center w-full text-left p-3 hover:bg-slate-700 rounded-sm text-white transition-colors"
-                @click="${this.onRenderDebugGuiButtonClick}"
-              >
-                <img src=${settingsIcon} alt="" width="20" height="20" />
-                <div class="flex-1">
-                  <div class="font-medium">
-                    ${translateText("user_setting.render_debug_gui")}
-                  </div>
-                  <div class="text-sm text-slate-400">
-                    ${translateText("user_setting.render_debug_gui_desc")}
-                  </div>
-                </div>
-              </button>
+              ${this.menuItem({
+                icon: "gear",
+                title: translateText("user_setting.render_debug_gui"),
+                desc: translateText("user_setting.render_debug_gui_desc"),
+                onClick: this.onRenderDebugGuiButtonClick,
+              })}
             </div>
 
-            <div class="border-t border-slate-600 pt-3 mt-4">
-              <button
-                class="flex gap-3 items-center w-full text-left p-3 hover:bg-red-600/20 rounded-sm text-red-400 transition-colors"
-                @click="${this.onExitButtonClick}"
-              >
-                <img src=${exitIcon} alt="" width="20" height="20" />
-                <div class="flex-1">
-                  <div class="font-medium">
-                    ${translateText("user_setting.exit_game_label")}
-                  </div>
-                  <div class="text-sm text-slate-400">
-                    ${translateText("user_setting.exit_game_info")}
-                  </div>
-                </div>
-              </button>
+            <div class="zf-game-menu-section">
+              <span class="zf-ring">
+                <a
+                  class="zf-game-menu-item zf-frame zf-sweep"
+                  href=${SOURCE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-source-link
+                >
+                  ${zfIcon("code", 22)}
+                  <span class="zf-game-menu-text">
+                    <span class="zf-game-menu-title"
+                      >${translateText("user_setting.source_code")}</span
+                    >
+                    <span class="zf-game-menu-desc"
+                      >${translateText("main.licence_notice")}</span
+                    >
+                  </span>
+                </a>
+              </span>
+              ${this.menuItem({
+                icon: "exit",
+                title: translateText("user_setting.exit_game_label"),
+                desc: translateText("user_setting.exit_game_info"),
+                onClick: this.onExitButtonClick,
+                danger: true,
+              })}
             </div>
           </div>
         </div>

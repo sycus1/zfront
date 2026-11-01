@@ -9,33 +9,187 @@ import { renderNumber } from "@openfront/engine-lib/Format";
 import { EventBus } from "@openfront/shared/EventBus";
 import { html, LitElement, nothing } from "lit";
 import { customElement } from "lit/decorators.js";
+import { type IconName, zfIcon } from "../../components/nightshift/Icon";
 import { Controller } from "../../Controller";
 import { ToggleStructureEvent } from "../../InputHandler";
 import { KeyboardLayoutController } from "../../KeyboardLayout";
+import { Platform } from "../../Platform";
 import { UIState } from "../../UIState";
 import { UserSettings } from "../../UserSettings";
-import { resolveKeybindLabel, translateText } from "../../Utils";
+import { keyCapLabel, resolveKeybindLabel, translateText } from "../../Utils";
 import { GameView } from "../../view";
 import {
   atomBombIcon,
   cityIcon,
-  defensePostIcon,
-  depotIcon,
   factoryIcon,
-  goldCoinIcon,
   hydrogenBombIcon,
-  mineIcon,
   mirvIcon,
-  missileSiloIcon,
-  noiseBeaconIcon,
-  outpostIcon,
   portIcon,
   samLauncherIcon,
-  wallIcon,
   warshipIcon,
 } from "../HotbarIcons";
 import { TutorialHighlight, TutorialHighlightEvent } from "../Tutorial";
 
+/** One button in the build strip. */
+export interface BuildItem {
+  type: PlayerBuildableUnitType;
+  /** The `unit_type.*` / `build_menu.desc.*` key. */
+  key: string;
+  /** A Night Shift line icon, or an image URL for OpenFront's own units. */
+  icon: IconName | string;
+  /** The keybind action, and its default key code. */
+  action: string;
+  defaultCode: string;
+}
+
+const WALL: BuildItem = {
+  type: UnitType.Wall,
+  key: "wall",
+  icon: "walls",
+  action: "buildWall",
+  defaultCode: "KeyV",
+};
+const TURRET: BuildItem = {
+  type: UnitType.DefensePost,
+  key: "defense_post",
+  icon: "turret",
+  action: "buildDefensePost",
+  defaultCode: "Digit4",
+};
+const MORTAR: BuildItem = {
+  type: UnitType.MissileSilo,
+  key: "missile_silo",
+  icon: "mortar",
+  action: "buildMissileSilo",
+  defaultCode: "Digit5",
+};
+const MINE: BuildItem = {
+  type: UnitType.Mine,
+  key: "mine",
+  icon: "mine",
+  action: "buildMine",
+  defaultCode: "KeyK",
+};
+const BEACON: BuildItem = {
+  type: UnitType.NoiseBeacon,
+  key: "noise_beacon",
+  icon: "beacon",
+  action: "buildNoiseBeacon",
+  defaultCode: "KeyL",
+};
+const DEPOT: BuildItem = {
+  type: UnitType.Depot,
+  key: "depot",
+  icon: "depot",
+  action: "buildDepot",
+  defaultCode: "KeyH",
+};
+const OUTPOST: BuildItem = {
+  type: UnitType.Outpost,
+  key: "outpost",
+  icon: "outpost",
+  action: "buildOutpost",
+  defaultCode: "KeyO",
+};
+
+/**
+ * zfront: the horde game's build strip, in the HUD board's order. City,
+ * Factory, Port and Warship can still be built from the radial build menu
+ * and their keys, but they stay off the strip.
+ */
+export const HORDE_BUILD_ITEMS: readonly BuildItem[] = [
+  WALL,
+  TURRET,
+  MORTAR,
+  MINE,
+  BEACON,
+  DEPOT,
+  OUTPOST,
+];
+
+/** Every unit OpenFront's hotbar offers, for games without the horde. */
+export const CLASSIC_BUILD_ITEMS: readonly BuildItem[] = [
+  {
+    type: UnitType.City,
+    key: "city",
+    icon: cityIcon,
+    action: "buildCity",
+    defaultCode: "Digit1",
+  },
+  {
+    type: UnitType.Factory,
+    key: "factory",
+    icon: factoryIcon,
+    action: "buildFactory",
+    defaultCode: "Digit2",
+  },
+  {
+    type: UnitType.Port,
+    key: "port",
+    icon: portIcon,
+    action: "buildPort",
+    defaultCode: "Digit3",
+  },
+  TURRET,
+  WALL,
+  MORTAR,
+  OUTPOST,
+  DEPOT,
+  MINE,
+  BEACON,
+  {
+    type: UnitType.SAMLauncher,
+    key: "sam_launcher",
+    icon: samLauncherIcon,
+    action: "buildSamLauncher",
+    defaultCode: "Digit6",
+  },
+  {
+    type: UnitType.Warship,
+    key: "warship",
+    icon: warshipIcon,
+    action: "buildWarship",
+    defaultCode: "Digit7",
+  },
+  {
+    type: UnitType.AtomBomb,
+    key: "atom_bomb",
+    icon: atomBombIcon,
+    action: "buildAtomBomb",
+    defaultCode: "Digit8",
+  },
+  {
+    type: UnitType.HydrogenBomb,
+    key: "hydrogen_bomb",
+    icon: hydrogenBombIcon,
+    action: "buildHydrogenBomb",
+    defaultCode: "Digit9",
+  },
+  {
+    type: UnitType.MIRV,
+    key: "mirv",
+    icon: mirvIcon,
+    action: "buildMIRV",
+    defaultCode: "Digit0",
+  },
+];
+
+/** A unit's translated name, or its type when it has no `unit_type` key. */
+export function unitTypeName(type: UnitType): string {
+  const item = CLASSIC_BUILD_ITEMS.find((i) => i.type === type);
+  return item ? translateText(`unit_type.${item.key}`) : type;
+}
+
+/** Levels shown as "Level 1 of N" in the tag (walls, turrets, mortars). */
+const MAX_SHOWN_LEVEL = 10;
+
+/**
+ * The build strip, bottom centre (the Night Shift "A2 compact bar"): one
+ * framed row of icon buttons with their key and cost. Above it, a yellow tag
+ * names the building being placed (or hovered), its cost, how far it
+ * upgrades and, on hover, what it does. Under 1024px the strip spans the
+ * screen in equal columns, as on the phone board.
+ */
 @customElement("unit-display")
 export class UnitDisplay extends LitElement implements Controller {
   public game: GameView;
@@ -44,19 +198,7 @@ export class UnitDisplay extends LitElement implements Controller {
   private playerBuildables: BuildableUnit[] | null = null;
   private keybinds: Record<string, { value: string; key: string }> = {};
   private keyboardLayout = new KeyboardLayoutController(this);
-  private _cities = 0;
-  private _warships = 0;
-  private _factories = 0;
-  private _missileSilo = 0;
-  private _port = 0;
-  private _defensePost = 0;
-  private _walls = 0;
-  private _outposts = 0;
-  private _depots = 0;
-  private _mines = 0;
-  private _noiseBeacons = 0;
-  private _samLauncher = 0;
-  private allDisabled = false;
+  private items: readonly BuildItem[] = [];
   private _hoveredUnit: PlayerBuildableUnitType | null = null;
   private tutorialHighlight: PlayerBuildableUnitType | null = null;
 
@@ -66,11 +208,10 @@ export class UnitDisplay extends LitElement implements Controller {
 
   init() {
     const config = this.game.config();
-    const userSettings = new UserSettings();
-
-    this.keybinds = userSettings.parsedUserKeybinds();
-
-    this.allDisabled = BuildMenus.types.every((u) => config.isUnitDisabled(u));
+    this.keybinds = new UserSettings().parsedUserKeybinds();
+    this.items = (
+      config.horde() ? HORDE_BUILD_ITEMS : CLASSIC_BUILD_ITEMS
+    ).filter((item) => !config.isUnitDisabled(item.type));
 
     const highlightUnits: Partial<
       Record<TutorialHighlight, PlayerBuildableUnitType>
@@ -129,18 +270,6 @@ export class UnitDisplay extends LitElement implements Controller {
     player.buildables(undefined, BuildMenus.types).then((buildables) => {
       this.playerBuildables = buildables;
     });
-    this._cities = player.totalUnitLevels(UnitType.City);
-    this._missileSilo = player.totalUnitLevels(UnitType.MissileSilo);
-    this._port = player.totalUnitLevels(UnitType.Port);
-    this._defensePost = player.totalUnitLevels(UnitType.DefensePost);
-    this._walls = player.totalUnitLevels(UnitType.Wall);
-    this._outposts = player.totalUnitLevels(UnitType.Outpost);
-    this._depots = player.totalUnitLevels(UnitType.Depot);
-    this._mines = player.totalUnitLevels(UnitType.Mine);
-    this._noiseBeacons = player.totalUnitLevels(UnitType.NoiseBeacon);
-    this._samLauncher = player.totalUnitLevels(UnitType.SAMLauncher);
-    this._factories = player.totalUnitLevels(UnitType.Factory);
-    this._warships = player.totalUnitLevels(UnitType.Warship);
     this.requestUpdate();
   }
 
@@ -150,256 +279,153 @@ export class UnitDisplay extends LitElement implements Controller {
       !this.game ||
       !myPlayer ||
       this.game.inSpawnPhase() ||
-      !myPlayer.isAlive()
+      !myPlayer.isAlive() ||
+      this.items.length === 0
     ) {
       return null;
     }
-    if (this.allDisabled) {
-      return null;
-    }
+    const tagItem =
+      this.items.find((i) => i.type === this._hoveredUnit) ??
+      this.items.find((i) => i.type === this.uiState.ghostStructure);
 
     return html`
-      <div class="border-t border-white/10 p-0.5 w-full">
-        <div class="grid grid-rows-1 grid-flow-col gap-0.5 w-fit mx-auto">
-          ${this.renderUnitItem(
-            cityIcon,
-            this._cities,
-            UnitType.City,
-            "city",
-            this.getHotkey("buildCity", "Digit1"),
-          )}
-          ${this.renderUnitItem(
-            factoryIcon,
-            this._factories,
-            UnitType.Factory,
-            "factory",
-            this.getHotkey("buildFactory", "Digit2"),
-          )}
-          ${this.renderUnitItem(
-            portIcon,
-            this._port,
-            UnitType.Port,
-            "port",
-            this.getHotkey("buildPort", "Digit3"),
-          )}
-          ${this.renderUnitItem(
-            defensePostIcon,
-            this._defensePost,
-            UnitType.DefensePost,
-            "defense_post",
-            this.getHotkey("buildDefensePost", "Digit4"),
-          )}
-          ${this.renderUnitItem(
-            wallIcon,
-            this._walls,
-            UnitType.Wall,
-            "wall",
-            this.getHotkey("buildWall", "KeyV"),
-          )}
-          ${this.renderUnitItem(
-            missileSiloIcon,
-            this._missileSilo,
-            UnitType.MissileSilo,
-            "missile_silo",
-            this.getHotkey("buildMissileSilo", "Digit5"),
-          )}
-          ${this.renderUnitItem(
-            outpostIcon,
-            this._outposts,
-            UnitType.Outpost,
-            "outpost",
-            this.getHotkey("buildOutpost", "KeyO"),
-          )}
-          ${this.renderUnitItem(
-            depotIcon,
-            this._depots,
-            UnitType.Depot,
-            "depot",
-            this.getHotkey("buildDepot", "KeyH"),
-          )}
-          ${this.renderUnitItem(
-            mineIcon,
-            this._mines,
-            UnitType.Mine,
-            "mine",
-            this.getHotkey("buildMine", "KeyK"),
-          )}
-          ${this.renderUnitItem(
-            noiseBeaconIcon,
-            this._noiseBeacons,
-            UnitType.NoiseBeacon,
-            "noise_beacon",
-            this.getHotkey("buildNoiseBeacon", "KeyL"),
-          )}
-          ${this.renderUnitItem(
-            samLauncherIcon,
-            this._samLauncher,
-            UnitType.SAMLauncher,
-            "sam_launcher",
-            this.getHotkey("buildSamLauncher", "Digit6"),
-          )}
-          ${this.renderUnitItem(
-            warshipIcon,
-            this._warships,
-            UnitType.Warship,
-            "warship",
-            this.getHotkey("buildWarship", "Digit7"),
-          )}
-          ${this.renderUnitItem(
-            atomBombIcon,
-            null,
-            UnitType.AtomBomb,
-            "atom_bomb",
-            this.getHotkey("buildAtomBomb", "Digit8"),
-          )}
-          ${this.renderUnitItem(
-            hydrogenBombIcon,
-            null,
-            UnitType.HydrogenBomb,
-            "hydrogen_bomb",
-            this.getHotkey("buildHydrogenBomb", "Digit9"),
-          )}
-          ${this.renderUnitItem(
-            mirvIcon,
-            null,
-            UnitType.MIRV,
-            "mirv",
-            this.getHotkey("buildMIRV", "Digit0"),
-          )}
-        </div>
+      <div class="zf-build">
+        ${tagItem ? this.renderTag(tagItem) : nothing}
+        <nav
+          class="zf-build-strip zf-hud zf-frame"
+          style="--zf-build-count: ${this.items.length}"
+          aria-label=${translateText("unit_display.build")}
+          @contextmenu=${(e: MouseEvent) => e.preventDefault()}
+        >
+          ${this.items.map((item) => this.renderItem(item))}
+        </nav>
       </div>
     `;
   }
 
-  private getHotkey(action: string, defaultCode: string): string {
-    return resolveKeybindLabel(
-      this.keybinds[action],
-      defaultCode,
-      this.keyboardLayout.map,
-    );
+  private costLabel(type: UnitType): string {
+    const cost = this.cost(type);
+    return cost === 0n ? translateText("build_menu.free") : renderNumber(cost);
   }
 
-  private renderUnitItem(
-    icon: string,
-    number: number | null,
-    unitType: PlayerBuildableUnitType,
-    structureKey: string,
-    hotkey: string,
-  ) {
-    if (this.game.config().isUnitDisabled(unitType)) {
-      return html``;
-    }
-    const selected = this.uiState.ghostStructure === unitType;
-    const hovered = this._hoveredUnit === unitType;
-    const displayHotkey = hotkey
-      .replace("Digit", "")
-      .replace("Key", "")
-      .toUpperCase();
-
+  /** The building being placed or hovered: name, cost, levels, use. */
+  private renderTag(item: BuildItem) {
+    const maxLevel = this.game.config().maxUnitLevel(item.type);
+    const hovered = this._hoveredUnit === item.type;
     return html`
-      <div
-        class="flex flex-col items-center relative"
-        @mouseenter=${() => {
-          this._hoveredUnit = unitType;
-          this.requestUpdate();
-        }}
-        @mouseleave=${() => {
-          this._hoveredUnit = null;
-          this.requestUpdate();
-        }}
-      >
+      <div class="zf-build-tag zf-frame" aria-live="polite">
+        <span class="zf-build-tag-head">
+          <span class="zf-stencil"
+            >${translateText(`unit_type.${item.key}`)}</span
+          >
+          <span class="zf-num" style="font-size: 13px" translate="no"
+            >${this.costLabel(item.type)}</span
+          >
+          ${
+            maxLevel <= MAX_SHOWN_LEVEL
+              ? html`<span class="zf-build-tag-level"
+                  >${translateText("unit_display.level", { max: maxLevel })}</span
+                >`
+              : nothing
+          }
+        </span>
         ${
           hovered
-            ? html`
-                <div
-                  class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 text-gray-200 text-center w-max text-xs bg-gray-800/90 backdrop-blur-xs rounded-sm p-1 z-[100] shadow-lg pointer-events-none"
-                >
-                  <div class="font-bold text-sm mb-1">
-                    ${translateText("unit_type." + structureKey)}${
-                      hotkey ? ` [${displayHotkey}]` : ""
-                    }
-                  </div>
-                  <div class="p-2">
-                    ${translateText("build_menu.desc." + structureKey)}
-                  </div>
-                  ${
-                    unitType === UnitType.Warship
-                      ? html`<div
-                          class="mt-1 px-2 py-1 text-[10px] text-cyan-300 border-t border-white/10"
-                        >
-                          ⇧ ${translateText("build_menu.warship_shift_hint")}
-                        </div>`
-                      : null
-                  }
-                  <div class="flex items-center justify-center gap-1">
-                    <img src=${goldCoinIcon} width="13" height="13" />
-                    <span class="text-yellow-300"
-                      >${
-                        this.cost(unitType) === 0n
-                          ? translateText("build_menu.free")
-                          : renderNumber(this.cost(unitType))
-                      }</span
-                    >
-                  </div>
-                </div>
-              `
-            : null
+            ? html`<span class="zf-build-tag-desc"
+                >${translateText(`build_menu.desc.${item.key}`)}${
+                  item.type === UnitType.Warship
+                    ? ` ${translateText("build_menu.warship_shift_hint")}`
+                    : ""
+                }</span
+              >`
+            : nothing
         }
-        <div
-          class="${
-            this.canBuild(unitType) ? "" : "opacity-40"
-          } border border-slate-500 rounded-sm px-0.5 pb-0.5 flex items-center gap-0.5 cursor-pointer
-             ${selected ? "hover:bg-gray-400/10" : "hover:bg-gray-800"}
-             rounded-sm text-white ${selected ? "bg-slate-400/20" : ""}
-             ${this.tutorialHighlight === unitType ? "tutorial-highlight" : ""}"
-          @click=${() => {
-            if (selected) {
-              this.uiState.ghostStructure = null;
-            } else if (this.canBuild(unitType)) {
-              this.uiState.ghostStructure = unitType;
-            }
-            this.requestUpdate();
-          }}
-          @mouseenter=${() => {
-            switch (unitType) {
-              case UnitType.AtomBomb:
-              case UnitType.HydrogenBomb:
-                this.eventBus?.emit(
-                  new ToggleStructureEvent([
-                    UnitType.MissileSilo,
-                    UnitType.SAMLauncher,
-                  ]),
-                );
-                break;
-              case UnitType.Warship:
-                this.eventBus?.emit(new ToggleStructureEvent([UnitType.Port]));
-                break;
-              default:
-                this.eventBus?.emit(new ToggleStructureEvent([unitType]));
-            }
-          }}
-          @mouseleave=${() =>
-            this.eventBus?.emit(new ToggleStructureEvent(null))}
+      </div>
+    `;
+  }
+
+  private renderItem(item: BuildItem) {
+    const selected = this.uiState.ghostStructure === item.type;
+    const hotkey = keyCapLabel(
+      resolveKeybindLabel(
+        this.keybinds[item.action],
+        item.defaultCode,
+        this.keyboardLayout.map,
+      ),
+      Platform.isMac,
+    );
+    const name = translateText(`unit_type.${item.key}`);
+    const cost = this.costLabel(item.type);
+    const label = hotkey
+      ? translateText("unit_display.item_key", { name, cost, key: hotkey })
+      : translateText("unit_display.item", { name, cost });
+    const icon = item.icon.includes("/")
+      ? html`<img src=${item.icon} alt="" aria-hidden="true" />`
+      : zfIcon(item.icon as IconName, 26, 2.8);
+
+    return html`
+      <span
+        class="zf-ring ${
+          this.tutorialHighlight === item.type ? "tutorial-highlight" : ""
+        }"
+        @mouseenter=${() => this.hover(item.type)}
+        @mouseleave=${() => this.hover(null)}
+      >
+        <button
+          type="button"
+          class="zf-frame zf-sweep zf-build-btn ${
+            this.canBuild(item.type) ? "" : "zf-cannot-afford"
+          }"
+          aria-pressed=${selected ? "true" : "false"}
+          aria-label=${label}
+          @click=${() => this.toggle(item.type, selected)}
         >
           ${
             hotkey
-              ? html`<div
-                  class="ml-0.5 text-[10px] relative -top-1 text-gray-400"
-                >
-                  ${displayHotkey}
-                </div>`
+              ? html`<span class="zf-num zf-build-key" aria-hidden="true"
+                  >${hotkey}</span
+                >`
               : nothing
           }
-          <div class="flex items-center gap-0.5 pt-0.5">
-            <img src=${icon} alt=${structureKey} class="align-middle size-5" />
-            ${
-              number !== null
-                ? html`<span class="text-xs">${renderNumber(number)}</span>`
-                : null
-            }
-          </div>
-        </div>
-      </div>
+          ${icon}
+          <span class="zf-num zf-build-cost" aria-hidden="true">${cost}</span>
+        </button>
+      </span>
     `;
+  }
+
+  private toggle(type: PlayerBuildableUnitType, selected: boolean) {
+    if (selected) {
+      this.uiState.ghostStructure = null;
+    } else if (this.canBuild(type)) {
+      this.uiState.ghostStructure = type;
+    }
+    this.requestUpdate();
+  }
+
+  /** Hovering a button shows its tag and highlights where it can go. */
+  private hover(type: PlayerBuildableUnitType | null) {
+    this._hoveredUnit = type;
+    this.requestUpdate();
+    if (type === null) {
+      this.eventBus?.emit(new ToggleStructureEvent(null));
+      return;
+    }
+    switch (type) {
+      case UnitType.AtomBomb:
+      case UnitType.HydrogenBomb:
+        this.eventBus?.emit(
+          new ToggleStructureEvent([
+            UnitType.MissileSilo,
+            UnitType.SAMLauncher,
+          ]),
+        );
+        break;
+      case UnitType.Warship:
+        this.eventBus?.emit(new ToggleStructureEvent([UnitType.Port]));
+        break;
+      default:
+        this.eventBus?.emit(new ToggleStructureEvent([type]));
+    }
   }
 }

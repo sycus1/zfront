@@ -94,7 +94,9 @@ describe("GameRightSidebar end timer warnings", () => {
 
     await setRemainingSeconds(61);
     expect(toasts).toHaveLength(0);
-    expect(sidebar.querySelector("[data-game-timer]")?.className).toBe("");
+    expect(sidebar.querySelector("[data-game-timer]")?.className).not.toMatch(
+      /game-end-timer/,
+    );
 
     await setRemainingSeconds(60);
     expect(toasts).toEqual([
@@ -177,7 +179,9 @@ describe("GameRightSidebar end timer warnings", () => {
     expect(
       sidebar.querySelector("[data-game-timer]")?.textContent?.trim(),
     ).toBe("00:30");
-    expect(sidebar.querySelector("[data-game-timer]")?.className).toBe("");
+    expect(sidebar.querySelector("[data-game-timer]")?.className).not.toMatch(
+      /game-end-timer/,
+    );
     expect(sidebar.querySelector("aside")?.className).not.toContain(
       "game-end-timer-sidebar-flash",
     );
@@ -196,7 +200,9 @@ describe("GameRightSidebar end timer warnings", () => {
     expect(
       sidebar.querySelector("[data-game-timer]")?.textContent?.trim(),
     ).toBe("00:30");
-    expect(sidebar.querySelector("[data-game-timer]")?.className).toBe("");
+    expect(sidebar.querySelector("[data-game-timer]")?.className).not.toMatch(
+      /game-end-timer/,
+    );
     expect(sidebar.querySelector("aside")?.className).not.toContain(
       "game-end-timer-sidebar-flash",
     );
