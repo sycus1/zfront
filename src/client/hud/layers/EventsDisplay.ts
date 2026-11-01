@@ -248,6 +248,13 @@ export class EventsDisplay extends LitElement implements Controller {
     ) {
       params = { ...params, unit: translateText(params.unit) };
     }
+    // zfront: the engine names a side of the base by its translation key.
+    if (
+      typeof params.direction === "string" &&
+      params.direction.startsWith("horde_direction_long.")
+    ) {
+      params = { ...params, direction: translateText(params.direction) };
+    }
 
     if (params.name === undefined || event.focusPlayerID === undefined) {
       return params;

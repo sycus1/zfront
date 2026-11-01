@@ -126,6 +126,11 @@ export class TutorialPanel extends LitElement implements Controller {
   @state() private attackNations = false;
   private completeTicks: number | null = null;
   private highlight: TutorialHighlight | null = null;
+  /**
+   * zfront: the steps teach OpenFront (cities, ports, nukes). A horde game
+   * shows a "coming soon" card instead until the zombie tutorial exists.
+   */
+  @state() private comingSoon = false;
 
   createRenderRoot() {
     return this;
@@ -138,11 +143,12 @@ export class TutorialPanel extends LitElement implements Controller {
       this.started = true;
       // The steps walk a new game from its spawn; a resumed save is well
       // past that, and would hold the spawn ring up until the next attack.
+      this.comingSoon = this.game.config().horde();
       this.setActive(
         !this.userSettings.tutorialDismissed() && !this.game.resumedFromSave(),
       );
     }
-    if (!this.active) return;
+    if (!this.active || this.comingSoon) return;
 
     const player = this.game.myPlayer();
     if (
@@ -394,9 +400,13 @@ export class TutorialPanel extends LitElement implements Controller {
             >${translateText("tutorial.title")}</span
           >
           <span class="flex items-center gap-2 text-sm text-zf-muted-300">
-            ${this.confirmingClose ? nothing : this.renderHeaderActions()}
             ${
-              this.ctx && !this.progress.finished()
+              this.confirmingClose || this.comingSoon
+                ? nothing
+                : this.renderHeaderActions()
+            }
+            ${
+              this.ctx && !this.progress.finished() && !this.comingSoon
                 ? html`<span class="zf-num text-[13px]"
                     >${translateText("tutorial.step_counter", {
                       current: this.progress.position(this.ctx),
@@ -419,7 +429,13 @@ export class TutorialPanel extends LitElement implements Controller {
             </span>
           </span>
         </div>
-        ${this.confirmingClose ? this.renderCloseChoice() : this.renderStep()}
+        ${
+          this.confirmingClose
+            ? this.renderCloseChoice()
+            : this.comingSoon
+              ? this.renderComingSoon()
+              : this.renderStep()
+        }
       </div>
     `;
   }
@@ -461,6 +477,19 @@ export class TutorialPanel extends LitElement implements Controller {
         onClick: () => this.progress.skip(),
       })}
     `;
+  }
+
+  private renderComingSoon() {
+    return html`<p class="m-0 flex gap-2" data-tutorial-coming-soon>
+      <span class="shrink-0 pt-0.5 text-zf-signal-400"
+        >${zfIcon("info", 16, 3)}</span
+      >
+      <span>
+        <span class="zf-tag zf-tag-signal me-1.5"
+          >${translateText("common.coming_soon")}</span
+        >${translateText("tutorial.coming_soon")}
+      </span>
+    </p>`;
   }
 
   private renderCloseChoice() {

@@ -1,4 +1,4 @@
-import { html, LitElement } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { type IconName, zfIcon } from "./components/nightshift/Icon";
@@ -64,16 +64,10 @@ export class GameModeSelector extends LitElement {
     );
   };
 
-  // Handled in Main, which also serves the help page's tutorial button.
-  private startTutorial = () => {
-    if (!this.validateUsername()) return;
-    document.dispatchEvent(new CustomEvent("start-tutorial"));
-  };
-
   private renderLink(
     label: string,
     icon: IconName,
-    extra: { class?: string; page?: string },
+    extra: { class?: string; page?: string; soon?: boolean },
     onClick?: () => void,
   ) {
     return html`
@@ -82,10 +76,18 @@ export class GameModeSelector extends LitElement {
           type="button"
           class="zf-menu-link zf-frame zf-sweep ${extra.class ?? ""}"
           data-page=${ifDefined(extra.page)}
+          ?disabled=${extra.soon}
           @click=${onClick}
         >
           ${zfIcon(icon, 20, 2.6, "zf-menu-link-icon")}
           <span>${label}</span>
+          ${
+            extra.soon
+              ? html`<span class="zf-menu-link-soon"
+                  >${translateText("common.coming_soon")}</span
+                >`
+              : nothing
+          }
           ${zfIcon("arrow-right", 22, 3, "zf-menu-link-arrow")}
         </button>
       </div>
@@ -107,12 +109,9 @@ export class GameModeSelector extends LitElement {
           </button>
         </div>
         <nav class="zf-menu-links" aria-label=${translateText("main.menu")}>
-          ${this.renderLink(
-            translateText("main.tutorial"),
-            "book",
-            {},
-            this.startTutorial,
-          )}
+          ${this.renderLink(translateText("main.tutorial"), "book", {
+            soon: true,
+          })}
           ${this.renderLink(translateText("main.settings"), "gear", {
             class: "nav-menu-item",
             page: "page-settings",

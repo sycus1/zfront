@@ -211,8 +211,9 @@ class Client {
         );
       });
     }
-    // Tutorial entry points (play-page card, help page): a default solo game
-    // with the guide on.
+    // Starts a default solo game with the guide on. zfront: nothing fires it
+    // while the zombie tutorial is "coming soon" (the menu link and the help
+    // page's button are disabled); it stays for when that tutorial lands.
     document.addEventListener("start-tutorial", () => {
       // The help modal loads on demand (see LazyModals); until it has, it
       // can't be open.

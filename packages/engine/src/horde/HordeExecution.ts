@@ -1,5 +1,9 @@
 import { TileRef } from "@openfront/engine-api/game/GameMap";
-import { PlayerType, UnitType } from "@openfront/engine-api/game/GameTypes";
+import {
+  MessageType,
+  PlayerType,
+  UnitType,
+} from "@openfront/engine-api/game/GameTypes";
 import {
   HordeFrame,
   HordeOutcome,
@@ -25,6 +29,13 @@ import { DefensePostExecution } from "../execution/DefensePostExecution";
 import { Execution, Game, Player, Unit } from "../game/Game";
 import { execSnapshotType } from "../snapshot/ExecutionSnapshot";
 import type { ExecRecord, SnapshotReader } from "../snapshot/SnapshotContext";
+import {
+  ELITE_ALERT_INTERVAL,
+  elitesAtWalls,
+  MAX_ELITE_ALERTS,
+  maskSectors,
+  SECTOR_KEYS,
+} from "./Alerts";
 import { BuildingOptions, beaconSounding, detonate } from "./Buildings";
 import {
   applyClaims,
@@ -645,6 +656,7 @@ export class HordeExecution implements Execution {
       this.field.step(this.hordeFlow.dist);
     }
     this.elites.step(this.field, this.hordeFlow.dist);
+    if (ticks % ELITE_ALERT_INTERVAL === 0) this.announceElitesAtWalls();
     this.fireMines();
     if (ticks % this.opts.turretFireInterval === 0) this.fireTurrets();
     else this.hordeTurretShots = [];
@@ -1693,8 +1705,51 @@ export class HordeExecution implements Execution {
       if (hit === null) continue;
       this.killed += hit.shamblers;
       payBounty(u.owner(), this.opts, hit.shamblers, hit.elites);
+      this.mg!.displayMessage(
+        "events_display.mine_detonated",
+        MessageType.HORDE_KILLS,
+        u.owner().id(),
+        undefined,
+        { kills: hit.shamblers + hit.elites },
+      );
       u.delete(false);
     }
+  }
+
+  /**
+   * "Elite at the south wall": tells each HQ's owner which sides have an
+   * elite standing at one of their walls, a few sides at most per check.
+   */
+  private announceElitesAtWalls(): void {
+    if (this.elites.count === 0) return;
+    const found = elitesAtWalls(
+      this.elites.cell.subarray(0, this.elites.count),
+      (cell) => this.isStandingWall(cell),
+      this.width,
+      this.height,
+      [...this.hordeHqAt.keys()],
+    );
+    for (const [hq, mask] of found) {
+      const owner = this.hordeHqAt.get(hq);
+      if (owner === undefined || !owner.isAlive()) continue;
+      for (const s of maskSectors(mask, MAX_ELITE_ALERTS)) {
+        this.mg!.displayMessage(
+          "events_display.elite_at_wall",
+          MessageType.HORDE_THREAT,
+          owner.id(),
+          undefined,
+          { direction: `horde_direction_long.${SECTOR_KEYS[s]}` },
+        );
+      }
+    }
+  }
+
+  /** A coarse cell holding a wall post or an unbroken wall span. */
+  private isStandingWall(cell: number): boolean {
+    const span = this.hordeSpanAt.get(cell);
+    if (span !== undefined) return !span.broken;
+    const u = this.hordeStructureAt.get(cell);
+    return u !== undefined && u.isActive() && u.type() === UnitType.Wall;
   }
 
   private fireTurrets(): void {
