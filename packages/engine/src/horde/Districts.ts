@@ -18,7 +18,9 @@ import { Game, Player } from "../game/Game";
  *
  * - **Core**: the district with a player's HQ, or one with no Outpost
  *   where they own at least `districtCorePercent` of the open ground. It
- *   is never overrun.
+ *   is never overrun. When districts are the land (`districtLand`), Core
+ *   is the HQ's district and its neighbours, the land a player starts
+ *   with, and nothing else.
  * - **Securing**: a finished Outpost stands in it (outside the HQ's
  *   district), however much of it is settled. Once no zombie has been
  *   in it for `districtSecureTicks`, it is Held.
@@ -32,8 +34,14 @@ import { Game, Player } from "../game/Game";
  * No wave rises in a Core or Held district, nor in a district next to a
  * Held one (HordeExecution.surveySpawns), so each district held out from
  * the base keeps the waves off a whole stretch of that side, and holding a
- * ring of them pushes the waves further out or closes a direction. Supply crates only drop in or next to a
- * player's own districts, and are worth more in a Held one (Crates.ts).
+ * ring of them pushes the waves further out or closes a direction. Supply
+ * crates only drop in or next to a player's own districts, and are worth
+ * more in a Held one (Crates.ts).
+ *
+ * When districts are the land, a player owns every tile of the districts
+ * they hold, and an Outpost may only go in a Wild district next to one of
+ * theirs (`outpostSite`); HordeExecution.syncDistrictLand hands the land
+ * over as districts are secured and lost.
  *
  * Deterministic: integer state, districts visited in id order, players in
  * player order, units in list order.
@@ -53,6 +61,12 @@ export interface DistrictOptions {
   districtOverrunTicks: number;
   /** A district where a player owns this percent of the open ground is Core. */
   districtCorePercent: number;
+  /**
+   * 1: districts are the land. A player starts with their HQ's district
+   * and its neighbours (Core), owns every tile of each district they hold,
+   * and takes more only with Outposts, in Wild districts next to theirs.
+   */
+  districtLand: number;
 }
 
 export interface DistrictsState {
@@ -76,6 +90,9 @@ export class Districts {
   readonly map: DistrictMap;
   /** Open (walkable) coarse cells per district. */
   private open: Int32Array;
+  /** Each district's cells, in row order: cells[first[d]..first[d + 1]). */
+  private cellList: Int32Array;
+  private first: Int32Array;
   /** smallID of the holder per district, 0 for nobody. */
   private holder: Int32Array;
   private status: Uint8Array;
@@ -95,9 +112,16 @@ export class Districts {
     this.map = districtMap(width, height, opts.districtSize, own);
     const n = this.map.count;
     this.open = new Int32Array(n);
-    for (let c = 0; c < this.map.ids.length; c++) {
-      if (passable(c)) this.open[this.map.ids[c]]++;
+    const ids = this.map.ids;
+    this.first = new Int32Array(n + 1);
+    for (let c = 0; c < ids.length; c++) {
+      if (passable(c)) this.open[ids[c]]++;
+      this.first[ids[c] + 1]++;
     }
+    for (let d = 0; d < n; d++) this.first[d + 1] += this.first[d];
+    this.cellList = new Int32Array(ids.length);
+    const next = this.first.slice(0, n);
+    for (let c = 0; c < ids.length; c++) this.cellList[next[ids[c]]++] = c;
     this.holder = new Int32Array(n);
     this.status = new Uint8Array(n);
     this.timer = new Int32Array(n);
@@ -144,6 +168,34 @@ export class Districts {
   /** The smallID holding district `d` (Core or Held), or 0. */
   claimedBy(d: number): number {
     return this.isClaimed(d) ? this.holder[d] : 0;
+  }
+
+  /** The smallID with an Outpost or a claim on district `d`, or 0. */
+  holderOf(d: number): number {
+    return this.status[d] === DistrictState.Wild ? 0 : this.holder[d];
+  }
+
+  /** District `d`'s coarse cells, in row order. */
+  cellsOf(d: number): Int32Array {
+    return this.cellList.subarray(this.first[d], this.first[d + 1]);
+  }
+
+  /** The districts a player whose HQ is on `cell` starts with. */
+  homeDistricts(cell: number): number[] {
+    const d = this.map.ids[cell];
+    return [d, ...this.map.neighbours[d]];
+  }
+
+  /**
+   * Whether the player `smallID` may put an Outpost on `cell` when
+   * districts are the land: its district is Wild and borders one they
+   * hold, so land is taken a district at a time, outwards.
+   */
+  outpostSite(smallID: number, cell: number): boolean {
+    if (!this.enabled()) return false;
+    const d = this.map.ids[cell];
+    if (this.status[d] !== DistrictState.Wild) return false;
+    return this.map.neighbours[d].some((n) => this.claimedBy(n) === smallID);
   }
 
   /**
@@ -194,9 +246,10 @@ export class Districts {
     }
 
     // Ground each human owns per district, sampled at each coarse cell's
-    // top-left tile.
+    // top-left tile. Not needed when districts are the land.
+    const land = o.districtLand !== 0;
     const owned = humans.map(() => new Int32Array(n));
-    if (humans.length > 0) {
+    if (humans.length > 0 && !land) {
       const index = new Map(humans.map((p, k) => [p.smallID(), k]));
       const mw = map.width();
       const mh = map.height();
@@ -216,7 +269,7 @@ export class Districts {
     const anchor = new Int32Array(n);
     humans.forEach((p, k) => {
       const id = p.smallID();
-      for (let i = 0; i < n; i++) {
+      for (let i = 0; i < n && !land; i++) {
         if (
           core[i] === 0 &&
           this.open[i] > 0 &&
@@ -226,7 +279,16 @@ export class Districts {
         }
       }
       const hq = p.spawnTile();
-      if (hq !== undefined) home[ids[view.cellOf(hq)]] = id;
+      if (hq !== undefined) {
+        const cell = view.cellOf(hq);
+        if (land) {
+          for (const i of this.homeDistricts(cell)) {
+            if (home[i] === 0) home[i] = id;
+          }
+        } else {
+          home[ids[cell]] = id;
+        }
+      }
       for (const u of p.units(UnitType.Outpost)) {
         if (!u.isActive() || u.isUnderConstruction()) continue;
         const i = ids[view.cellOf(u.tile())];

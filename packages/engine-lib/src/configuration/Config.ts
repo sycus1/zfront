@@ -89,8 +89,16 @@ const OVERTIME_DEFAULTS = {
 
 /** zfront: the default radius in tiles an Outpost claims once built. */
 export const OUTPOST_CLAIM_RADIUS = 12;
-/** zfront: the radius on close-up town maps, about a block (60 m). */
+/**
+ * zfront: the radius on close-up town maps, about a block (60 m), when
+ * districts aren't the land there (HordeOptions.districtLand).
+ */
 export const TOWN_OUTPOST_CLAIM_RADIUS = 20;
+/**
+ * zfront: on town maps an Outpost takes a whole district, and each one
+ * costs this much more than the last (EngineConfig's Outpost cost).
+ */
+export const TOWN_OUTPOST_COST_STEP = 15_000;
 /** zfront: horde turret range in coarse cells (2x2 tiles), by map scale. */
 export const HORDE_TURRET_RANGE = 8;
 export const TOWN_TURRET_RANGE = 20;
@@ -193,11 +201,12 @@ export class Config {
     );
   }
 
-  /** zfront: radius in tiles an Outpost claims, for the placement preview. */
+  /**
+   * zfront: radius in tiles an Outpost claims, for the placement preview.
+   * 0 on town maps, where it claims the district it stands in instead.
+   */
   outpostClaimRadius(): number {
-    return isTownScale(this._gameConfig.gameMap)
-      ? TOWN_OUTPOST_CLAIM_RADIUS
-      : OUTPOST_CLAIM_RADIUS;
+    return isTownScale(this._gameConfig.gameMap) ? 0 : OUTPOST_CLAIM_RADIUS;
   }
 
   /** zfront: zombie waves (packages/engine/src/horde). */

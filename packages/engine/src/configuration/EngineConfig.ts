@@ -11,8 +11,12 @@ import {
 import { PlayerLike } from "@openfront/engine-api/game/ReadViews";
 import { TeamCountConfig } from "@openfront/engine-api/Schemas";
 import { NukeType } from "@openfront/engine-api/StatsSchemas";
-import { Config } from "@openfront/engine-lib/configuration/Config";
+import {
+  Config,
+  TOWN_OUTPOST_COST_STEP,
+} from "@openfront/engine-lib/configuration/Config";
 import { exp, log, pow2 } from "@openfront/engine-lib/DetMath";
+import { isTownScale } from "@openfront/engine-lib/game/MapScale";
 import {
   assertNever,
   sigmoid,
@@ -394,7 +398,15 @@ export class EngineConfig extends Config {
       case UnitType.Depot:
         return this.costWrapper(() => 30_000, UnitType.Depot);
       case UnitType.Outpost:
-        return this.costWrapper(() => 20_000, UnitType.Outpost);
+        // zfront: on town maps each Outpost takes a district, and costs
+        // more for every Outpost the player already has.
+        return this.costWrapper(
+          (n) =>
+            isTownScale(this.gameConfig().gameMap)
+              ? 20_000 + TOWN_OUTPOST_COST_STEP * n
+              : 20_000,
+          UnitType.Outpost,
+        );
       case UnitType.SAMLauncher:
         return this.costWrapper(
           (numUnits: number) => Math.min(3_000_000, (numUnits + 1) * 1_500_000),
