@@ -139,6 +139,7 @@ describe("Settlement", () => {
       wavesToWin: 0,
       hqHp: 10_000_000,
       structureHp: 10_000_000,
+      turretHp: 10_000_000,
     });
     game.addExecution(horde);
     survivor.removeTroops(survivor.troops());

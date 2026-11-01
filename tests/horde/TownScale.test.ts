@@ -43,6 +43,7 @@ const WAVES: Partial<HordeOptions> = {
   elitesPerWave: 0,
   hqHp: 10_000_000,
   structureHp: 10_000_000,
+  turretHp: 10_000_000,
   shamblerSpeed: 1,
 };
 
@@ -112,7 +113,10 @@ describe("Town scale", () => {
   });
 
   test("town maps get the town horde numbers, continent maps the defaults", () => {
-    expect(hordeOptionsForMap(GameMapType.Sheffield)).toBe(TOWN_HORDE_OPTIONS);
+    expect(hordeOptionsForMap(GameMapType.Sheffield)).toEqual({
+      ...TOWN_HORDE_OPTIONS,
+      waveGrowthPercent: 50,
+    });
     expect(hordeOptionsForMap(GameMapType.Britannia)).toEqual({});
     // Every town number is a real option.
     for (const k of Object.keys(TOWN_HORDE_OPTIONS)) {
@@ -124,8 +128,10 @@ describe("Town scale", () => {
     expect(hordeOptionsForMap(GameMapType.Bath)).toEqual({
       ...TOWN_HORDE_OPTIONS,
       firstWaveSize: 185,
+      waveGrowthPercent: 48,
     });
     expect(hordeOptionsForMap(GameMapType.Whitby).firstWaveSize).toBe(120);
+    expect(hordeOptionsForMap(GameMapType.Whitby).waveGrowthPercent).toBe(49);
     expect(hordeOptionsForMap(GameMapType.Whitby).cellCap).toBe(
       TOWN_HORDE_OPTIONS.cellCap,
     );

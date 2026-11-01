@@ -190,6 +190,7 @@ describe("turrets", () => {
       const { game, horde } = await defenceGame({
         ...WAVES,
         structureHp: 10_000_000,
+        turretHp: 10_000_000,
         hqHp: 10_000_000,
         startingTurrets: 0,
       });
@@ -251,6 +252,7 @@ describe("starting turret", () => {
       ...WAVES,
       startingTurrets: 1,
       structureHp: 10_000_000,
+      turretHp: 10_000_000,
       hqHp: 10_000_000,
     });
     run(game, 150);
@@ -262,6 +264,7 @@ describe("starting turret", () => {
       ...WAVES,
       startingTurrets: 1,
       structureHp: 10_000_000,
+      turretHp: 10_000_000,
       hqHp: 10_000_000,
     });
     let shots: Int32Array = new Int32Array();
@@ -283,6 +286,7 @@ describe("starting turret", () => {
       ...WAVES,
       startingTurrets: 1,
       structureHp: 10_000_000,
+      turretHp: 10_000_000,
       hqHp: 10_000_000,
     });
     run(game, 2);

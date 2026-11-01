@@ -437,6 +437,22 @@ _2026-10-31._ With one set of town numbers Bath was easy, Sheffield mixed and Wh
 
 Before: Bath 15 of 15, Whitby 0 of 5 at plain settings. Raising Bath's growth instead was a cliff (48% lost all five plain games, 50% won two), and a Bath first wave of 200 or more loses `fort` in wave 1, so first-wave size is the gentler knob. A Whitby first wave of 120 also ends the scripted `scavenge` player's wave-1 loss there. Looting crates (`--loot 50`) makes every town much easier, so the plain runs are the ones to judge by.
 
+## Turret health
+
+_2026-11-01._ Dan lost a game on wave 1: the only turret fell to the first crowd. Town turrets had the same 300 health as every other town building, and a packed street presses up to 40 a cell each step on whatever it reaches first, so a lone turret melted in seconds once a crowd touched it. Turrets now have their own health, `turretHp` (2,000 on towns, 3,000 on continent maps, as before), and other buildings keep `structureHp`. Horde snapshot v18: older games keep the health they had.
+
+The balance harness has a `lone` strategy: the free first turret, 4 tiles from the HQ towards where wave 1 lands, and nothing else. On Bath, at seven HQ spots, a 300-health turret fell in wave 1 at four of them and the HQ with it; 1,000 still lost turrets at three; 2,000 held at all seven with the HQ untouched. Sheffield and Whitby were already held by a lone turret.
+
+Tougher turrets alone made the late game easy: every defended strategy won on every town (Bath went from 3 to 5 of 5 plain wins), even at 800 health. So growth went up per town in `TOWN_MAP_OPTIONS`: Bath 48%, Sheffield 50%, Whitby 49% (wave 10 is about 6,300, 5,800 and 4,300). Wins out of 15 (plain, `--loot 50`, `--call-early`):
+
+| Map       | before | after | plain losses after                           |
+| --------- | ------ | ----- | -------------------------------------------- |
+| Bath      | 13     | 12    | `fort`, `scavenge`, `mortars` all on wave 10 |
+| Sheffield | 12     | 13    | `scavenge` wave 10, `mortars` wave 9         |
+| Whitby    | 11     | 14    | `turrets` wave 10                            |
+
+Growth is still a cliff (Whitby 50% loses all five plain games, Bath 49% loses `fort` on wave 2), so move it a point at a time. As before, looting and calling early make every town easier.
+
 ## Prerequisites
 
 - npm 12.1 or later. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`. The machine currently has npm 11.19.
