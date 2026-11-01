@@ -14,7 +14,9 @@ import { Game, Player } from "../game/Game";
  * `crateLootTicks` have passed the looter is paid. Any zombie within
  * `crateDangerRadius` of a crate destroys it, looted or not, and a crate
  * nobody starts looting is gone after `crateLife` ticks. A crate dropped
- * near where the announced wave comes ashore is worth more.
+ * near where the announced wave comes ashore is worth more. With districts
+ * on, crates only drop in or next to the player's own districts, and one
+ * in a district they hold as a buffer is worth more (Districts.ts).
  *
  * Deterministic: integer state, its own seeded PRNG (so the waves' draws
  * are unchanged) and a fixed scan order. Integers only.
@@ -44,6 +46,8 @@ export interface CrateOptions {
   depotCratePercent: number;
   /** Depots counted for faster drops, at most. */
   depotCrateMax: number;
+  /** A crate dropped in a Held district is worth this many percent more. */
+  crateHeldBonusPercent: number;
 }
 
 /** What the crates need to know about the horde this tick. */
@@ -59,6 +63,11 @@ export interface CrateView {
   landings: readonly number[];
   /** Waves started so far. */
   wave: number;
+  /**
+   * Whether a crate for `owner` (smallID) may drop on a cell: 0 no, 1 yes,
+   * 2 yes and it's in a district they hold as a buffer (Districts.crateSpot).
+   */
+  spot(cell: number, owner: number): 0 | 1 | 2;
 }
 
 /** A crate as the renderer and the snapshot see it. */
@@ -232,12 +241,14 @@ export class Crates {
       if (!map.isLand(tile) || map.ownerID(tile) === p.smallID()) continue;
       const cell = view.cellOf(tile);
       if (!view.passable(cell) || this.inDanger(cell, view)) continue;
+      const spot = view.spot(cell, p.smallID());
+      if (spot === 0) continue;
       if (this.crates.some((c) => view.cellOf(c.tile) === cell)) continue;
       this.crates.push({
         id: this.nextId++,
         tile,
         owner: p.smallID(),
-        gold: this.value(cell, view),
+        gold: this.value(cell, view, spot === 2),
         expires: ticks + o.crateLife,
         lootEnd: -1,
         looter: 0,
@@ -247,9 +258,12 @@ export class Crates {
     return false;
   }
 
-  private value(cell: number, view: CrateView): number {
+  private value(cell: number, view: CrateView, held: boolean): number {
     const o = this.opts;
-    const gold = o.crateBaseGold + Math.max(1, view.wave) * o.crateGoldPerWave;
+    const base = o.crateBaseGold + Math.max(1, view.wave) * o.crateGoldPerWave;
+    const gold = held
+      ? Math.floor((base * (100 + o.crateHeldBonusPercent)) / 100)
+      : base;
     const w = view.width;
     const cx = cell % w;
     const cy = (cell - cx) / w;

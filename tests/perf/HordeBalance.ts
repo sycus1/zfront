@@ -23,6 +23,10 @@
  *   mortars  plays like turrets, but half the inner ring comes after two
  *            mortars (Missile Silos) by the HQ, which are upgraded as the
  *            turrets are.
+ *   districts plays like turrets, but once half the inner ring is up it
+ *            puts each Outpost it may hold in a Wild district towards
+ *            where the announced wave lands, to hold it as a buffer
+ *            (horde Districts.ts) and push the landings out.
  *   lone     places only the free first turret, LONE_DISTANCE tiles from
  *            the HQ towards where the first wave lands, and saves its
  *            gold: a first turret placed like that should hold wave 1.
@@ -59,6 +63,7 @@ import {
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
 import { GameConfig } from "@openfront/engine-api/Schemas";
+import { DistrictState } from "@openfront/engine-lib/game/Districts";
 import { loadTerrainMap } from "@openfront/engine-lib/game/TerrainMapLoader";
 import { EngineConfig } from "@openfront/engine/configuration/EngineConfig";
 import { ConstructionExecution } from "@openfront/engine/execution/ConstructionExecution";
@@ -66,6 +71,7 @@ import { SpawnExecution } from "@openfront/engine/execution/SpawnExecution";
 import { UpgradeStructureExecution } from "@openfront/engine/execution/UpgradeStructureExecution";
 import { Game, Player } from "@openfront/engine/game/Game";
 import { createGame } from "@openfront/engine/game/GameImpl";
+import { Districts } from "@openfront/engine/horde/Districts";
 import {
   DEFAULT_HORDE_OPTIONS,
   HordeExecution,
@@ -101,6 +107,7 @@ const STRATEGIES = [
   "scavenge",
   "mortars",
   "lone",
+  "districts",
 ] as const;
 type Strategy = (typeof STRATEGIES)[number];
 
@@ -258,6 +265,81 @@ function faceLandings(
   ];
 }
 
+/**
+ * For "districts": puts an Outpost in a Wild district towards the middle
+ * of `landings`, as far out as it may go, when the player may hold another
+ * and can pay for it. Tries directions nearest the landings first.
+ */
+function placeOutpost(
+  game: Game,
+  me: Player,
+  hq: [number, number],
+  landings: readonly number[],
+  districts: Districts,
+): void {
+  const O = UnitType.Outpost;
+  if (me.unitCount(O) >= game.outpostLimit()) return;
+  if (me.gold() < game.unitInfo(O).cost(game, me)) return;
+  if (me.units(O).some((u) => u.isUnderConstruction())) return;
+  if (landings.length === 0) return;
+  const w = game.miniMap().width();
+  let sx = 0;
+  let sy = 0;
+  for (const c of landings) {
+    sx += (c % w) * 2 + 1 - hq[0];
+    sy += Math.floor(c / w) * 2 + 1 - hq[1];
+  }
+  const face = Math.atan2(sy, sx);
+  // One Outpost a district: skip any that's taken or being secured.
+  const states = districts.encode();
+  for (const turn of [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6]) {
+    const a = face + (turn * Math.PI) / 12;
+    for (let r = 120; r >= 10; r -= 4) {
+      const x = Math.round(hq[0] + Math.cos(a) * r);
+      const y = Math.round(hq[1] + Math.sin(a) * r);
+      if (!game.isValidCoord(x, y)) continue;
+      const cell = (y >> 1) * w + (x >> 1);
+      if (states[districts.districtOf(cell)] !== DistrictState.Wild) continue;
+      const at = me.canBuild(O, game.ref(x, y));
+      if (at === false) continue;
+      game.addExecution(new ConstructionExecution(me, O, at));
+      return;
+    }
+  }
+}
+
+/** Mean distance in tiles from `hq` to coarse cells `cells`, or 0. */
+function meanDistance(
+  cells: readonly number[],
+  w: number,
+  hq: [number, number],
+): number {
+  if (cells.length === 0) return 0;
+  let sum = 0;
+  for (const c of cells) {
+    sum += Math.hypot(
+      (c % w) * 2 + 1 - hq[0],
+      Math.floor(c / w) * 2 + 1 - hq[1],
+    );
+  }
+  return Math.round(sum / cells.length);
+}
+
+/**
+ * Districts held as buffers (Held or Threatened) and being secured, as
+ * "held/securing", for the wave table.
+ */
+function heldDistricts(exec: HordeExecution): string {
+  const states = exec.encodeFrame()?.districts ?? new Uint8Array();
+  let held = 0;
+  let securing = 0;
+  for (const s of states) {
+    if (s === DistrictState.Held || s === DistrictState.Threatened) held++;
+    if (s === DistrictState.Securing) securing++;
+  }
+  return `${held}/${securing}`;
+}
+
 /** Ticks before an order that came to nothing is tried again. */
 const RETRY = 50;
 
@@ -313,7 +395,7 @@ function spend(
               [T, OUTER_RING, 2],
               [T, OUTER_RING, 3],
             ]
-          : s === "turrets"
+          : s === "turrets" || s === "districts"
             ? [
                 [T, TURRET_RING, 1],
                 [T, TURRET_RING, 2],
@@ -388,6 +470,10 @@ interface WaveRow {
   mortarKilled: number;
   /** Tiles the player holds at the end of the wave. */
   tiles: number;
+  /** Mean distance in tiles from the HQ to where the wave landed. */
+  landed: number;
+  /** Districts held and being secured, and Outposts, "held/securing/outposts". */
+  held: string;
   /** Gold in the bank at the end of the wave. */
   gold: number;
   /** Gold from supply crates during the wave. */
@@ -483,6 +569,18 @@ async function play(
       );
     }
     if (game.ticks() % 2 === 0) {
+      if (
+        strategy === "districts" &&
+        me.units(UnitType.DefensePost).length >= TURRET_RING.length / 2
+      ) {
+        placeOutpost(
+          game,
+          me,
+          hqXY,
+          exec.upcomingLandings(),
+          (exec as unknown as { districts: Districts }).districts,
+        );
+      }
       spend(game, me, hqXY, strategy, ordered, face);
     }
     if (callEarly && exec.stats().wave >= 1 && exec.callableTicks() > 0) {
@@ -501,6 +599,7 @@ async function play(
         exec.lootCrate(me, c.id);
       }
     }
+    const landings = exec.upcomingLandings().slice();
     game.executeNextTick();
     const s = exec.stats();
     if (row === null || s.wave !== row.wave) {
@@ -516,6 +615,8 @@ async function play(
         walls: "",
         other: "",
         tiles: 0,
+        held: "",
+        landed: meanDistance(landings, game.miniMap().width(), hqXY),
         gold: 0,
         crates: 0,
         mortarKilled: 0,
@@ -531,6 +632,9 @@ async function play(
     row.mortarKilled += s.mortarKilled - lastMortar;
     lastMortar = s.mortarKilled;
     row.tiles = me.numTilesOwned();
+    if (game.ticks() % 10 === 0) {
+      row.held = `${heldDistricts(exec)}/${me.units(UnitType.Outpost).length}`;
+    }
     row.gold = Number(me.gold());
     row.alive = s.alive + s.elites;
     lastKilled = s.killed;
@@ -589,6 +693,8 @@ async function main(): Promise<void> {
             "depots/mines/mortars",
             "by mortar",
             "tiles",
+            "landed",
+            "held/sec/outposts",
             "gold",
             "crates",
             "alive",
@@ -605,6 +711,8 @@ async function main(): Promise<void> {
             w.other,
             String(w.mortarKilled),
             String(w.tiles),
+            String(w.landed),
+            w.held,
             String(w.gold),
             String(w.crates),
             String(w.alive),

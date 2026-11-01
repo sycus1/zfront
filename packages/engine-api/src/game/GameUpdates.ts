@@ -112,6 +112,13 @@ export interface HordeFrame {
   /** Ticks looting takes, and an unlooted crate's whole life. */
   crateLootTicks: number;
   crateLife: number;
+  /**
+   * District size in coarse cells (0: districts are off), from which the
+   * renderer rebuilds the district map (engine-lib `game/Districts`), and
+   * one DistrictState byte per district.
+   */
+  districtSize: number;
+  districts: Uint8Array;
   /** Spike instrumentation: worker encode time and send time (epoch ms). */
   encodeMs: number;
   sentAt: number;
