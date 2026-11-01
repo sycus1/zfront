@@ -33,6 +33,7 @@ import { EventsDisplay } from "./layers/EventsDisplay";
 import { GameLeftSidebar } from "./layers/GameLeftSidebar";
 import { GameRightSidebar } from "./layers/GameRightSidebar";
 import { HeadsUpMessage } from "./layers/HeadsUpMessage";
+import { HordeEdgeIndicators } from "./layers/horde/HordeEdgeIndicators";
 import { HordeHud } from "./layers/HordeHud";
 import { ImmunityTimer } from "./layers/ImmunityTimer";
 import { MainRadialMenu } from "./layers/MainRadialMenu";
@@ -334,6 +335,7 @@ export function createRenderer(
     spawnTimer,
     immunityTimer,
     hordeHud,
+    new HordeEdgeIndicators(game, eventBus, transformHandler),
     gameLeftSidebar,
     unitDisplay,
     gameRightSidebar,
