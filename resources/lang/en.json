@@ -570,6 +570,11 @@
     "sw": "SW",
     "w": "W"
   },
+  "horde_edge": {
+    "crate": "Supply crate: {gold} gold. Click to go there",
+    "horde": "{count} zombies off-screen. Click to go there",
+    "incoming": "The next wave lands this way. Click to go there"
+  },
   "horde_hud": {
     "alive": "{count} zombies",
     "build_time": "Build time: {time}",
