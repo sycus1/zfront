@@ -1,5 +1,6 @@
 import { GameMap } from "@openfront/engine-api/game/GameMap";
 import { MapManifest } from "@openfront/engine-api/game/MapFiles";
+import { MapDistrictIds } from "@openfront/engine-lib/game/Districts";
 import { genTerrainFromBin } from "@openfront/engine-lib/game/TerrainMapLoader";
 import { TileSet } from "@openfront/engine-lib/game/TileSet";
 import { EngineConfig } from "@openfront/engine/configuration/EngineConfig";
@@ -51,17 +52,20 @@ export async function loadTestMaps(
 
 /**
  * Restores a snapshot of a game built by tests/util/Setup on `mapName`, with
- * the given EngineConfig class (TestConfig and its variants override behavior).
+ * the given EngineConfig class (TestConfig and its variants override behavior)
+ * and the map's hand-made districts, if the game had any.
  */
 export async function restoreTestGame(
   bytes: Uint8Array,
   mapName: string,
   ConfigClass: typeof EngineConfig = TestConfig,
+  mapDistricts?: MapDistrictIds,
 ): Promise<Game> {
   const maps = await loadTestMaps(mapName);
   return restoreGame(bytes, {
     config: (gc) => new ConfigClass(gc, false),
     ...maps,
+    mapDistricts,
   });
 }
 
@@ -75,6 +79,7 @@ export async function roundTrip(game: Game, mapName: string) {
     bytes,
     mapName,
     game.config().constructor as typeof EngineConfig,
+    game.mapDistricts(),
   );
   return { bytes, restored, again: snapshotGame(restored) };
 }

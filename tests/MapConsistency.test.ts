@@ -106,7 +106,7 @@ function normalizeCustomTribes(raw: unknown): CustomTribe[] | undefined {
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe("Map consistency", () => {
-  test("Every GameMapType has map-generator assets (image.png + info.json + layer PNGs only)", () => {
+  test("Every GameMapType has map-generator assets (image.png + info.json + districts.png + layer PNGs only)", () => {
     const errors: string[] = [];
     for (const key of allMapKeys) {
       const folder = toFolderName(key);
@@ -132,11 +132,17 @@ describe("Map consistency", () => {
         );
       }
 
-      // Build the set of expected PNGs: image.png + layer PNGs.
+      // Build the set of expected PNGs: image.png, the optional hand-made
+      // districts (zfront, map-generator/districts.go) + layer PNGs.
       const info = readInfoJson(key);
       const layers = (info?.layers as Array<{ id: string }> | undefined) ?? [];
-      const allowedPngs = new Set(["image.png"]);
+      const allowedPngs = new Set(["image.png", "districts.png"]);
       for (const layer of layers) {
+        if (layer.id === "districts") {
+          errors.push(
+            `${key}: a layer can't be called "districts" (districts.png is the district map)`,
+          );
+        }
         allowedPngs.add(`${layer.id}.png`);
       }
 
@@ -727,7 +733,7 @@ describe("Map consistency", () => {
       const genDir = path.join(MAP_GEN_MAPS, folder);
 
       const layers = (info.layers as Array<{ id: string }> | undefined) ?? [];
-      const allowedPngs = new Set(["image.png"]);
+      const allowedPngs = new Set(["image.png", "districts.png"]);
       for (const layer of layers) {
         allowedPngs.add(`${layer.id}.png`);
       }
@@ -736,7 +742,7 @@ describe("Map consistency", () => {
       for (const file of files) {
         if (file.endsWith(".png") && !allowedPngs.has(file)) {
           errors.push(
-            `${key}: unexpected PNG "${file}" in map-generator/assets/maps/${folder}/ (not image.png or a defined layer)`,
+            `${key}: unexpected PNG "${file}" in map-generator/assets/maps/${folder}/ (not image.png, districts.png or a defined layer)`,
           );
         }
       }

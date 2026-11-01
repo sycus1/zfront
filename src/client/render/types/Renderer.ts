@@ -1,4 +1,5 @@
 import type { TileRef } from "@openfront/engine-api/game/GameMap";
+import type { MapDistrictIds } from "@openfront/engine-lib/game/Districts";
 
 /** TrainType enum — numeric values matching UnitState.trainType. */
 export enum TrainType {
@@ -299,5 +300,7 @@ export interface RendererConfig {
     cellBytes: Uint8Array;
     cellWidth: number;
     cellHeight: number;
+    /** The map's hand-made districts on these cells, if it has any. */
+    districts?: MapDistrictIds;
   };
 }

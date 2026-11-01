@@ -522,7 +522,15 @@ async function play(
   const terrain = await loadTerrainMap(
     await loadMapFiles(loader, gameConfig.gameMap, gameConfig.gameMapSize),
   );
-  const game = createGame([], [], terrain.gameMap, terrain.miniGameMap, config);
+  const game = createGame(
+    [],
+    [],
+    terrain.gameMap,
+    terrain.miniGameMap,
+    config,
+    terrain.teamGameSpawnAreas,
+    terrain.districts,
+  );
   if (spawn[0] < 0) spawn = openTileNearCentre(game);
   const info = new PlayerInfo("survivor", PlayerType.Human, null, "survivor");
   game.addExecution(
