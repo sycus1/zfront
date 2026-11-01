@@ -27,6 +27,8 @@ const allMapKeys = Object.keys(GameMapType) as GameMapName[];
 // Real-town maps (scripts/realmap) are solo-only while we try them out.
 const FREQUENCY_EXEMPTIONS: Set<GameMapName> = new Set([
   "Bath",
+  "Cannock",
+  "Hednesford",
   "Sheffield",
   "Whitby",
 ]);

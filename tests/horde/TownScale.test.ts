@@ -108,6 +108,8 @@ describe("Town scale", () => {
     expect(isTownScale(GameMapType.Sheffield)).toBe(true);
     expect(isTownScale(GameMapType.Bath)).toBe(true);
     expect(isTownScale(GameMapType.Whitby)).toBe(true);
+    expect(isTownScale(GameMapType.Cannock)).toBe(true);
+    expect(isTownScale(GameMapType.Hednesford)).toBe(true);
     expect(metresPerTile(GameMapType.Britannia)).toBe(0);
     expect(isTownScale(GameMapType.Britannia)).toBe(false);
   });
@@ -135,6 +137,16 @@ describe("Town scale", () => {
     expect(hordeOptionsForMap(GameMapType.Whitby).cellCap).toBe(
       TOWN_HORDE_OPTIONS.cellCap,
     );
+    expect(hordeOptionsForMap(GameMapType.Cannock)).toEqual({
+      ...TOWN_HORDE_OPTIONS,
+      firstWaveSize: 155,
+      waveGrowthPercent: 46,
+    });
+    expect(hordeOptionsForMap(GameMapType.Hednesford)).toEqual({
+      ...TOWN_HORDE_OPTIONS,
+      firstWaveSize: 160,
+      waveGrowthPercent: 47,
+    });
     // Every override is a real option, and only town maps have them.
     for (const [map, own] of Object.entries(TOWN_MAP_OPTIONS)) {
       expect(isTownScale(map as GameMapType)).toBe(true);

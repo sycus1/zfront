@@ -26,6 +26,7 @@ vi.mock("../../src/client/Utils", async (importOriginal) => ({
 // Side-effect import so the custom element registers (a type-only import
 // would be elided and createElement would return an inert element).
 import "../../src/client/SinglePlayerModal";
+import { MAP_FACTS } from "../../src/client/components/nightshift/MapFacts";
 
 function createModal(): any {
   return document.createElement("single-player-modal") as any;
@@ -144,7 +145,7 @@ describe("SinglePlayerModal pages", () => {
     const modal = await mount();
     expect(modal.querySelector("h1")?.textContent).toBe("zf_play.map_title");
     const cards = modal.querySelectorAll('.zf-maps [role="radio"]');
-    expect(cards).toHaveLength(4);
+    expect(cards).toHaveLength(MAP_FACTS.length);
     const checked = modal.querySelector(
       '.zf-maps [role="radio"][aria-checked="true"]',
     );

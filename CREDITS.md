@@ -12,7 +12,7 @@ See [Contributors](https://github.com/openfrontio/OpenFrontIO/graphs/contributor
 © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright)  
 Licensed under ODbL
 
-### Real-town maps (Bath, Sheffield, Whitby)
+### Real-town maps (Bath, Cannock, Hednesford, Sheffield, Whitby)
 
 Built by `scripts/realmap` from:
 

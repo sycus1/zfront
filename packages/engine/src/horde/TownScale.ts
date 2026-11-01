@@ -101,6 +101,8 @@ export const TOWN_MAP_OPTIONS: Partial<
   [GameMapType.Bath]: { firstWaveSize: 185, waveGrowthPercent: 48 },
   [GameMapType.Sheffield]: { waveGrowthPercent: 50 },
   [GameMapType.Whitby]: { firstWaveSize: 120, waveGrowthPercent: 49 },
+  [GameMapType.Cannock]: { firstWaveSize: 155, waveGrowthPercent: 46 },
+  [GameMapType.Hednesford]: { firstWaveSize: 160, waveGrowthPercent: 47 },
 };
 
 /**

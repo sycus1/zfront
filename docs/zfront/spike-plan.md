@@ -484,6 +484,19 @@ _2026-11-01._ Dan's district vision (plan: https://claude.ai/artifact/KzYDcwEJCt
 
 Whitby gains least because much of it is open fields and moor, where no border can be a chokepoint. `balance:horde --zone 0 --strategy turrets,districts` still wins all three towns with the HQ untouched, and waves land about as far out as on the grid.
 
+## Cannock and Hednesford
+
+_2026-11-01._ Dan asked for a Cannock map, or Hednesford. Both are made the same way as Bath, Sheffield and Whitby (`scripts/realmap`, 1.2 km square at 3 m a tile): Cannock centred on the town centre and its ring road (52.6905, -2.0300), Hednesford on Market Street, the station and Hednesford Park (52.7108, -2.0005). Cannock is 19% buildings, Hednesford 13%; neither has much water. Their `districts.png` comes from `scripts/realmap/districts.ts` (Cannock 60 districts, Hednesford 61).
+
+Tuned with the four defended strategies that build no walls (`turrets`, `scavenge`, `mortars`, `districts`) and `lone`, at seven HQ spots per town (the centre and six spots 90 tiles out), `--zone 0`. At current settings the other towns win 17 (Bath), 13 (Sheffield) and 26 (Whitby) of those 28 games. Cannock is a cliff between a first wave of 150 at 46% growth (23 of 28) and 165 at 47% (9); Hednesford is a little easier than Cannock.
+
+| Map        | first wave | growth | wins of 28 | losses                                                   |
+| ---------- | ---------- | ------ | ---------- | -------------------------------------------------------- |
+| Cannock    | 155        | 46%    | 18         | `scavenge`, `mortars`, waves 8-10                        |
+| Hednesford | 160        | 47%    | 16         | `scavenge`, `mortars` waves 7-10, `turrets` once wave 10 |
+
+A lone first turret holds wave 1 at every spot on both, and `districts` wins every game, holding 2-5 districts and pushing landings out from about 115 to 150-180 tiles, as on the other towns. These runs were on the jittered district grid; with the hand-made districts the same 28 games give Cannock 16 wins and Hednesford 18, still with no loss before wave 7.
+
 ## Prerequisites
 
 - npm 12.1 or later. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`. The machine currently has npm 11.19.
