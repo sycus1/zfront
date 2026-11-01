@@ -6,10 +6,17 @@ import { customElement } from "lit/decorators.js";
  * The main menu's backdrop, "B2 Live Feed" in the zfront Main Menu canvas:
  * the Bath map and the game's building sprites, tinted amber and pushed into
  * shadow, with red zombies walking in from the west, south and river and
- * turrets firing at them. The map and sprites are DOM images under the amber
- * multiply and black shade; the zombies, tracers and flashes are drawn on top
- * in their true colours on one canvas the size of the viewport. The footage
- * pans slowly and stops under prefers-reduced-motion.
+ * turrets firing at them. The map and sprites are tinted amber and shaded once,
+ * into offscreen canvases; every frame then draws them, and the zombies,
+ * tracers and flashes in their true colours on top, onto one canvas the size
+ * of the viewport. The footage pans slowly and stops under
+ * prefers-reduced-motion.
+ *
+ * Everything is on that one canvas on purpose. The box the footage is framed
+ * in is far bigger than the screen (4,500px square on a 3440px ultrawide);
+ * as DOM layers under a CSS blend mode it needed an offscreen surface that
+ * size, which is past many GPUs' 4096px texture limit, and those browsers
+ * dropped the map and showed flat amber. The canvas is capped below that.
  *
  * Positions are percentages of a square "box" laid over the viewport, as on
  * the canvas boards; desktop and phone frame the box differently and send the
@@ -26,6 +33,12 @@ const PAN_Y = -0.008;
 
 /** Amber multiply, then black at this opacity: the Night Shift study. */
 const SHADE = 0.62;
+const AMBER = "#f2a93b"; // amber-500
+const SPRITE_SIZE = 0.034;
+const SPRITE_SHADOW = "rgba(0, 0, 0, 0.35)";
+
+/** Largest canvas side: under the 4096px texture limit of many GPUs. */
+export const MAX_CANVAS_SIDE = 4096;
 
 const ZOMBIE_SIZE = 0.0042;
 const KILL_SIZE = 0.007;
@@ -71,6 +84,7 @@ interface Sprite {
   file: string;
   x: number;
   y: number;
+  /** Width as a percentage of the box; sprites are square. */
   width?: number;
 }
 
@@ -153,6 +167,42 @@ export function buildHorde(horde: Horde): Zombie[] {
 
 export const LIVE_FEED_HORDES = { desktop: DESKTOP_HORDE, phone: PHONE_HORDE };
 
+/**
+ * The canvas's device-pixel ratio: the screen's, capped at 1.5 (the footage
+ * is soft and shaded anyway) and so neither side passes MAX_CANVAS_SIDE.
+ */
+export function canvasScale(
+  width: number,
+  height: number,
+  devicePixelRatio: number,
+): number {
+  return Math.min(
+    devicePixelRatio || 1,
+    1.5,
+    MAX_CANVAS_SIDE / width,
+    MAX_CANVAS_SIDE / height,
+  );
+}
+
+/** Tints an image amber and shades it, keeping its transparency. */
+function nightShift(image: HTMLImageElement): HTMLCanvasElement {
+  const out = document.createElement("canvas");
+  out.width = image.naturalWidth;
+  out.height = image.naturalHeight;
+  const ctx = out.getContext("2d")!;
+  ctx.drawImage(image, 0, 0);
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = AMBER;
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.globalCompositeOperation = "source-atop";
+  ctx.fillStyle = `rgba(0, 0, 0, ${SHADE})`;
+  ctx.fillRect(0, 0, out.width, out.height);
+  // Multiply paints the transparent pixels too: cut back to the image.
+  ctx.globalCompositeOperation = "destination-in";
+  ctx.drawImage(image, 0, 0);
+  return out;
+}
+
 /** CSS ease-in-out, close enough for a 40s pan. */
 function easeInOut(t: number): number {
   return t * t * (3 - 2 * t);
@@ -199,6 +249,10 @@ export class LiveFeedBackdrop extends LitElement {
   private boxTop = 0;
   private dpr = 1;
 
+  /** The map and sprites, tinted and shaded, once they have loaded. */
+  private map: HTMLCanvasElement | null = null;
+  private sprites = new Map<string, HTMLCanvasElement>();
+
   private raf = 0;
   private visible = false;
   private resizeObserver: ResizeObserver | null = null;
@@ -228,6 +282,7 @@ export class LiveFeedBackdrop extends LitElement {
   }
 
   firstUpdated() {
+    this.loadImages();
     this.layout();
     if (typeof ResizeObserver !== "undefined") {
       this.resizeObserver = new ResizeObserver(() => {
@@ -277,12 +332,22 @@ export class LiveFeedBackdrop extends LitElement {
     this.raf = requestAnimationFrame(this.tick);
   };
 
-  private get box(): HTMLElement | null {
-    return this.querySelector(".zf-feed-box");
-  }
-
-  private get pan(): HTMLElement | null {
-    return this.querySelector(".zf-feed-pan");
+  private loadImages() {
+    const load = (path: string, done: (c: HTMLCanvasElement) => void) => {
+      const image = new Image();
+      image.decoding = "async";
+      image.onload = () => {
+        done(nightShift(image));
+        // A still frame (reduced motion, or a hidden tab) needs a redraw.
+        this.draw(performance.now() / 1000);
+      };
+      image.src = assetUrl(path);
+    };
+    load("images/menu/bath-feed.png", (c) => (this.map = c));
+    const files = new Set([...BUILDINGS.map((b) => b.file), "turret"]);
+    for (const file of files) {
+      load(`images/menu/${file}.png`, (c) => this.sprites.set(file, c));
+    }
   }
 
   private get canvas(): HTMLCanvasElement | null {
@@ -305,18 +370,10 @@ export class LiveFeedBackdrop extends LitElement {
     this.boxSize = Math.max(1.3 * width, 1.6 * height);
     this.boxLeft = width / 2 - this.frame.anchorX * this.boxSize;
     this.boxTop = height / 2 - this.frame.anchorY * this.boxSize;
-    const box = this.box;
-    if (box) {
-      box.style.width = `${this.boxSize}px`;
-      box.style.height = `${this.boxSize}px`;
-      box.style.left = `${this.boxLeft}px`;
-      box.style.top = `${this.boxTop}px`;
-    }
 
     const canvas = this.canvas;
     if (canvas) {
-      // Capped: the footage is soft anyway and sits under a shade.
-      this.dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      this.dpr = canvasScale(width, height, window.devicePixelRatio);
       canvas.width = Math.round(width * this.dpr);
       canvas.height = Math.round(height * this.dpr);
     }
@@ -340,10 +397,6 @@ export class LiveFeedBackdrop extends LitElement {
     if (!canvas || !ctx || this.boxSize === 0) return;
 
     const { scale, tx, ty } = this.panAt(t);
-    const pan = this.pan;
-    if (pan) {
-      pan.style.transform = `scale(${scale}) translate(${tx}px, ${ty}px)`;
-    }
 
     // Box percentages to canvas pixels, through the pan (scale about the
     // box centre, after the translate, as CSS composes it).
@@ -356,7 +409,26 @@ export class LiveFeedBackdrop extends LitElement {
       this.dpr;
     const unit = this.boxSize * scale * this.dpr;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // The ground: ink until the map arrives, then the tinted map and the
+    // buildings, pixelated as the game draws them.
+    ctx.fillStyle = "#111111";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.imageSmoothingEnabled = false;
+    if (this.map) ctx.drawImage(this.map, px(0), py(0), unit, unit);
+    ctx.shadowColor = SPRITE_SHADOW;
+    ctx.shadowOffsetY = 2 * this.dpr;
+    const sprites: Sprite[] = [
+      ...BUILDINGS,
+      ...TURRETS.map((tt) => ({ file: "turret", x: tt.x, y: tt.y })),
+    ];
+    for (const s of sprites) {
+      const image = this.sprites.get(s.file);
+      if (!image) continue;
+      const size = ((s.width ?? SPRITE_SIZE * 100) / 100) * unit;
+      ctx.drawImage(image, px(s.x) - size / 2, py(s.y) - size / 2, size, size);
+    }
+    ctx.shadowColor = "transparent";
+    ctx.shadowOffsetY = 0;
 
     for (const z of this.zombies) {
       // Reduced motion: the horde stands at its kill points, alive.
@@ -427,29 +499,7 @@ export class LiveFeedBackdrop extends LitElement {
   }
 
   render() {
-    const sprite = (s: Sprite) =>
-      html`<img
-        class="zf-feed-sprite"
-        src=${assetUrl(`images/menu/${s.file}.png`)}
-        alt=""
-        draggable="false"
-        style="left: ${s.x}%; top: ${s.y}%; ${s.width ? `width: ${s.width}%;` : ""}"
-      />`;
     return html`
-      <div class="zf-feed-box">
-        <div class="zf-feed-pan">
-          <img
-            class="zf-feed-map"
-            src=${assetUrl("images/menu/bath-feed.png")}
-            alt=""
-            draggable="false"
-          />
-          ${BUILDINGS.map(sprite)}
-          ${TURRETS.map((t) => sprite({ file: "turret", x: t.x, y: t.y }))}
-          <div class="zf-feed-tint"></div>
-          <div class="zf-feed-shade" style="opacity: ${SHADE}"></div>
-        </div>
-      </div>
       <canvas class="zf-feed-canvas"></canvas>
       <div class="zf-feed-scan"></div>
     `;
