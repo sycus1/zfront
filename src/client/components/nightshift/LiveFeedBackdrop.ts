@@ -1,6 +1,7 @@
 import { assetUrl } from "@openfront/shared/AssetUrls";
 import { html, LitElement } from "lit";
 import { customElement } from "lit/decorators.js";
+import { nightShiftImage } from "./MapBackdrop";
 
 /**
  * The main menu's backdrop, "B2 Live Feed" in the zfront Main Menu canvas:
@@ -33,7 +34,6 @@ const PAN_Y = -0.008;
 
 /** Amber multiply, then black at this opacity: the Night Shift study. */
 const SHADE = 0.62;
-const AMBER = "#f2a93b"; // amber-500
 const SPRITE_SIZE = 0.034;
 const SPRITE_SHADOW = "rgba(0, 0, 0, 0.35)";
 
@@ -184,25 +184,6 @@ export function canvasScale(
   );
 }
 
-/** Tints an image amber and shades it, keeping its transparency. */
-function nightShift(image: HTMLImageElement): HTMLCanvasElement {
-  const out = document.createElement("canvas");
-  out.width = image.naturalWidth;
-  out.height = image.naturalHeight;
-  const ctx = out.getContext("2d")!;
-  ctx.drawImage(image, 0, 0);
-  ctx.globalCompositeOperation = "multiply";
-  ctx.fillStyle = AMBER;
-  ctx.fillRect(0, 0, out.width, out.height);
-  ctx.globalCompositeOperation = "source-atop";
-  ctx.fillStyle = `rgba(0, 0, 0, ${SHADE})`;
-  ctx.fillRect(0, 0, out.width, out.height);
-  // Multiply paints the transparent pixels too: cut back to the image.
-  ctx.globalCompositeOperation = "destination-in";
-  ctx.drawImage(image, 0, 0);
-  return out;
-}
-
 /** CSS ease-in-out, close enough for a 40s pan. */
 function easeInOut(t: number): number {
   return t * t * (3 - 2 * t);
@@ -337,7 +318,7 @@ export class LiveFeedBackdrop extends LitElement {
       const image = new Image();
       image.decoding = "async";
       image.onload = () => {
-        done(nightShift(image));
+        done(nightShiftImage(image, SHADE));
         // A still frame (reduced motion, or a hidden tab) needs a redraw.
         this.draw(performance.now() / 1000);
       };
