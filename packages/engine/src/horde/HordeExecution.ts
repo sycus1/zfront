@@ -154,6 +154,8 @@ export interface HordeOptions
   /** Structure damage per tick is pressure >> pressureShift. */
   pressureShift: number;
   structureHp: number;
+  /** Turret (Defense Post) health; other buildings have structureHp. */
+  turretHp: number;
   /** Wall health by tier: barricade, stone, reinforced (levels 1-3). */
   wallHp: number;
   stoneWallHp: number;
@@ -285,6 +287,7 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   turretEliteDamage: 20,
   pressureShift: 5,
   structureHp: 3_000,
+  turretHp: 3_000,
   wallHp: 4_000,
   stoneWallHp: 12_000,
   reinforcedWallHp: 30_000,
@@ -1710,8 +1713,9 @@ export class HordeExecution implements Execution {
     s.broken = true;
   }
 
-  /** Full health of a structure: walls by tier, everything else the same. */
+  /** Full health of a structure: walls by tier, turrets their own. */
   private maxHp(u: Unit): number {
+    if (u.type() === UnitType.DefensePost) return this.opts.turretHp;
     if (u.type() !== UnitType.Wall) return this.opts.structureHp;
     const o = this.opts;
     const tier = Math.min(3, Math.max(1, u.level()));
@@ -2045,6 +2049,7 @@ const HordeOptionsSchema = z.object({
   turretEliteDamage: zInt(),
   pressureShift: zInt(),
   structureHp: zInt(),
+  turretHp: zInt(),
   wallHp: zInt(),
   stoneWallHp: zInt(),
   reinforcedWallHp: zInt(),
@@ -2223,7 +2228,7 @@ export function hordeOf(game: Game): HordeExecution | null {
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 17,
+  version: 18,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -2476,6 +2481,12 @@ export const HordeExecutionSnapshot = execSnapshotType({
     16: (d) => ({
       ...d,
       options: { ...d.options, startingGold: 0, startingRadius: 0 },
+    }),
+    // 17 -> 18: turrets get their own health. Old games keep the health
+    // every building had.
+    17: (d) => ({
+      ...d,
+      options: { ...d.options, turretHp: d.options.structureHp },
     }),
   },
   cls: () => HordeExecution,

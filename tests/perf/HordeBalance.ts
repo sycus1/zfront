@@ -23,6 +23,9 @@
  *   mortars  plays like turrets, but half the inner ring comes after two
  *            mortars (Missile Silos) by the HQ, which are upgraded as the
  *            turrets are.
+ *   lone     places only the free first turret, LONE_DISTANCE tiles from
+ *            the HQ towards where the first wave lands, and saves its
+ *            gold: a first turret placed like that should hold wave 1.
  *
  * Usage:
  *   npm run balance:horde -- [--strategy none,turrets,fort]
@@ -33,6 +36,7 @@
  *
  * --map plays another map; its HQ goes on the open land nearest the
  * middle (spawn "centre"), since the named spawns are Britannia places.
+ * A spawn can also be given as tile coordinates, e.g. --spawn 300:420.
  *
  * --zone gives the player land within that many tiles of the HQ at the
  * start, standing in for expanding by hand. --zone 0 gives none, so the
@@ -96,6 +100,7 @@ const STRATEGIES = [
   "spans",
   "scavenge",
   "mortars",
+  "lone",
 ] as const;
 type Strategy = (typeof STRATEGIES)[number];
 
@@ -147,7 +152,9 @@ function parseArgs(argv: string[]): Options {
       case "--spawn":
         opts.spawns = next().split(",");
         for (const s of opts.spawns) {
-          if (!(s in SPAWNS)) throw new Error(`unknown spawn ${s}`);
+          if (!(s in SPAWNS) && spawnXY(s) === null) {
+            throw new Error(`unknown spawn ${s}`);
+          }
         }
         break;
       case "--set":
@@ -175,6 +182,12 @@ function parseArgs(argv: string[]): Options {
     }
   }
   return opts;
+}
+
+/** A spawn given as tile coordinates, "x:y", or null. */
+function spawnXY(name: string): [number, number] | null {
+  const m = /^(\d+):(\d+)$/.exec(name);
+  return m === null ? null : [parseInt(m[1], 10), parseInt(m[2], 10)];
 }
 
 /** The land tile below mountain height nearest the middle of the map. */
@@ -218,6 +231,33 @@ const MORTARS: [number, number][] = [
   [-3, -3],
   [3, 3],
 ];
+/** Tiles from the HQ to the lone strategy's turret. */
+const LONE_DISTANCE = 4;
+
+/**
+ * Offset LONE_DISTANCE tiles from `hq` towards the middle of `landings`
+ * (coarse cells, two tiles a side), or null before any are announced.
+ */
+function faceLandings(
+  landings: readonly number[],
+  cellsWide: number,
+  hq: [number, number],
+): [number, number] | null {
+  if (landings.length === 0) return null;
+  let sx = 0;
+  let sy = 0;
+  for (const c of landings) {
+    sx += (c % cellsWide) * 2 + 1 - hq[0];
+    sy += Math.floor(c / cellsWide) * 2 + 1 - hq[1];
+  }
+  const len = Math.hypot(sx, sy);
+  if (len === 0) return null;
+  return [
+    Math.round((sx / len) * LONE_DISTANCE),
+    Math.round((sy / len) * LONE_DISTANCE),
+  ];
+}
+
 /** Ticks before an order that came to nothing is tried again. */
 const RETRY = 50;
 
@@ -235,6 +275,8 @@ function spend(
   s: Strategy,
   /** Orders by planned tile; one that came to nothing is tried again. */
   ordered: Map<number, Order>,
+  /** For "lone": the turret's offset from the HQ, once wave 1 is announced. */
+  face: [number, number] | null,
 ) {
   if (s === "none") return;
   // Steps run in order: each builds at its offsets (level 1), or upgrades
@@ -254,40 +296,44 @@ function spend(
           [T, OUTER_RING, 2],
           [T, OUTER_RING, 3],
         ]
-      : s === "mortars"
-        ? [
-            [T, TURRET_RING.slice(0, 4), 1],
-            [UnitType.MissileSilo, MORTARS, 1],
-            [T, TURRET_RING, 1],
-            [UnitType.MissileSilo, MORTARS, 2],
-            [T, TURRET_RING, 2],
-            [UnitType.MissileSilo, MORTARS, 3],
-            [T, OUTER_RING, 1],
-            [T, TURRET_RING, 3],
-            [T, OUTER_RING, 2],
-            [T, OUTER_RING, 3],
-          ]
-        : s === "turrets"
+      : s === "lone"
+        ? face === null
+          ? []
+          : [[T, [face], 1]]
+        : s === "mortars"
           ? [
+              [T, TURRET_RING.slice(0, 4), 1],
+              [UnitType.MissileSilo, MORTARS, 1],
               [T, TURRET_RING, 1],
+              [UnitType.MissileSilo, MORTARS, 2],
               [T, TURRET_RING, 2],
+              [UnitType.MissileSilo, MORTARS, 3],
               [T, OUTER_RING, 1],
               [T, TURRET_RING, 3],
               [T, OUTER_RING, 2],
               [T, OUTER_RING, 3],
             ]
-          : [
-              [T, TURRET_RING.slice(0, 1), 1],
-              [W, walls, 1],
-              [T, TURRET_RING, 1],
-              [W, walls, 2],
-              [T, TURRET_RING, 2],
-              [T, OUTER_RING, 1],
-              [W, walls, 3],
-              [T, TURRET_RING, 3],
-              [T, OUTER_RING, 2],
-              [T, OUTER_RING, 3],
-            ];
+          : s === "turrets"
+            ? [
+                [T, TURRET_RING, 1],
+                [T, TURRET_RING, 2],
+                [T, OUTER_RING, 1],
+                [T, TURRET_RING, 3],
+                [T, OUTER_RING, 2],
+                [T, OUTER_RING, 3],
+              ]
+            : [
+                [T, TURRET_RING.slice(0, 1), 1],
+                [W, walls, 1],
+                [T, TURRET_RING, 1],
+                [W, walls, 2],
+                [T, TURRET_RING, 2],
+                [T, OUTER_RING, 1],
+                [W, walls, 3],
+                [T, TURRET_RING, 3],
+                [T, OUTER_RING, 2],
+                [T, OUTER_RING, 3],
+              ];
   for (const [type, offsets, level] of plan) {
     for (const [dx, dy] of offsets) {
       const x = hq[0] + dx;
@@ -416,6 +462,7 @@ async function play(
   }
 
   const ordered = new Map<number, Order>();
+  let face: [number, number] | null = null;
   const start = game.ticks();
   const rows: WaveRow[] = [];
   let row: WaveRow | null = null;
@@ -428,7 +475,16 @@ async function play(
   const limit = start + 72_000;
   while (game.ticks() < limit) {
     // An order is paid for when its construction starts, a tick later.
-    if (game.ticks() % 2 === 0) spend(game, me, hqXY, strategy, ordered);
+    if (face === null && strategy === "lone") {
+      face = faceLandings(
+        exec.upcomingLandings(),
+        game.miniMap().width(),
+        hqXY,
+      );
+    }
+    if (game.ticks() % 2 === 0) {
+      spend(game, me, hqXY, strategy, ordered, face);
+    }
     if (callEarly && exec.stats().wave >= 1 && exec.callableTicks() > 0) {
       exec.callWave(me);
     }
@@ -515,7 +571,7 @@ async function main(): Promise<void> {
         opts.callEarly,
         opts.loot,
         opts.seed,
-        SPAWNS[name],
+        SPAWNS[name] ?? spawnXY(name)!,
         strategy,
       );
       console.log(`\n${strategy} @ ${name}: ${r.outcome} after ${r.seconds}s`);

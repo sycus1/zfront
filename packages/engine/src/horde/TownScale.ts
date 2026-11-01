@@ -19,7 +19,7 @@ import { HordeOptions } from "./HordeExecution";
 export const TOWN_HORDE_OPTIONS: Partial<HordeOptions> = {
   firstWaveSize: 150,
   // Packed crowds make a bigger wave press harder, so growth bites: about
-  // 4,300 on wave 10.
+  // 4,300 on wave 10. Each town sets its own in TOWN_MAP_OPTIONS.
   waveGrowthPercent: 45,
   emitRate: 4,
   elitePoints: 10,
@@ -54,6 +54,11 @@ export const TOWN_HORDE_OPTIONS: Partial<HordeOptions> = {
   // health comes down by about ten to keep the same fights.
   hqHp: 5_000,
   structureHp: 300,
+  // A turret is what a crowd presses on first, and a packed street of 40 a
+  // cell presses hard: at 300 a lone first turret fell to wave 1 from about
+  // half the HQ spots on Bath. 2,000 holds wave 1 from all of them (see
+  // `npm run balance:horde -- --zone 0 --map Bath --strategy lone`).
+  turretHp: 2_000,
   wallHp: 400,
   stoneWallHp: 1_200,
   reinforcedWallHp: 3_000,
@@ -78,17 +83,20 @@ export const TOWN_HORDE_OPTIONS: Partial<HordeOptions> = {
  * Per-town changes laid over TOWN_HORDE_OPTIONS, so the towns are about
  * equally hard. Street layout decides how many fronts a crowd presses on:
  * Bath's narrow streets let a few turrets hold, Whitby's open ground and
- * harbour sides let crowds spread round them. Only the first wave changes
- * (growth stays 45%), so every wave on a town scales with it. Tuned with
- * `npm run balance:horde -- --zone 0 --map <town>` so each town is won by
- * three of the five defended strategies, losing late (wave 9 or 10). See
- * "Per-town difficulty" in docs/zfront/spike-plan.md.
+ * harbour sides let crowds spread round them. The first wave sets how hard
+ * the opening is; growth sets how hard the late waves are, and went up a
+ * little per town when turrets got tougher (turretHp). Tuned with
+ * `npm run balance:horde -- --zone 0 --map <town>` so a lone first turret
+ * holds wave 1 and the defended strategies still lose some games late
+ * (wave 9 or 10). See "Per-town difficulty" and "Turret health" in
+ * docs/zfront/spike-plan.md.
  */
 export const TOWN_MAP_OPTIONS: Partial<
   Record<GameMapType, Partial<HordeOptions>>
 > = {
-  [GameMapType.Bath]: { firstWaveSize: 185 },
-  [GameMapType.Whitby]: { firstWaveSize: 120 },
+  [GameMapType.Bath]: { firstWaveSize: 185, waveGrowthPercent: 48 },
+  [GameMapType.Sheffield]: { waveGrowthPercent: 50 },
+  [GameMapType.Whitby]: { firstWaveSize: 120, waveGrowthPercent: 49 },
 };
 
 /**

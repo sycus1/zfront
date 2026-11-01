@@ -32,6 +32,7 @@ const WAVES: Partial<HordeOptions> = {
   shamblerSpeed: 1,
   eliteSpeed: 1,
   structureHp: 10_000_000,
+  turretHp: 10_000_000,
   hqHp: 10_000_000,
   repairHp: 0,
   hqIncome: 0,

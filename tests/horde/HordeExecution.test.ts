@@ -279,7 +279,12 @@ describe("HordeExecution", () => {
     test("a snapshot with a recompute pending restores identically", async () => {
       // Nothing falls in the window, so the only recompute is the pending one.
       const { game, horde } = await hordeGame(
-        { ...SMALL_WAVES, structureHp: 1_000_000, hqHp: 10_000_000 },
+        {
+          ...SMALL_WAVES,
+          structureHp: 1_000_000,
+          turretHp: 1_000_000,
+          hqHp: 10_000_000,
+        },
         [[50, 44]],
       );
       game.player("survivor").setSpawnTile(game.ref(50, 52));
