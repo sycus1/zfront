@@ -1,21 +1,17 @@
-import { html, LitElement, nothing } from "lit";
+import { html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
-import "./components/IOSAddToHomeScreenBanner";
+import { ifDefined } from "lit/directives/if-defined.js";
+import { type IconName, zfIcon } from "./components/nightshift/Icon";
 import { whenModalLoaded } from "./LazyModals";
 import type { SinglePlayerModal } from "./SinglePlayerModal";
 import { UsernameInput } from "./UsernameInput";
-import { getGamesPlayed, translateText } from "./Utils";
+import { translateText } from "./Utils";
 
-const PRIMARY_ACTION =
-  "bg-malibu-blue hover:bg-aquarius active:bg-malibu-blue/80 hover:scale-y-105 hover:scale-x-[1.01]";
-const DISABLED = "opacity-50 cursor-not-allowed pointer-events-none";
-/** Tutorial card: the panel's gold, dark text for contrast. */
-const TUTORIAL_ACTION =
-  "bg-cyber-yellow hover:bg-yellow-300 active:bg-cyber-yellow/80 !text-gray-900 hover:scale-y-105 hover:scale-x-[1.01]";
-
-/** The Tutorial card shows beside Solo until the player has played this many games. */
-const TUTORIAL_CARD_MAX_GAMES = 5;
-
+/**
+ * The main menu's actions, inside its yellow panel: PLAY SOLO, then Tutorial,
+ * Settings and Help. Settings and Help are `.nav-menu-item[data-page]`
+ * buttons, which Navigation.ts routes to their inline pages.
+ */
 @customElement("game-mode-selector")
 export class GameModeSelector extends LitElement {
   @state() private inputValid: boolean = true;
@@ -74,51 +70,58 @@ export class GameModeSelector extends LitElement {
     document.dispatchEvent(new CustomEvent("start-tutorial"));
   };
 
-  private renderActionCard(
-    title: string,
-    onClick: () => void,
-    bgClass: string,
+  private renderLink(
+    label: string,
+    icon: IconName,
+    extra: { class?: string; page?: string },
+    onClick?: () => void,
   ) {
     return html`
-      <button
-        @click=${onClick}
-        ?disabled=${!this.inputValid}
-        class="relative flex items-center justify-center w-full h-full rounded-lg ${bgClass} transition-all duration-200 text-sm lg:text-base font-medium text-white uppercase tracking-wider text-center ${
-          !this.inputValid ? DISABLED : ""
-        }"
-      >
-        ${title}
-      </button>
+      <div class="zf-ring">
+        <button
+          type="button"
+          class="zf-menu-link zf-frame zf-sweep ${extra.class ?? ""}"
+          data-page=${ifDefined(extra.page)}
+          @click=${onClick}
+        >
+          ${zfIcon(icon, 20, 2.6, "zf-menu-link-icon")}
+          <span>${label}</span>
+          ${zfIcon("arrow-right", 22, 3, "zf-menu-link-arrow")}
+        </button>
+      </div>
     `;
   }
 
   render() {
     return html`
-      <div class="flex flex-col gap-4 w-full px-4 pb-4 mx-auto sm:px-0 sm:pb-0">
-        <ios-add-to-home-screen-banner
-          class="no-game-portal [&:empty]:hidden"
-        ></ios-add-to-home-screen-banner>
-
-        <div class="flex gap-4 h-14">
-          <div class="flex-[2]">
-            ${this.renderActionCard(
-              translateText("main.solo"),
-              this.openSinglePlayerModal,
-              PRIMARY_ACTION,
-            )}
-          </div>
-          ${
-            getGamesPlayed() < TUTORIAL_CARD_MAX_GAMES
-              ? html`<div class="flex-1">
-                  ${this.renderActionCard(
-                    translateText("main.tutorial"),
-                    this.startTutorial,
-                    TUTORIAL_ACTION,
-                  )}
-                </div>`
-              : nothing
-          }
+      <div class="flex flex-col gap-3.5 sm:gap-5">
+        <div class="zf-ring">
+          <button
+            type="button"
+            class="zf-btn zf-btn-ink zf-btn-lg zf-frame zf-sweep"
+            ?disabled=${!this.inputValid}
+            @click=${this.openSinglePlayerModal}
+          >
+            <span>${translateText("main.play_solo")}</span>
+            ${zfIcon("arrow-right", 36, 3)}
+          </button>
         </div>
+        <nav class="zf-menu-links" aria-label=${translateText("main.menu")}>
+          ${this.renderLink(
+            translateText("main.tutorial"),
+            "book",
+            {},
+            this.startTutorial,
+          )}
+          ${this.renderLink(translateText("main.settings"), "gear", {
+            class: "nav-menu-item",
+            page: "page-settings",
+          })}
+          ${this.renderLink(translateText("main.help"), "help", {
+            class: "nav-menu-item",
+            page: "page-help",
+          })}
+        </nav>
       </div>
     `;
   }

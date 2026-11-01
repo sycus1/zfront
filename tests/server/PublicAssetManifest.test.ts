@@ -391,5 +391,8 @@ describe("PublicAssetManifest", () => {
     expect(index["privacy-policy.html"]).toBe("text/html; charset=utf-8");
     expect(index["terms-of-service.html"]).toBe("text/html; charset=utf-8");
     expect(index["press/"]).toBe("text/html; charset=utf-8");
+    // Browsers and iOS ask for these at the site root by convention.
+    expect(index["favicon.ico"]).toBe("image/x-icon");
+    expect(index["apple-touch-icon.png"]).toBe("image/png");
   });
 });

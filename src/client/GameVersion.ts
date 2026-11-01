@@ -6,7 +6,7 @@ import { ClientEnv } from "./ClientEnv";
 // .github/workflows/release.yml hands build.sh a third argument, which
 // build.sh writes to the file, while every untagged deploy goes through
 // build-deploy.sh, which passes two arguments and leaves the placeholder in
-// the tree. So the nav bar and footer read "vx.xx.xx" on every nightly, every
+// the tree. So the footer read "vx.xx.xx" on every nightly, every
 // staging deploy and every Steam depot build -- a label naming no build at
 // all, and the one thing a player is asked to quote in a bug report.
 const VERSION_RE = /^v?\d+\.\d+\.\d+/;
@@ -22,8 +22,7 @@ const SHORT_COMMIT_LENGTH = 7;
  * "bf739f8 (Steam a1b2c3d)" are both self-consistent rather than one half
  * naming a build and the other a placeholder.
  *
- * Pure, and takes both inputs, so the nav bar and the footer cannot drift:
- * they are two renderings of one answer, not two derivations of it.
+ * Pure, and takes both inputs, so it can be tested on its own.
  */
 export function composeGameVersion(
   rawVersion: string,
@@ -57,45 +56,6 @@ export function composeGameVersion(
  */
 export function currentGameVersion(): string {
   return composeGameVersion(version, currentGitCommit());
-}
-
-/**
- * The version alone, never a commit -- what the nav bar under the logo shows.
- *
- * The commit is deliberately not substituted here (OPE-387). A sha under the
- * logo reads as a broken label to a player who is not debugging a build, and
- * that spot is the front door of the game rather than a place anyone is asked
- * to quote from. The footer is where the build's real identity belongs, and it
- * still names the commit on an untagged build, so nothing is lost -- it just
- * is not the first thing on the main menu.
- */
-export function taggedGameVersion(rawVersion: string): string {
-  const trimmed = rawVersion.trim();
-  return trimmed.startsWith("v") ? trimmed : `v${trimmed}`;
-}
-
-/** The nav bar's version elements, in both the mobile and desktop nav bars. */
-const NAV_VERSION_SELECTOR = "#game-version, .game-version-display";
-
-/**
- * Stamps the version onto the nav bar, and reports how many elements it found
- * so the caller can warn when the markup has moved out from under it.
- *
- * Lives here rather than inline in Main.ts so it can be tested without
- * importing Main.ts, which is a module of side effects.
- *
- * Uses taggedGameVersion, not currentGameVersion: the nav bar and the footer
- * answer different questions on an untagged build, by decision rather than by
- * drift (OPE-387).
- */
-export function renderNavVersion(root: ParentNode = document): number {
-  const elements = root.querySelectorAll(NAV_VERSION_SELECTOR);
-  const label = taggedGameVersion(version);
-  elements.forEach((el) => {
-    (el as HTMLElement).style.fontFamily = '"OpenFront", Inter, sans-serif';
-    el.textContent = label;
-  });
-  return elements.length;
 }
 
 // ClientEnv.get() throws when BOOTSTRAP_CONFIG is missing. A cosmetic version

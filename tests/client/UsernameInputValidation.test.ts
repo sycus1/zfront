@@ -49,9 +49,10 @@ beforeEach(() => {
 describe("UsernameInput validation error", () => {
   it("surfaces the validator's error and blocks play on an invalid name", async () => {
     const el = await mount();
-    const input = el.querySelector<HTMLInputElement>(
-      'input[aria-label="username.enter_username"]',
-    )!;
+    // The field is named by its visible label, not an aria-label.
+    const label = el.querySelector("label")!;
+    expect(label.textContent?.trim()).toBe("main.your_name");
+    const input = el.querySelector<HTMLInputElement>(`input#${label.htmlFor}`)!;
 
     // Below MIN_USERNAME_LENGTH, so validateUsername rejects it.
     input.value = "ab";
@@ -60,6 +61,11 @@ describe("UsernameInput validation error", () => {
 
     expect(el.canPlay()).toBe(false);
     expect(el.validationError).toContain("username.too_short");
+    // The error is announced and tied to the field.
+    const error = el.querySelector("#username-validation-error")!;
+    expect(error.getAttribute("role")).toBe("alert");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.getAttribute("aria-describedby")).toBe(error.id);
 
     // Typing a valid name clears the error again.
     input.value = "ValidName";
@@ -68,5 +74,6 @@ describe("UsernameInput validation error", () => {
 
     expect(el.canPlay()).toBe(true);
     expect(el.validationError).toBe("");
+    expect(input.getAttribute("aria-invalid")).toBe("false");
   });
 });

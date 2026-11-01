@@ -63,11 +63,6 @@ const PREVIEWABLE: readonly CueCategory[] = ["effects", "alerts", "interface"];
  */
 const PREVIEW_CEILING_MS = 10_000;
 
-// Set by the inline script at the top of <body> in index.html.
-function isHalloweenSeason(): boolean {
-  return document.body.dataset.halloweenSeason !== undefined;
-}
-
 @customElement("user-setting")
 export class UserSettingModal extends BaseModal {
   private keyboardLayout = new KeyboardLayoutController(this);
@@ -492,14 +487,6 @@ export class UserSettingModal extends BaseModal {
     console.log(
       "🔍 Go to player:",
       this.userSettings.goToPlayer() ? "ON" : "OFF",
-    );
-  }
-
-  private toggleHalloweenTheme() {
-    this.userSettings.toggleHalloweenTheme();
-    document.body.classList.toggle(
-      "halloween-theme",
-      isHalloweenSeason() && this.userSettings.halloweenTheme(),
     );
   }
 
@@ -1540,18 +1527,6 @@ export class UserSettingModal extends BaseModal {
         .checked=${this.userSettings.goToPlayer()}
         @change=${this.toggleGoToPlayer}
       ></setting-toggle>
-
-      ${
-        isHalloweenSeason()
-          ? html`<setting-toggle
-              label="${translateText("user_setting.halloween_theme_label")}"
-              description="${translateText("user_setting.halloween_theme_desc")}"
-              id="halloween-theme-toggle"
-              .checked=${this.userSettings.halloweenTheme()}
-              @change=${this.toggleHalloweenTheme}
-            ></setting-toggle>`
-          : null
-      }
 
       <!-- Help messages (moved here from the in-game menu) -->
       <setting-toggle

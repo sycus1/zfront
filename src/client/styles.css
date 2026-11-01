@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "./halloween.css";
+@import "./styles/nightshift.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 @custom-variant hover (&:hover);
@@ -9,7 +9,7 @@
 @theme {
   --default-ring-width: 3px;
   --default-ring-color: var(--color-malibu-blue);
-  --font-display: "OpenFront", Inter, Arial, sans-serif;
+  --font-display: Inter, Arial, sans-serif;
 
   /* Openfront.io brand palette — see Openfront_Brand_Guidelines.pdf §4 */
   --color-malibu-blue: #0084d1;

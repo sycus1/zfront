@@ -1,0 +1,558 @@
+/*
+ * zfront Night Shift: design tokens, fonts and the shared primitives the
+ * menus are built from. The source of truth is the "zfront Night Shift"
+ * design system (tokens.json and components/bundle.css); this is the Lit +
+ * Tailwind port of it.
+ *
+ * Colours are Tailwind theme colours with a zf- prefix, so they do not collide
+ * with Tailwind's own palette: bg-zf-ink-900, text-zf-signal-400 and so on,
+ * and var(--color-zf-…) in plain CSS. Everything else is a plain custom
+ * property on :root.
+ */
+
+/* ---- Fonts (SIL OFL 1.1, see src/client/fonts/OFL.txt) ------------------ */
+
+@font-face {
+  font-family: "Big Shoulders Stencil Display";
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("../fonts/big-shoulders-stencil-display-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Big Shoulders Stencil Display";
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("../fonts/big-shoulders-stencil-display-latin-ext.woff2")
+    format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* Archivo is a variable font: one file covers 600 to 800. */
+@font-face {
+  font-family: "Archivo";
+  font-style: normal;
+  font-weight: 600 800;
+  font-display: swap;
+  src: url("../fonts/archivo-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Archivo";
+  font-style: normal;
+  font-weight: 600 800;
+  font-display: swap;
+  src: url("../fonts/archivo-latin-ext.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/jetbrains-mono-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/jetbrains-mono-latin-ext.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* ---- Tokens -------------------------------------------------------------- */
+
+@theme {
+  --color-zf-ink-900: #111111;
+  --color-zf-ink-800: #1b1913;
+  --color-zf-tile-fill: #111111e6;
+  --color-zf-line-700: #2c281f;
+  --color-zf-line-600: #3a3528;
+  --color-zf-line-500: #5b5340;
+  --color-zf-muted-400: #8f887a;
+  --color-zf-muted-300: #c9c2ae;
+  --color-zf-cream-100: #f5f2e8;
+  --color-zf-signal-400: #ffd23f;
+  --color-zf-signal-wash: #ffd23f1f;
+  /* Map tint only: never text or controls. */
+  --color-zf-amber-500: #f2a93b;
+  --color-zf-scanline: #0000001f;
+  --color-zf-focus-ring: #ffffff;
+  /* Danger and zombies only. */
+  --color-zf-horde-500: #c71a12;
+  --color-zf-horde-300: #ff5c33;
+  /* Game only: the mark a killed zombie leaves, tracer core, muzzle flash. */
+  --color-zf-kill-900: #591009;
+  --color-zf-tracer-100: #fff2b3;
+  --color-zf-flash-400: #ffa640;
+
+  --font-zf-display:
+    "Big Shoulders Stencil Display", Impact, "Arial Narrow", sans-serif;
+  --font-zf-body: Archivo, system-ui, sans-serif;
+  --font-zf-data: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+
+:root {
+  --zf-cut-lg: 14px;
+  --zf-cut-sm: 8px;
+  --zf-border-1: 1px;
+  --zf-border-2: 2px;
+  --zf-border-3: 3px;
+  --zf-border-4: 4px;
+  --zf-control-min: 44px;
+  --zf-option-min: 52px;
+  --zf-cta-min: 76px;
+  --zf-stripe-band: 6px;
+  --zf-gutter: clamp(16px, 4vw, 48px);
+}
+
+/* ---- Primitives ---------------------------------------------------------- */
+
+@layer components {
+  /*
+   * The clipped corner: a 45° cut off the top-right. A bordered box draws its
+   * border as an inset shadow on the straight edges plus a corner gradient on
+   * the diagonal, so the border runs unbroken round the cut. Set the fill,
+   * border and ink with --zf-fill, --zf-border and --zf-ink.
+   */
+  .zf-frame {
+    --zf-cut: var(--zf-cut-sm);
+    --zf-bw: var(--zf-border-2);
+    --zf-border: transparent;
+    --zf-fill: transparent;
+    --zf-ink: inherit;
+    position: relative;
+    background: var(--zf-fill);
+    color: var(--zf-ink);
+    box-shadow: inset 0 0 0 var(--zf-bw) var(--zf-border);
+    clip-path: polygon(
+      0 0,
+      calc(100% - var(--zf-cut)) 0,
+      100% var(--zf-cut),
+      100% 100%,
+      0 100%
+    );
+  }
+  .zf-frame::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: var(--zf-cut);
+    height: var(--zf-cut);
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom left,
+      transparent 50%,
+      var(--zf-border) 50%,
+      var(--zf-border) calc(50% + var(--zf-bw)),
+      transparent calc(50% + var(--zf-bw))
+    );
+  }
+  .zf-frame-lg {
+    --zf-cut: var(--zf-cut-lg);
+  }
+
+  /*
+   * Hover: a hazard stripe slides in along the bottom edge; a press nudges
+   * the control 2px down. Reduced motion swaps the sweep for an instant
+   * invert, which each control sets with --zf-invert-fill / --zf-invert-ink.
+   */
+  .zf-sweep {
+    --zf-sweep-a: var(--color-zf-signal-400);
+    --zf-sweep-b: var(--color-zf-ink-900);
+    /* An uncut control (a desktop menu row) must still hide the stripe. */
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 80ms;
+  }
+  .zf-sweep::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: var(--zf-stripe-band);
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--zf-sweep-a) 0 8px,
+      var(--zf-sweep-b) 8px 16px
+    );
+    transform: translateX(-101%);
+    transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .zf-sweep:hover::after {
+    transform: none;
+  }
+  .zf-sweep:active {
+    transform: translateY(2px);
+  }
+  .zf-sweep:disabled {
+    cursor: not-allowed;
+    transform: none;
+  }
+  .zf-sweep:disabled::after {
+    display: none;
+  }
+
+  /*
+   * Focus. A clipped control would clip its own outline, so the outline goes
+   * on an unclipped wrapper (.zf-ring) round it.
+   */
+  .zf-ring {
+    display: flex;
+    position: relative;
+  }
+  .zf-ring > * {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .zf-ring:has(:focus-visible) {
+    outline: 3px solid var(--color-zf-focus-ring);
+    outline-offset: 2px;
+  }
+  .zf-ring :focus-visible {
+    outline: none;
+  }
+
+  /* Black-and-yellow tape: under the wordmark, nowhere decorative. */
+  .zf-hazard {
+    --zf-stripe: var(--color-zf-signal-400);
+    --zf-stripe-step: 18px;
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--zf-stripe) 0 var(--zf-stripe-step),
+      transparent var(--zf-stripe-step) calc(2 * var(--zf-stripe-step))
+    );
+  }
+
+  /* Small spaced capitals: tile titles, strip labels. */
+  .zf-tile-title {
+    font-family: var(--font-zf-body);
+    font-weight: 800;
+    font-size: 13px;
+    line-height: 16px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zf-sweep,
+  .zf-sweep::after {
+    transition: none;
+  }
+  .zf-sweep::after {
+    display: none;
+  }
+  .zf-sweep:hover:not(:disabled) {
+    --zf-fill: var(--zf-invert-fill, var(--color-zf-signal-400));
+    --zf-border: var(
+      --zf-invert-border,
+      var(--zf-invert-fill, var(--color-zf-signal-400))
+    );
+    --zf-ink: var(--zf-invert-ink, var(--color-zf-ink-900));
+  }
+  .zf-sweep:active {
+    transform: none;
+  }
+}
+
+/* ---- Main menu: the live feed backdrop (LiveFeedBackdrop.ts) ------------- */
+
+/* Components layer, so a utility such as `hidden` still wins. */
+@layer components {
+  zf-live-feed {
+    display: block;
+    overflow: hidden;
+    pointer-events: none;
+    background: var(--color-zf-ink-900);
+    isolation: isolate;
+  }
+  .zf-feed-box {
+    position: absolute;
+  }
+  .zf-feed-pan {
+    position: absolute;
+    inset: 0;
+    will-change: transform;
+  }
+  .zf-feed-map {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+  }
+  .zf-feed-sprite {
+    position: absolute;
+    width: 3.4%;
+    height: auto;
+    transform: translate(-50%, -50%);
+    image-rendering: pixelated;
+    filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.35));
+  }
+  .zf-feed-tint {
+    position: absolute;
+    inset: 0;
+    background: var(--color-zf-amber-500);
+    mix-blend-mode: multiply;
+  }
+  .zf-feed-shade {
+    position: absolute;
+    inset: 0;
+    background: #000000;
+  }
+  .zf-feed-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .zf-feed-scan {
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      var(--color-zf-scanline) 0 2px,
+      transparent 2px 4px
+    );
+  }
+}
+
+/* ---- Text field ---------------------------------------------------------- */
+
+@layer components {
+  .zf-field {
+    --zf-fill: var(--color-zf-cream-100);
+    --zf-ink: var(--color-zf-ink-900);
+    --zf-border: var(--color-zf-ink-900);
+    width: 100%;
+    min-height: var(--zf-option-min);
+    padding: 0 14px;
+    border: 0;
+    margin: 0;
+    font-family: var(--font-zf-body);
+    font-weight: 600;
+    font-size: 18px;
+    line-height: normal;
+  }
+  .zf-field::placeholder {
+    color: #5c5c5c;
+  }
+  /* Danger is red: the one place a menu field turns it. */
+  .zf-field-error {
+    --zf-fill: var(--color-zf-horde-500);
+    --zf-ink: var(--color-zf-cream-100);
+    padding: 8px 12px;
+    font-family: var(--font-zf-body);
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 18px;
+  }
+}
+
+/* ---- Button -------------------------------------------------------------- */
+
+@layer components {
+  .zf-icon {
+    flex-shrink: 0;
+    display: block;
+  }
+  .zf-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    border: 0;
+    margin: 0;
+    text-decoration: none;
+    text-align: left;
+    font-family: var(--font-zf-display);
+    font-weight: 900;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .zf-btn-lg {
+    --zf-cut: var(--zf-cut-lg);
+    min-height: var(--zf-cta-min);
+    padding: 0 24px;
+    font-size: 44px;
+  }
+  .zf-btn-signal {
+    --zf-fill: var(--color-zf-signal-400);
+    --zf-border: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-ink-900);
+  }
+  /* Ink on a yellow panel; reduced motion inverts it to an outline. */
+  .zf-btn-ink {
+    --zf-fill: var(--color-zf-ink-900);
+    --zf-border: var(--color-zf-ink-900);
+    --zf-ink: var(--color-zf-signal-400);
+    --zf-invert-fill: transparent;
+    --zf-invert-border: var(--color-zf-ink-900);
+    --zf-invert-ink: var(--color-zf-ink-900);
+  }
+  .zf-btn:disabled {
+    --zf-fill: transparent;
+    --zf-border: var(--color-zf-line-600);
+    --zf-ink: var(--color-zf-muted-400);
+  }
+  .zf-btn-ink:disabled {
+    --zf-border: var(--color-zf-ink-900);
+    --zf-ink: var(--color-zf-ink-900);
+    opacity: 0.55;
+  }
+}
+
+@media (max-width: 639.98px) {
+  .zf-btn-lg {
+    min-height: 64px;
+    padding: 0 20px;
+    font-size: 38px;
+  }
+}
+
+/* ---- Main menu ----------------------------------------------------------- */
+
+@layer components {
+  /* The yellow panel: full-bleed and uncut on phone, a cut tile on desktop. */
+  .zf-menu-panel {
+    --zf-cut: var(--zf-cut-lg);
+    --zf-fill: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-ink-900);
+  }
+
+  /* Tutorial, Settings, Help: icon buttons on phone, ruled rows on desktop. */
+  .zf-menu-links {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .zf-menu-link {
+    --zf-border: var(--color-zf-ink-900);
+    --zf-ink: var(--color-zf-ink-900);
+    --zf-invert-fill: var(--color-zf-ink-900);
+    --zf-invert-ink: var(--color-zf-signal-400);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    min-height: 56px;
+    padding: 0 4px;
+    border: 0;
+    margin: 0;
+    font-family: var(--font-zf-body);
+    font-weight: 800;
+    font-size: 12px;
+    line-height: 1.1;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-align: center;
+  }
+  .zf-menu-link .zf-menu-link-arrow {
+    display: none;
+  }
+}
+
+@media (max-width: 639.98px) {
+  .zf-menu-panel {
+    clip-path: none;
+  }
+  .zf-menu-panel::before {
+    display: none;
+  }
+}
+
+@media (min-width: 640px) {
+  .zf-menu-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border-top: 1px solid rgb(17 17 17 / 0.25);
+  }
+  .zf-menu-link {
+    flex-direction: row;
+    justify-content: space-between;
+    min-height: 52px;
+    padding: 0;
+    font-size: 18px;
+    letter-spacing: 0.02em;
+    text-align: left;
+    clip-path: none;
+    box-shadow: none;
+    border-bottom: 1px solid rgb(17 17 17 / 0.25);
+  }
+  .zf-menu-link::before,
+  .zf-menu-link .zf-menu-link-icon {
+    display: none;
+  }
+  .zf-menu-link .zf-menu-link-arrow {
+    display: block;
+  }
+}
+
+/* ---- Footer -------------------------------------------------------------- */
+
+@layer components {
+  .zf-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 24px;
+    padding: 12px var(--zf-gutter);
+    background: var(--color-zf-ink-900);
+    color: var(--color-zf-signal-400);
+    border-top: var(--zf-border-4) solid var(--color-zf-signal-400);
+    font-family: var(--font-zf-body);
+    font-size: 13px;
+    line-height: 18px;
+    font-weight: 600;
+  }
+  .zf-footer nav a,
+  .zf-footer nav button {
+    color: var(--color-zf-signal-400);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    cursor: pointer;
+  }
+  .zf-footer nav a:hover,
+  .zf-footer nav button:hover {
+    color: var(--color-zf-cream-100);
+  }
+  .zf-footer nav a:focus-visible,
+  .zf-footer nav button:focus-visible {
+    outline: 3px solid var(--color-zf-focus-ring);
+    outline-offset: 2px;
+  }
+}

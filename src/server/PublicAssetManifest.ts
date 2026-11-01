@@ -400,6 +400,7 @@ const ROOT_FILE_TYPES: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
   ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
   ".pdf": "application/pdf",
   ".zip": "application/zip",
 };
