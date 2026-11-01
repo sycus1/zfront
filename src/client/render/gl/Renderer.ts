@@ -520,7 +520,12 @@ export class GPURenderer {
 
     // --- zfront horde overlay ---
     this.hordePass = new HordePass(gl, mapW, mapH);
-    this.districtPass = new DistrictPass(gl, mapW, mapH);
+    this.districtPass = new DistrictPass(
+      gl,
+      mapW,
+      mapH,
+      header.hordeGrid?.districts,
+    );
 
     // --- Point lights ---
     this.pointLightPass = new PointLightPass(

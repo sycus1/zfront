@@ -467,6 +467,23 @@ _2026-11-01._ Dan found no reason to expand past an Outpost or two for wall anch
 
 `balance:horde` has a `districts` strategy: `turrets`, plus an Outpost in a Wild district towards each announced wave whenever it may hold another. It shows where each wave landed (mean distance from the HQ) and districts held. With `--zone 0`, `turrets` and `districts` both win Bath, Sheffield and Whitby. With Outposts held, waves on that side land about 140-180 tiles out instead of about 110-130, and Outposts start being overrun in waves 9 and 10. With no Outposts, districts on and off give the same results except Whitby, where `turrets` now wins (it lost wave 10) and `spans` keeps more HQ.
 
+### Hand-made districts
+
+_2026-11-01._ Dan's district vision (plan: https://claude.ai/artifact/KzYDcwEJCtfqR5N2vYT7FW) makes districts the whole board: you grow by capturing them, they hold buildings, and later their borders become your walls. So each town gets its own districts, with borders on chokepoints. This is stage 1 of that plan and leaves the rules above unchanged.
+
+- **Format.** An optional `map-generator/assets/maps/<town>/districts.png`, the size of `image.png`, one flat colour per district; transparent pixels join the nearest district. `npm run gen-maps` reads it onto the map4x grid (each cell takes the colour most of its 2x2 tiles have) and writes `districts: { count, rows }` into the manifest, one run-length string per row (`map-generator/districts.go`, `MapDistricts` in `engine-api/game/MapFiles.ts`). It warns about a district painted in more than one piece. Repaint the PNG in any editor and run `gen-maps` again.
+- **Loading.** `loadTerrainMap` decodes it into `TerrainMapData.districts` (halved for Compact games). The engine gets it through `createGame`/`RestoreDeps` (`Game.mapDistricts()`), the renderer through `RendererConfig.hordeGrid.districts`, and both build the same map with `districtMap()`. `districtSize` still turns districts on; a map without its own districts gets the jittered grid as before.
+- **First cut.** `scripts/realmap/districts.ts <town>` writes a districts.png from the town's generated terrain: one seed per 25-cell block at its most open cell, districts grown along open ground, slowly through narrow cells and quickly through wide ones so neighbours meet in the narrow part of a street, six rounds of moving each seed to its district's middle, small districts merged, and buildings and water joined to the nearest district. `--preview <dir>` also writes the districts over the terrain.
+- **Result** (open border cells are open cells next to another district's open cell, where border walls would go):
+
+| Town      | Districts (grid) | Open border cells (grid) | Per district (grid) |
+| --------- | ---------------- | ------------------------ | ------------------- |
+| Bath      | 52 (64)          | 1296 (2950)              | 24.9 (46.1)         |
+| Sheffield | 59 (64)          | 1171 (2434)              | 19.8 (38.0)         |
+| Whitby    | 60 (64)          | 2792 (4110)              | 46.5 (64.2)         |
+
+Whitby gains least because much of it is open fields and moor, where no border can be a chokepoint. `balance:horde --zone 0 --strategy turrets,districts` still wins all three towns with the HQ untouched, and waves land about as far out as on the grid.
+
 ## Prerequisites
 
 - npm 12.1 or later. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`. The machine currently has npm 11.19.

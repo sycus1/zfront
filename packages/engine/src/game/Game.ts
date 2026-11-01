@@ -40,6 +40,7 @@ import {
   UnitPredicate,
 } from "@openfront/engine-api/game/ReadViews";
 import { AllPlayersStats, ClientID } from "@openfront/engine-api/Schemas";
+import { MapDistrictIds } from "@openfront/engine-lib/game/Districts";
 import { MotionPlanRecord } from "@openfront/engine-lib/game/MotionPlans";
 import type { EngineConfig } from "../configuration/EngineConfig";
 import { AbstractGraph } from "../pathfinding/algorithms/AbstractGraph";
@@ -459,6 +460,8 @@ export interface Game extends GameLike {
   height(): number;
   map(): GameMap;
   miniMap(): GameMap;
+  /** zfront: the map's hand-made districts on miniMap's grid, if any. */
+  mapDistricts(): MapDistrictIds | undefined;
   forEachTile(fn: (tile: TileRef) => void): void;
   // Zero-allocation neighbor iteration (cardinal only), in the same N, S, W, E
   // order as neighbors().

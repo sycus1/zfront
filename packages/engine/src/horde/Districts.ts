@@ -4,15 +4,17 @@ import {
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
 import {
-  buildDistricts,
   DistrictMap,
+  districtMap,
   DistrictState,
+  MapDistrictIds,
 } from "@openfront/engine-lib/game/Districts";
 import { Game, Player } from "../game/Game";
 
 /**
  * zfront: buffer districts. The map is cut into districts (engine-lib
- * `game/Districts`) and each one is Wild, Securing, Held or Core:
+ * `game/Districts`: the map's own hand-made ones if it has them, else a
+ * jittered grid) and each one is Wild, Securing, Held or Core:
  *
  * - **Core**: the district with a player's HQ, or one with no Outpost
  *   where they own at least `districtCorePercent` of the open ground. It
@@ -38,7 +40,10 @@ import { Game, Player } from "../game/Game";
  */
 
 export interface DistrictOptions {
-  /** District size in coarse cells; 0 turns districts off. */
+  /**
+   * District size in coarse cells for maps without hand-made districts;
+   * 0 turns districts off on every map.
+   */
   districtSize: number;
   /** Ticks with no zombie in it before an Outpost's district is Held. */
   districtSecureTicks: number;
@@ -84,8 +89,10 @@ export class Districts {
     private width: number,
     height: number,
     passable: (cell: number) => boolean,
+    /** The map's hand-made districts (Game.mapDistricts), if any. */
+    own?: MapDistrictIds,
   ) {
-    this.map = buildDistricts(width, height, opts.districtSize);
+    this.map = districtMap(width, height, opts.districtSize, own);
     const n = this.map.count;
     this.open = new Int32Array(n);
     for (let c = 0; c < this.map.ids.length; c++) {

@@ -10,6 +10,11 @@ import {
   MapMetadata,
   Nation,
 } from "@openfront/engine-api/game/MapFiles";
+import {
+  decodeMapDistricts,
+  MapDistrictIds,
+  scaleMapDistricts,
+} from "./Districts";
 import { GameMapImpl } from "./GameMapImpl";
 
 export type TerrainMapData = {
@@ -20,6 +25,8 @@ export type TerrainMapData = {
   teamGameSpawnAreas?: TeamGameSpawnAreas;
   /** Map layers from the manifest, if any. */
   layers?: MapLayer[];
+  /** zfront: the map's hand-made districts on miniGameMap's grid, if any. */
+  districts?: MapDistrictIds;
 };
 
 /**
@@ -108,6 +115,23 @@ export async function loadTerrainMap(files: MapFiles): Promise<TerrainMapData> {
     }
   }
 
+  let districts: MapDistrictIds | undefined;
+  if (manifest.districts !== undefined) {
+    try {
+      districts = scaleMapDistricts(
+        decodeMapDistricts(
+          manifest.districts,
+          manifest.map4x.width,
+          manifest.map4x.height,
+        ),
+        miniMap.width(),
+        miniMap.height(),
+      );
+    } catch (e) {
+      throw new Error(`Map ${map}: ${(e as Error).message}`);
+    }
+  }
+
   return {
     nations: manifest.nations,
     additionalNations: manifest.additionalNations ?? [],
@@ -115,6 +139,7 @@ export async function loadTerrainMap(files: MapFiles): Promise<TerrainMapData> {
     miniGameMap: miniMap,
     teamGameSpawnAreas,
     layers,
+    districts,
   };
 }
 
