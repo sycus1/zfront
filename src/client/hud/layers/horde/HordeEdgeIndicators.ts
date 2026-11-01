@@ -10,6 +10,7 @@ import {
   CrateTarget,
   EdgeInsets,
   EdgeMarker,
+  ScreenRect,
   crateTargets,
   edgeMarkers,
   hordeClusters,
@@ -20,6 +21,15 @@ import {
 const INSETS: EdgeInsets = { top: 28, right: 28, bottom: 28, left: 28 };
 /** Tiles beyond which a marker is drawn at its faintest. */
 const FAR_TILES = 160;
+/** HUD panels the markers keep out of, and how often they are re-measured. */
+const HUD_SELECTORS = [
+  "game-left-sidebar aside",
+  "game-right-sidebar",
+  "[data-horde-hud]",
+  "control-panel",
+  "unit-display",
+];
+const HUD_MEASURE_MS = 500;
 
 const COLORS = {
   horde: "239, 68, 68",
@@ -86,6 +96,8 @@ export class HordeEdgeIndicators implements Controller {
   private incoming: Float32Array = new Float32Array(0);
   private crates: CrateTarget[] = [];
   private raf = 0;
+  private hud: ScreenRect[] = [];
+  private hudMeasuredAt = -Infinity;
 
   constructor(
     private game: GameView,
@@ -98,7 +110,7 @@ export class HordeEdgeIndicators implements Controller {
     const container = document.createElement("div");
     container.dataset.hordeEdge = "";
     container.style.cssText =
-      "position:fixed;left:0;top:0;width:0;height:0;z-index:900;pointer-events:none;overflow:visible;";
+      "position:fixed;left:0;top:0;width:0;height:0;z-index:899;pointer-events:none;overflow:visible;";
     const style = document.createElement("style");
     style.textContent = STYLE;
     container.appendChild(style);
@@ -147,6 +159,11 @@ export class HordeEdgeIndicators implements Controller {
     const origin = th.worldToCanvasCoordinates(new Cell(0, 0));
     container.style.left = `${rect.left}px`;
     container.style.top = `${rect.top}px`;
+    const now = performance.now();
+    if (now - this.hudMeasuredAt >= HUD_MEASURE_MS) {
+      this.hudMeasuredAt = now;
+      this.hud = measureHud(rect);
+    }
     const markers = edgeMarkers(
       this.clusters,
       this.incoming,
@@ -159,6 +176,7 @@ export class HordeEdgeIndicators implements Controller {
         height: rect.height,
       },
       INSETS,
+      this.hud,
     );
     const seen = new Set<string>();
     for (const m of markers) {
@@ -244,4 +262,22 @@ export class HordeEdgeIndicators implements Controller {
       el.badge.setAttribute("aria-label", title);
     }
   }
+}
+
+/** The visible HUD panels, relative to the map canvas's rect. */
+function measureHud(canvas: DOMRect): ScreenRect[] {
+  const out: ScreenRect[] = [];
+  for (const sel of HUD_SELECTORS) {
+    for (const el of document.querySelectorAll(sel)) {
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) continue;
+      out.push({
+        left: r.left - canvas.left,
+        top: r.top - canvas.top,
+        right: r.right - canvas.left,
+        bottom: r.bottom - canvas.top,
+      });
+    }
+  }
+  return out;
 }

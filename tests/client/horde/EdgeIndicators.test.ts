@@ -1,6 +1,7 @@
 import { hordeDensityByte } from "@openfront/engine-lib/game/HordeCells";
 import { describe, expect, it } from "vitest";
 import {
+  avoidRects,
   clampToRect,
   crateTargets,
   EdgeCamera,
@@ -148,6 +149,37 @@ describe("edgeMarkers", () => {
     );
     expect(far).toHaveLength(1);
     expect(far[0].x).toBeCloseTo(90);
+  });
+});
+
+describe("avoidRects", () => {
+  const panel = { left: 0, top: 0, right: 40, bottom: 30 };
+
+  it("pulls a marker under a panel back along its ray", () => {
+    // Up-left corner: the ray from (50, 50) to (10, 10) enters the grown
+    // panel (pad 5) at its bottom edge, y = 35.
+    const p = avoidRects(50, 50, 10, 10, [panel], 5);
+    expect(p.y).toBeCloseTo(35);
+    expect(p.x).toBeCloseTo(35);
+  });
+
+  it("leaves markers clear of every panel alone", () => {
+    expect(avoidRects(50, 50, 90, 90, [panel], 5)).toEqual({ x: 90, y: 90 });
+  });
+
+  it("moves edge markers out from under the HUD", () => {
+    const crates = [{ id: 1, x: -50, y: -50, gold: 100 }];
+    const m = edgeMarkers(
+      new Float32Array(0),
+      new Float32Array(0),
+      crates,
+      CAM,
+      INSETS,
+      [panel],
+      5,
+    );
+    expect(m[0].x).toBeGreaterThan(35 - 1e-3);
+    expect(m[0].y).toBeGreaterThan(35 - 1e-3);
   });
 });
 

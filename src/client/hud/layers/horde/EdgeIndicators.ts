@@ -196,6 +196,56 @@ export function clampToRect(
   return { x: cx + dx * t, y: cy + dy * t };
 }
 
+/** A screen rectangle in CSS pixels, e.g. a HUD panel markers keep out of. */
+export interface ScreenRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/**
+ * Pulls (x, y) back towards the screen centre (cx, cy), along the same ray,
+ * until it is clear of every rect grown by `pad`, so a marker never hides
+ * under a HUD panel. Rects that hold the centre itself are ignored.
+ */
+export function avoidRects(
+  cx: number,
+  cy: number,
+  x: number,
+  y: number,
+  rects: readonly ScreenRect[],
+  pad: number,
+): { x: number; y: number } {
+  let px = x;
+  let py = y;
+  for (let pass = 0; pass < 4; pass++) {
+    let moved = false;
+    for (const r of rects) {
+      const l = r.left - pad;
+      const t = r.top - pad;
+      const rr = r.right + pad;
+      const b = r.bottom + pad;
+      if (px < l || px > rr || py < t || py > b) continue;
+      if (cx >= l && cx <= rr && cy >= t && cy <= b) continue;
+      // Where the ray from the centre first enters the rect.
+      const dx = px - cx;
+      const dy = py - cy;
+      let enter = 0;
+      if (dx !== 0)
+        enter = Math.max(enter, Math.min((l - cx) / dx, (rr - cx) / dx));
+      if (dy !== 0)
+        enter = Math.max(enter, Math.min((t - cy) / dy, (b - cy) / dy));
+      const k = Math.max(0, Math.min(1, enter) - 1e-6);
+      px = cx + dx * k;
+      py = cy + dy * k;
+      moved = true;
+    }
+    if (!moved) break;
+  }
+  return { x: px, y: py };
+}
+
 /** Tiles from the visible part of the map to (sx, sy) on screen. */
 function offscreenTiles(cam: EdgeCamera, sx: number, sy: number): number {
   const ox = sx < 0 ? -sx : sx > cam.width ? sx - cam.width : 0;
@@ -315,7 +365,8 @@ export function hordeStrength(zombies: number): number {
 /**
  * The markers for everything off-screen: one horde marker per direction
  * the zombies are in, one incoming marker per direction the announced wave
- * lands from, and one marker per supply crate.
+ * lands from, and one marker per supply crate. Markers are kept clear of
+ * the `avoid` rects (HUD panels), in the camera's screen space.
  */
 export function edgeMarkers(
   clusters: Float32Array,
@@ -323,6 +374,8 @@ export function edgeMarkers(
   crates: readonly CrateTarget[],
   cam: EdgeCamera,
   insets: EdgeInsets,
+  avoid: readonly ScreenRect[] = [],
+  avoidPad = 18,
 ): EdgeMarker[] {
   if (cam.width <= 0 || cam.height <= 0 || cam.scale <= 0) return [];
   const out = sectorMarkers("horde", clusters, 3, cam, insets, hordeStrength);
@@ -356,6 +409,13 @@ export function edgeMarkers(
       strength: 1,
       distance: offscreenTiles(cam, sx, sy),
     });
+  }
+  if (avoid.length > 0) {
+    for (const m of out) {
+      const p = avoidRects(cx, cy, m.x, m.y, avoid, avoidPad);
+      m.x = p.x;
+      m.y = p.y;
+    }
   }
   return out;
 }
