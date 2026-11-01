@@ -589,6 +589,7 @@ export class HordeExecution implements Execution {
       this.width,
       this.height,
       (c) => this.terrainCost[c] !== 0,
+      mg.mapDistricts(),
     );
     this.hordeStructureAt = new Map();
     this.hordeTurrets = [];

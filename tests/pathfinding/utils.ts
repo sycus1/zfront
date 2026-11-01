@@ -96,6 +96,8 @@ export function getAdapter(
         originalGame.miniGameMap,
         originalGame._config,
         originalGame._stats,
+        originalGame._teamGameSpawnAreas,
+        originalGame._mapDistricts,
       );
 
       (clonedGame as any)._waterManager._miniWaterHPA =

@@ -33,6 +33,22 @@ export interface MapManifest {
   teamGameSpawnAreas?: TeamGameSpawnAreas;
   /** Optional map layers rendered between terrain and territory. */
   layers?: MapLayer[];
+  /**
+   * zfront: the map's hand-made districts, from `districts.png` beside its
+   * `image.png` (see map-generator/districts.go). Without them, horde games
+   * cut the map into a jittered grid (engine-lib `game/Districts`).
+   */
+  districts?: MapDistricts;
+}
+
+/**
+ * Hand-made districts on the map4x grid, run-length encoded: one string per
+ * row, each a space-separated list of `id*length` runs that add up to the
+ * row's width. Ids run from 0 to `count - 1`.
+ */
+export interface MapDistricts {
+  count: number;
+  rows: string[];
 }
 
 export type LayerPlacement = "land" | "water";

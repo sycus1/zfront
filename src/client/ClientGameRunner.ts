@@ -1,4 +1,4 @@
-import { GameMap, TileRef } from "@openfront/engine-api/game/GameMap";
+import { TileRef } from "@openfront/engine-api/game/GameMap";
 import {
   BuildableUnit,
   PlayerType,
@@ -266,8 +266,9 @@ export function joinLobby(
 }
 
 // zfront: the horde moves on the mini map's cells; the terrain is coloured
-// by them.
-function hordeGrid(mini: GameMap): RendererConfig["hordeGrid"] {
+// by them, and the map's own districts (if any) are drawn on them.
+function hordeGrid(terrain: TerrainMapData): RendererConfig["hordeGrid"] {
+  const mini = terrain.miniGameMap;
   const cellWidth = mini.width();
   const cellHeight = mini.height();
   const cellBytes = new Uint8Array(cellWidth * cellHeight);
@@ -276,7 +277,7 @@ function hordeGrid(mini: GameMap): RendererConfig["hordeGrid"] {
       cellBytes[y * cellWidth + x] = mini.terrainByte(mini.ref(x, y));
     }
   }
-  return { cellBytes, cellWidth, cellHeight };
+  return { cellBytes, cellWidth, cellHeight, districts: terrain.districts };
 }
 
 // Build the WebGL view + its glCanvas. Must run before createRenderer so the
@@ -350,9 +351,7 @@ function createWebGLView(
         // but the NamePass / palette / relation matrix all need a static upper
         // bound at construction time.
         maxPlayers: 1024,
-        hordeGrid: config.horde()
-          ? hordeGrid(terrainMap.miniGameMap)
-          : undefined,
+        hordeGrid: config.horde() ? hordeGrid(terrainMap) : undefined,
       },
       terrainSource,
       palette,

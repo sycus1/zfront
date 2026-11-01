@@ -28,7 +28,16 @@ the drawing into the client later.
    ```
 
 4. Run the map generator: `npm run gen-maps`.
-5. Try it headlessly: `npm run balance:horde -- --map Bath --zone 0`.
+5. Cut the town into districts (a first cut of `districts.png`, with borders
+   in the narrow parts of streets; repaint it by hand if you like), then run
+   the map generator again to put them in the manifest:
+
+   ```bash
+   npx tsx scripts/realmap/districts.ts bath
+   npm run gen-maps
+   ```
+
+6. Try it headlessly: `npm run balance:horde -- --map Bath --zone 0`.
 
 Downloads are cached in `scripts/realmap/cache/` (git-ignored).
 

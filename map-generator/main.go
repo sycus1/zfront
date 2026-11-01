@@ -220,6 +220,18 @@ func processMap(ctx context.Context, name string, isTest bool) (string, error) {
 		}
 	}
 
+	// zfront: hand-made districts, if the map has a districts.png.
+	districtsPng := filepath.Join(inputMapDir, name, "districts.png")
+	if _, err := os.Stat(districtsPng); err == nil {
+		districts, err := readDistricts(ctx, districtsPng, sourceImg.Width, sourceImg.Height, result.Map.Width, result.Map.Height, result.Map4x.Width, result.Map4x.Height)
+		if err != nil {
+			return "", fmt.Errorf("map %s: %w", name, err)
+		}
+		manifest["districts"] = districts
+	} else if !os.IsNotExist(err) {
+		return "", fmt.Errorf("map %s: %w", name, err)
+	}
+
 	// Serialize the updated manifest to JSON
 	updatedManifest, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {

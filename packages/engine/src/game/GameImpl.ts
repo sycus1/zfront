@@ -34,6 +34,7 @@ import {
 } from "@openfront/engine-api/Schemas";
 import { ATTACK_INDEX_SENT } from "@openfront/engine-api/StatsSchemas";
 import { renderNumber } from "@openfront/engine-lib/Format";
+import { MapDistrictIds } from "@openfront/engine-lib/game/Districts";
 import { GameMapImpl } from "@openfront/engine-lib/game/GameMapImpl";
 import {
   MotionPlanRecord,
@@ -94,6 +95,7 @@ export function createGame(
   miniGameMap: GameMap,
   config: EngineConfig,
   teamGameSpawnAreas?: TeamGameSpawnAreas,
+  mapDistricts?: MapDistrictIds,
 ): Game {
   const stats = new StatsImpl();
   return new GameImpl(
@@ -104,6 +106,7 @@ export function createGame(
     config,
     stats,
     teamGameSpawnAreas,
+    mapDistricts,
   );
 }
 
@@ -162,6 +165,7 @@ export class GameImpl implements Game {
     private _config: EngineConfig,
     private _stats: Stats,
     teamGameSpawnAreas?: TeamGameSpawnAreas,
+    private _mapDistricts?: MapDistrictIds,
     // Restoring a snapshot: skip team and player setup, the snapshot
     // supplies both (see restoreState).
     restoring: boolean = false,
@@ -255,6 +259,10 @@ export class GameImpl implements Game {
   }
   miniMap(): GameMap {
     return this.miniGameMap;
+  }
+
+  mapDistricts(): MapDistrictIds | undefined {
+    return this._mapDistricts;
   }
 
   addUpdate(update: GameUpdate) {

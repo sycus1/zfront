@@ -97,9 +97,9 @@ describe("District map", () => {
   test("every cell belongs to a district, the same way every time", () => {
     const a = buildDistricts(50, 40, 10);
     const b = buildDistricts(50, 40, 10);
-    expect(a.cols).toBe(5);
-    expect(a.rows).toBe(4);
+    // 5 across and 4 down.
     expect(a.count).toBe(20);
+    expect(a.handMade).toBe(false);
     expect(Array.from(a.ids)).toEqual(Array.from(b.ids));
     const sizes = new Array(a.count).fill(0);
     for (const id of a.ids) {

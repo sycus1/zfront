@@ -4,7 +4,8 @@
  *
  * The frame carries only the district size and one state byte per
  * district; the pass rebuilds the district map (engine-lib
- * `game/Districts`) once, then on each frame packs, per coarse cell, the
+ * `game/Districts`, from the map's own districts if it has them) once,
+ * then on each frame packs, per coarse cell, the
  * state of its district and which sides border another district, uploads
  * that as an R8 texture, and draws it on a map-sized quad: a green wash
  * and outline for Held districts, amber stripes while an Outpost secures
@@ -14,8 +15,9 @@
 
 import { HordeFrame } from "@openfront/engine-api/game/GameUpdates";
 import {
-  buildDistricts,
   DistrictMap,
+  districtMap,
+  MapDistrictIds,
 } from "@openfront/engine-lib/game/Districts";
 import districtFragSrc from "../shaders/district/district.frag.glsl?raw";
 import districtVertSrc from "../shaders/district/district.vert.glsl?raw";
@@ -76,6 +78,8 @@ export class DistrictPass {
     private gl: WebGL2RenderingContext,
     mapW: number,
     mapH: number,
+    /** The map's hand-made districts, as the engine got them. */
+    private own?: MapDistrictIds,
   ) {
     this.program = createProgram(
       gl,
@@ -102,7 +106,12 @@ export class DistrictPass {
       frame.width !== this.gridW ||
       frame.height !== this.gridH
     ) {
-      this.map = buildDistricts(frame.width, frame.height, frame.districtSize);
+      this.map = districtMap(
+        frame.width,
+        frame.height,
+        frame.districtSize,
+        this.own,
+      );
       this.gridW = frame.width;
       this.gridH = frame.height;
       if (this.tex) gl.deleteTexture(this.tex);
@@ -116,6 +125,8 @@ export class DistrictPass {
       });
       this.last = new Uint8Array();
     }
+    // A frame for some other cut (not possible on one map) is ignored.
+    if (frame.districts.length !== this.map.count) return;
     if (sameBytes(this.last, frame.districts)) return;
     this.last = frame.districts.slice();
     const cells = districtCells(

@@ -5,6 +5,7 @@ import {
 } from "@openfront/engine-api/game/GameTypes";
 import type { SnapshotHeader } from "@openfront/engine-api/game/SnapshotHeader";
 import { GameConfig, GameConfigSchema } from "@openfront/engine-api/Schemas";
+import { MapDistrictIds } from "@openfront/engine-lib/game/Districts";
 import {
   GameMapImpl,
   GameMapSnapshot,
@@ -253,6 +254,8 @@ export interface RestoreDeps {
   gameMap: GameMap;
   miniGameMap: GameMap;
   teamGameSpawnAreas?: TeamGameSpawnAreas;
+  /** The map's hand-made districts (TerrainMapData.districts), if any. */
+  mapDistricts?: MapDistrictIds;
 }
 
 /**
@@ -288,6 +291,7 @@ export function restoreGame(bytes: Uint8Array, deps: RestoreDeps): Game {
     config,
     new StatsImpl(),
     deps.teamGameSpawnAreas,
+    deps.mapDistricts,
     true,
   );
 

@@ -82,6 +82,7 @@ export async function createGameRunner(
     gameMap.miniGameMap,
     config,
     gameMap.teamGameSpawnAreas,
+    gameMap.districts,
   );
 
   const gr = new GameRunner(
@@ -127,6 +128,7 @@ export async function createGameRunnerFromSnapshot(
     gameMap: gameMap.gameMap,
     miniGameMap: gameMap.miniGameMap,
     teamGameSpawnAreas: gameMap.teamGameSpawnAreas,
+    mapDistricts: gameMap.districts,
   });
   // No init(): the snapshot already holds every execution init() adds.
   return new GameRunner(
