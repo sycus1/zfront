@@ -484,6 +484,18 @@ _2026-11-01._ Dan's district vision (plan: https://claude.ai/artifact/KzYDcwEJCt
 
 Whitby gains least because much of it is open fields and moor, where no border can be a chokepoint. `balance:horde --zone 0 --strategy turrets,districts` still wins all three towns with the HQ untouched, and waves land about as far out as on the grid.
 
+### Districts are the land
+
+_2026-11-01._ Stage 2 of the district plan: on town maps you grow only by taking whole districts (`districtLand: 1` in `TownScale.ts`; continent maps keep settling).
+
+- **Start.** The game opens on the HQ's district and its neighbours, every free land tile in them (`giveStart`). They are Core and are never overrun. With district land on, Core is only these districts, not any district you happen to own most of, so deleting an Outpost can't turn a district into Core.
+- **No settling** beyond them, and no claim radius round Outposts or other buildings. The placement preview draws neither the settling circle (`HordeFrame.settleRadius` is 0) nor an Outpost claim circle (`Config.outpostClaimRadius()` is 0 on towns).
+- **Outposts.** One may only go in a Wild district next to a district you hold, one to a district, even while it is being built (`Game.outpostSiteRule`, set by the horde in its setup, so it isn't snapshotted). While it secures the district it holds only its own tile. When the district is Held you get every free tile in it. If the Outpost is lost, or the district overrun, you lose every tile you had there, including the ones under your buildings, which stay standing on wild ground (`syncDistrictLand`).
+- **Cost.** On town maps an Outpost costs 20,000 plus `TOWN_OUTPOST_COST_STEP` (15,000) for each Outpost you already have: 20k, 35k, 50k and so on. The Outpost limit (one, plus one every two waves) still applies.
+- Horde snapshot v20: older games keep settling and Outpost claims.
+
+The start is bigger than the old 60-tile disc: about 22,000 tiles on Bath and Sheffield and 16,000 on Whitby, against 12,700 and 9,800, roughly what settling reached by wave 5. It no longer grows by itself. With `--zone 0`, `turrets` and `spans` still win all three towns with the HQ untouched. `districts`, which keeps buying Outposts, now holds 3 rather than 4-5 and loses Bath in wave 10 (it won before) while still winning Sheffield and Whitby: the land it buys is gold not spent on turrets. Bath's `fort` (walls first) falls in wave 2 (it won with 2,038 HQ before), and `mortars` and `scavenge` lose a wave or two earlier on Bath and Sheffield; Whitby's `mortars` now wins. The turtle/sprawl balance is stage 6.
+
 ## Prerequisites
 
 - npm 12.1 or later. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`. The machine currently has npm 11.19.

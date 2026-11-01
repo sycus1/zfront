@@ -76,7 +76,10 @@ export interface HordeFrame {
   nextWaveLandings: Int32Array;
   /** The first human HQ's coarse cell, or -1, for pointing at it. */
   hqCell: number;
-  /** The first human HQ's tile, or -1, and the radius settlers fill round it. */
+  /**
+   * The first human HQ's tile, or -1, and the radius settlers fill round
+   * it (0 when nobody settles, as districts are the land).
+   */
   hqTile: number;
   settleRadius: number;
   /**

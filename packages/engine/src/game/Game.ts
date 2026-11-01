@@ -453,6 +453,9 @@ export interface Player extends PlayerLike {
   bestTransportShipSpawn(tile: TileRef): TileRef | false;
 }
 
+/** zfront: whether `player` may put an Outpost on `tile`. */
+export type OutpostSiteRule = (player: Player, tile: TileRef) => boolean;
+
 export interface Game extends GameLike {
   // Map & Dimensions
   isOnMap(cell: Cell): boolean;
@@ -503,6 +506,13 @@ export interface Game extends GameLike {
    */
   outpostLimit(): number;
   setOutpostLimit(limit: number): void;
+  /**
+   * zfront: where an Outpost may go when districts are the land: the horde
+   * sets it in its setup (also on restore), so it isn't snapshotted. Null
+   * means the usual rule, near the player's border (Claims.outpostSpawn).
+   */
+  outpostSiteRule(): OutpostSiteRule | null;
+  setOutpostSiteRule(rule: OutpostSiteRule | null): void;
   isNationSpawnImmunityActive(): boolean;
   elapsedGameSeconds(): number;
 
