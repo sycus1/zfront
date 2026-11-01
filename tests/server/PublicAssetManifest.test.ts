@@ -390,7 +390,8 @@ describe("PublicAssetManifest", () => {
     const index = buildRootFilesIndex(getPublicDir(path.resolve("resources")));
     expect(index["privacy-policy.html"]).toBe("text/html; charset=utf-8");
     expect(index["terms-of-service.html"]).toBe("text/html; charset=utf-8");
-    expect(index["press/"]).toBe("text/html; charset=utf-8");
+    // OpenFront's press kit was removed; zfront ships no press page.
+    expect(index["press/"]).toBeUndefined();
     // Browsers and iOS ask for these at the site root by convention.
     expect(index["favicon.ico"]).toBe("image/x-icon");
     expect(index["apple-touch-icon.png"]).toBe("image/png");
