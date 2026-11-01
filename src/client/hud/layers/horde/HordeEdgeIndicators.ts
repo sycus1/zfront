@@ -18,7 +18,7 @@ import {
 } from "./EdgeIndicators";
 
 /** How far in from the screen edges the markers sit, in CSS pixels. */
-const INSETS: EdgeInsets = { top: 28, right: 28, bottom: 28, left: 28 };
+const INSETS: EdgeInsets = { top: 30, right: 30, bottom: 30, left: 30 };
 /** Tiles beyond which a marker is drawn at its faintest. */
 const FAR_TILES = 160;
 /** HUD panels the markers keep out of, and how often they are re-measured. */
@@ -32,7 +32,7 @@ const HUD_SELECTORS = [
 const HUD_MEASURE_MS = 500;
 
 const COLORS = {
-  horde: "239, 68, 68",
+  horde: "220, 38, 38",
   incoming: "249, 115, 22",
   crate: "250, 204, 21",
 } as const;
@@ -51,17 +51,19 @@ const STYLE = `
   display: flex; align-items: center; justify-content: center;
   min-width: 30px; height: 22px; padding: 0 6px; border-radius: 9999px;
   font: 600 11px/1 system-ui, sans-serif; color: #fff; white-space: nowrap;
-  background: rgba(17, 24, 39, 0.82); border: 1.5px solid currentColor;
+  background: currentColor; border: 1.5px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
   pointer-events: auto; cursor: pointer; user-select: none;
 }
-.horde-edge-badge span { color: #fff; }
+.horde-edge-badge span { color: #fff; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5); }
+.horde-edge.crate .horde-edge-badge span { color: #1f2937; text-shadow: none; }
 .horde-edge-arrow {
   position: absolute; left: 0; top: 0; width: 0; height: 0;
   pointer-events: none;
 }
 .horde-edge-arrow::after {
-  content: ""; position: absolute; left: 22px; top: -8px;
-  border-style: solid; border-width: 8px 0 8px 12px;
+  content: ""; position: absolute; left: 17px; top: -7px;
+  border-style: solid; border-width: 7px 0 7px 10px;
   border-color: transparent transparent transparent currentColor;
 }
 .horde-edge.incoming .horde-edge-glow,
