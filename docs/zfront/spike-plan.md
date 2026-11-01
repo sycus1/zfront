@@ -453,6 +453,20 @@ Tougher turrets alone made the late game easy: every defended strategy won on ev
 
 Growth is still a cliff (Whitby 50% loses all five plain games, Bath 49% loses `fort` on wave 2), so move it a point at a time. As before, looting and calling early make every town easier.
 
+## Buffer districts
+
+_2026-11-01._ Dan found no reason to expand past an Outpost or two for wall anchors, and pointed at the buffer-state idea: take neighbouring ground and hold it as a cushion rather than growing the base. From the options doc (https://claude.ai/artifact/TFDqoc5GyG7sQSePVtBGGo) he picked buffer districts, with salvage sites to follow. This is step 1.
+
+- **Districts.** On town maps the coarse grid is cut into districts about 25 cells (150 m) across, 64 to a town: a jittered grid, each cell going to its nearest seed (`engine-lib/game/Districts.ts`, `districtSize`; 0, the default, turns them off, so continent maps are unchanged). The engine and the renderer build the same map, and the frame carries one state byte per district.
+- **States** (`horde/Districts.ts`, updated every 10 ticks). Core: the HQ's district, or one with no Outpost where the player owns 60% of the open ground; never overrun. Securing: a finished Outpost stands in it. Held: an Outpost's district once no zombie has been in it for 10 s. Threatened: Held with 40 or more zombies in it; if they stay 10 s it is overrun, goes back to Wild and the Outpost is lost.
+- **Outposts don't draw the horde** with districts on (they are left out of the target types), so a crowd walks past one and only one that lingers takes it.
+- **Spawns.** No wave rises in a Core or Held district or next to a Held one. With districts on each direction falls back on its own to the cells beyond its band (`WaveDirector.survey` `perSector`), so holding the band on one side pushes that side's waves out past it rather than closing it. When the blocked districts change, the announced wave's landings move (and a direction that closes is planned again).
+- **Crates** only drop in or next to the player's own districts, and one in a Held district is worth 50% more (`crateHeldBonusPercent`).
+- **Overlay** (`DistrictPass`): faint lines between Wild districts, a light outline round Core ones, amber stripes while securing, a green wash and outline when Held, a red pulse when Threatened.
+- Horde snapshot v19: older games have districts off.
+
+`balance:horde` has a `districts` strategy: `turrets`, plus an Outpost in a Wild district towards each announced wave whenever it may hold another. It shows where each wave landed (mean distance from the HQ) and districts held. With `--zone 0`, `turrets` and `districts` both win Bath, Sheffield and Whitby. With Outposts held, waves on that side land about 140-180 tiles out instead of about 110-130, and Outposts start being overrun in waves 9 and 10. With no Outposts, districts on and off give the same results except Whitby, where `turrets` now wins (it lost wave 10) and `spans` keeps more HQ.
+
 ## Prerequisites
 
 - npm 12.1 or later. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`. The machine currently has npm 11.19.

@@ -80,8 +80,16 @@ export class WaveDirector {
    * the horde can walk from (by the current flow field). Cells between
    * `minSpawnDistance` and `maxSpawnDistance` are used when there are any;
    * failing that, any beyond `minSpawnDistance`; failing that, all of them.
+   * With `perSector`, a sector with no cells in the band uses its own cells
+   * beyond it, so a sector whose band is all taken (by held districts)
+   * spawns further out rather than closing.
    */
-  survey(spawnCells: Int32Array, centre: number, dist: Uint32Array): void {
+  survey(
+    spawnCells: Int32Array,
+    centre: number,
+    dist: Uint32Array,
+    perSector = false,
+  ): void {
     const w = this.width;
     const cx = centre % w;
     const cy = (centre - cx) / w;
@@ -116,6 +124,13 @@ export class WaveDirector {
         band[s].push(cell);
         anyBand = true;
       }
+    }
+    if (perSector && anyFar) {
+      // Never closer than the band: a sector with nothing beyond it closes.
+      this.bySector = band.map((cells, s) =>
+        cells.length > 0 ? cells : far[s],
+      );
+      return;
     }
     this.bySector = anyBand
       ? band

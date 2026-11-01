@@ -35,6 +35,12 @@ import {
 } from "./Claims";
 import { Crate, CrateOptions, Crates, CrateState } from "./Crates";
 import {
+  DISTRICT_INTERVAL,
+  DistrictOptions,
+  Districts,
+  DistrictsState,
+} from "./Districts";
+import {
   payBounty,
   payCallEarlyBonus,
   payClearBonus,
@@ -90,7 +96,8 @@ export interface HordeOptions
     EconomyOptions,
     BuildingOptions,
     CrateOptions,
-    MortarOptions {
+    MortarOptions,
+    DistrictOptions {
   /** Ticks from the end of the spawn phase to the first wave. */
   firstWaveDelay: number;
   /**
@@ -268,6 +275,13 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   crateLandingBonusPercent: 100,
   depotCratePercent: 25,
   depotCrateMax: 4,
+  crateHeldBonusPercent: 50,
+  // Districts are off on continent maps; town maps turn them on.
+  districtSize: 0,
+  districtSecureTicks: 100,
+  districtOverrunCount: 60,
+  districtOverrunTicks: 100,
+  districtCorePercent: 60,
   mineRadius: 2,
   mineTrigger: 40,
   mineKills: 600,
@@ -353,6 +367,10 @@ const TARGET_TYPES: readonly UnitType[] = [
   UnitType.Outpost,
 ];
 
+const DISTRICT_TARGET_TYPES: readonly UnitType[] = TARGET_TYPES.filter(
+  (t) => t !== UnitType.Outpost,
+);
+
 /** Horde buildings that take up their cell, so no span runs through them. */
 const OCCUPYING_TYPES: readonly UnitType[] = [
   ...TARGET_TYPES,
@@ -432,6 +450,7 @@ export class HordeExecution implements Execution {
   private director!: WaveDirector;
   private crates!: Crates;
   private mortars!: Mortars;
+  private districts!: Districts;
 
   private wave = 0;
   private wavesSurvived = 0;
@@ -554,6 +573,12 @@ export class HordeExecution implements Execution {
       this.width,
     );
     this.mortars = new Mortars(opts, this.width, this.height);
+    this.districts = new Districts(
+      opts,
+      this.width,
+      this.height,
+      (c) => this.terrainCost[c] !== 0,
+    );
     this.hordeStructureAt = new Map();
     this.hordeTurrets = [];
     this.hordeMortars = [];
@@ -633,6 +658,53 @@ export class HordeExecution implements Execution {
       this.claimAll();
       this.settleAll();
     }
+    if (ticks % DISTRICT_INTERVAL === 0) this.updateDistricts();
+  }
+
+  /**
+   * Brings the districts up to date. When the districts no wave may rise
+   * in have changed, the announced wave's landings move out of them, and
+   * a direction that has closed altogether is planned again.
+   */
+  private updateDistricts(): void {
+    const mg = this.mg!;
+    const overrun: number[] = [];
+    const changed = this.districts.update(
+      mg,
+      DISTRICT_INTERVAL,
+      {
+        cellOf: (t) => this.cellOf(t),
+        density: this.field.density,
+        eliteCells: this.elites.cell.subarray(0, this.elites.count),
+      },
+      overrun,
+    );
+    // An overrun district's Outposts are lost with it.
+    if (overrun.length > 0) {
+      const lost = new Set(overrun);
+      for (const u of mg.units(UnitType.Outpost)) {
+        const d = this.districts.districtOf(this.cellOf(u.tile()));
+        if (!u.isActive() || !lost.has(d)) continue;
+        u.delete(false);
+        this.structuresDestroyed++;
+      }
+    }
+    const plan = this.nextPlan;
+    if (!changed || plan === null) return;
+    const blocked = this.nextLandings.some((c) =>
+      this.districts.blocksSpawn(c),
+    );
+    this.surveySpawns();
+    if ((plan.sectors & ~this.director.availableSectors()) !== 0) {
+      this.nextPlan = null;
+      this.planNextWave();
+    } else if (blocked) {
+      this.nextLandings = this.director.emitterCells(
+        plan,
+        this.opts.emittersPerWave,
+        this.random,
+      );
+    }
   }
 
   private tickCrates(ticks: number): void {
@@ -646,6 +718,7 @@ export class HordeExecution implements Execution {
       occupied: (c) => density[c] !== 0 || elites.has(c),
       landings: this.nextLandings,
       wave: this.wave,
+      spot: (c, owner) => this.districts.crateSpot(c, owner),
     });
   }
 
@@ -807,6 +880,8 @@ export class HordeExecution implements Execution {
       crates: this.encodeCrates(),
       crateLootTicks: this.opts.crateLootTicks,
       crateLife: this.opts.crateLife,
+      districtSize: this.districts.map.size,
+      districts: this.districts.encode(),
       encodeMs: 0,
       sentAt: 0,
     };
@@ -929,6 +1004,7 @@ export class HordeExecution implements Execution {
     }
     this.crates.hash(mix);
     this.mortars.hash(mix);
+    this.districts.hash(mix);
     return h >>> 0;
   }
 
@@ -1020,7 +1096,12 @@ export class HordeExecution implements Execution {
    * original does.
    */
   private scanStructures(ticks: number): void {
-    const units = this.mg!.units(TARGET_TYPES);
+    // With districts on, an Outpost holds ground rather than drawing the
+    // horde: crowds walk past it, and only one that lingers overruns its
+    // district, which costs the Outpost (updateDistricts).
+    const units = this.mg!.units(
+      this.districts.enabled() ? DISTRICT_TARGET_TYPES : TARGET_TYPES,
+    );
     const walls = this.mg!.units(UnitType.Wall);
     this.linkWalls(walls);
     const bait = this.soundingBeacons(ticks);
@@ -1389,14 +1470,30 @@ export class HordeExecution implements Execution {
     );
   }
 
-  /** Sorts spawn cells by direction around the first HQ (or the map centre). */
+  /**
+   * Sorts spawn cells by direction around the first HQ (or the map centre),
+   * leaving out districts players hold (and those next to Held ones),
+   * unless that leaves none. With districts on, each direction falls back
+   * on its own to the cells beyond its band, so holding the band in one
+   * direction pushes that side's waves out past it.
+   */
   private surveySpawns(): void {
     let centre = (this.height >> 1) * this.width + (this.width >> 1);
     for (const cell of this.hordeHqAt.keys()) {
       centre = cell;
       break;
     }
-    this.director.survey(this.spawnCells, centre, this.hordeFlow.dist);
+    let cells = this.spawnCells;
+    if (this.districts.enabled()) {
+      const open = cells.filter((c) => !this.districts.blocksSpawn(c));
+      if (open.length > 0) cells = open;
+    }
+    this.director.survey(
+      cells,
+      centre,
+      this.hordeFlow.dist,
+      this.districts.enabled(),
+    );
   }
 
   private startWave(): void {
@@ -1874,6 +1971,7 @@ export class HordeExecution implements Execution {
       linkedWalls: [...this.linkedWalls],
       crates: this.mg !== null ? this.crates.state() : null,
       mortars: this.mg !== null ? this.mortars.state() : null,
+      districts: this.mg !== null ? this.districts.state() : null,
     });
   }
 
@@ -1947,6 +2045,7 @@ export class HordeExecution implements Execution {
     );
     if (s.crates !== null) this.crates.restore(s.crates);
     if (s.mortars !== null) this.mortars.restore(s.mortars);
+    if (s.districts !== null) this.districts.restore(s.districts);
     if (s.flowCells !== null) {
       this.computeFlow(s.flowCells, s.flowWalls, s.flowBait);
     }
@@ -2091,6 +2190,12 @@ const HordeOptionsSchema = z.object({
   crateLandingBonusPercent: zInt(),
   depotCratePercent: zInt(),
   depotCrateMax: zInt(),
+  crateHeldBonusPercent: zInt(),
+  districtSize: zInt(),
+  districtSecureTicks: zInt(),
+  districtOverrunCount: zInt(),
+  districtOverrunTicks: zInt(),
+  districtCorePercent: zInt(),
   mortarRange: zInt(),
   mortarMinRange: zInt(),
   mortarReload: zInt(),
@@ -2135,6 +2240,12 @@ const MortarStateSchema = z.object({
   ),
   killed: zInt(),
 }) satisfies z.ZodType<MortarState>;
+
+const DistrictsStateSchema = z.object({
+  holder: z.array(zInt()),
+  status: z.array(zInt()),
+  timer: z.array(zInt()),
+}) satisfies z.ZodType<DistrictsState>;
 
 const WavePlanSchema = z.object({
   wave: zInt(),
@@ -2199,6 +2310,8 @@ const HordeStateSchema = z.object({
   crates: CrateStateSchema.nullable(),
   /** Null before init. */
   mortars: MortarStateSchema.nullable(),
+  /** Null before init. */
+  districts: DistrictsStateSchema.nullable(),
 });
 type HordeState = z.infer<typeof HordeStateSchema>;
 
@@ -2228,7 +2341,7 @@ export function hordeOf(game: Game): HordeExecution | null {
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 18,
+  version: 19,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -2487,6 +2600,21 @@ export const HordeExecutionSnapshot = execSnapshotType({
     17: (d) => ({
       ...d,
       options: { ...d.options, turretHp: d.options.structureHp },
+    }),
+    // 18 -> 19: buffer districts. Old games have none, and their crates
+    // are worth what they were.
+    18: (d) => ({
+      ...d,
+      options: {
+        ...d.options,
+        crateHeldBonusPercent: 0,
+        districtSize: 0,
+        districtSecureTicks: 0,
+        districtOverrunCount: 0,
+        districtOverrunTicks: 0,
+        districtCorePercent: 0,
+      },
+      districts: null,
     }),
   },
   cls: () => HordeExecution,

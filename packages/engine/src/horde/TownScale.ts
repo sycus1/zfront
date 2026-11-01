@@ -77,6 +77,10 @@ export const TOWN_HORDE_OPTIONS: Partial<HordeOptions> = {
   outpostRadius: TOWN_OUTPOST_CLAIM_RADIUS,
   crateMinDistance: 10,
   crateMaxDistance: 40,
+  // Buffer districts about 150 m across, 64 to a town (Districts.ts). A
+  // crowd of 40 that lingers 10 seconds overruns one.
+  districtSize: 25,
+  districtOverrunCount: 40,
 };
 
 /**

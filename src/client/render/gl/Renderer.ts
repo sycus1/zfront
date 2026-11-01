@@ -39,6 +39,7 @@ import { BorderStampPass } from "./passes/BorderStampPass";
 import { CoordinateGridPass } from "./passes/CoordinateGridPass";
 import { CrosshairPass } from "./passes/CrosshairPass";
 import { DefenseCoveragePass } from "./passes/DefenseCoveragePass";
+import { DistrictPass } from "./passes/DistrictPass";
 import { FalloutBloomPass } from "./passes/FalloutBloomPass";
 import { FalloutLightPass } from "./passes/FalloutLightPass";
 import { FxPass } from "./passes/fx-pass";
@@ -129,6 +130,7 @@ export class GPURenderer {
   private defenseCoveragePass: DefenseCoveragePass;
   private bloomPass: FalloutBloomPass;
   private hordePass: HordePass;
+  private districtPass: DistrictPass;
   private pointLightPass: PointLightPass;
   private falloutLightPass: FalloutLightPass;
   private lightmapPass: LightmapPass;
@@ -518,6 +520,7 @@ export class GPURenderer {
 
     // --- zfront horde overlay ---
     this.hordePass = new HordePass(gl, mapW, mapH);
+    this.districtPass = new DistrictPass(gl, mapW, mapH);
 
     // --- Point lights ---
     this.pointLightPass = new PointLightPass(
@@ -731,6 +734,7 @@ export class GPURenderer {
 
   updateHorde(frame: HordeFrame): void {
     this.hordePass.update(frame);
+    this.districtPass.update(frame);
     this.barPass.setStructureHealth(frame.structureHp);
     this.structurePass.setHq(frame.hqTile);
     this.settleCircle =
@@ -1428,6 +1432,7 @@ export class GPURenderer {
     if (pe.railroad) this.railroadPass.draw(cam, zoom);
     if (pe.unit) this.unitPass.drawGround(cam);
     if (pe.falloutBloom) this.bloomPass.draw(cam, this.frameTick);
+    this.districtPass.draw(cam, performance.now() / 1000);
     this.hordePass.draw(cam, performance.now() / 1000, zoom);
     this.samRadiusPass.draw(cam);
     this.settleCirclePass.draw(cam);
@@ -1559,6 +1564,7 @@ export class GPURenderer {
     this.defenseCoveragePass.dispose();
     this.bloomPass.dispose();
     this.hordePass.dispose();
+    this.districtPass.dispose();
     this.pointLightPass.dispose();
     this.falloutLightPass.dispose();
     this.lightmapPass.dispose();

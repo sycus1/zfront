@@ -62,6 +62,8 @@ function frame(overrides: Partial<HordeFrame> = {}): HordeFrame {
     crates: new Int32Array(),
     crateLootTicks: 50,
     crateLife: 300,
+    districtSize: 0,
+    districts: new Uint8Array(),
     encodeMs: 0,
     sentAt: 0,
     ...overrides,
