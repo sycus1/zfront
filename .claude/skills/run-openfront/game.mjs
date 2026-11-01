@@ -14,8 +14,9 @@ import { gotoHome, launch, openSoloModal } from "./driver.mjs";
 
 // ---------- game lifecycle ----------
 
-// From an open single-player modal: tweak options and click Start, then wait
-// until the game is fully loaded (renderer mounted, sim ticking).
+// From the open solo flow: tweak options, go to the GAME RULES step and click
+// START GAME, then wait until the game is fully loaded (renderer mounted, sim
+// ticking). Solo games have no AI players (bots is forced to 0 at start).
 // opts: { bots, instantBuild, infiniteGold, infiniteTroops, map, difficulty }
 export async function startSoloGame(page, opts = {}) {
   if (Object.keys(opts).length > 0) {
@@ -31,8 +32,13 @@ export async function startSoloGame(page, opts = {}) {
     }, opts);
     await page.waitForTimeout(300); // let Lit re-render
   }
+  await page.evaluate(() => {
+    const modal = document.querySelector("single-player-modal");
+    modal.step = "setup";
+  });
+  await page.waitForTimeout(300);
   await page
-    .locator('o-button[translationKey="game_settings.start"] button:visible')
+    .locator("single-player-modal .zf-strip-action button:visible")
     .first()
     .click();
   await waitForGameReady(page);

@@ -40,7 +40,7 @@ export class PlayPage extends LitElement {
         >
           <h1 class="m-0">
             <img
-              src=${assetUrl("images/logo/zfront-wordmark.svg")}
+              src=${assetUrl("brand/zfront-wordmark.svg")}
               alt=${translateText("main.logo_alt")}
               class="block h-(--zf-logo-h) w-auto max-w-full"
               draggable="false"

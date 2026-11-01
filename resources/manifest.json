@@ -3,19 +3,19 @@
     {
       "purpose": "any",
       "sizes": "192x192",
-      "src": "/icons/zfront-192.png",
+      "src": "/brand/png/zfront-app-icon-192.png",
       "type": "image/png"
     },
     {
       "purpose": "any",
       "sizes": "512x512",
-      "src": "/icons/zfront-512.png",
+      "src": "/brand/png/zfront-app-icon-512.png",
       "type": "image/png"
     },
     {
       "purpose": "maskable",
       "sizes": "512x512",
-      "src": "/icons/zfront-512.png",
+      "src": "/brand/png/zfront-app-icon-512.png",
       "type": "image/png"
     }
   ],

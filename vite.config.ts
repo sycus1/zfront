@@ -230,7 +230,7 @@ export default defineConfig(({ mode }) => {
     instanceId: JSON.stringify(env.INSTANCE_ID ?? "DEV_ID"),
     manifestHref: buildAssetUrl("manifest.json", assetManifest, cdnBase),
     faviconHref: buildAssetUrl(
-      "images/logo/zfront-favicon.svg",
+      "brand/zfront-favicon.svg",
       assetManifest,
       cdnBase,
     ),

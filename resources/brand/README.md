@@ -1,6 +1,6 @@
 # zfront logo kit
 
-Source of truth: the Logos asset group in the zfront Night Shift design system. These are the same files, plus `zfront-favicon.ico` (16/32/48 px) and `png/` app icons (180/192/512 px) rendered from `zfront-favicon.svg` and `zfront-app-icon.svg`. Nothing in the client references them yet.
+Source of truth: the Logos asset group in the zfront Night Shift design system. These are the same files, plus `zfront-favicon.ico` (16/32/48 px) and `png/` app icons (180/192/512 px) rendered from `zfront-favicon.svg` and `zfront-app-icon.svg`. The client loads them from here (favicon, wordmark, loading screen, PWA manifest); `resources/public/favicon.ico` and `apple-touch-icon.png` are root-URL copies of the ico and the 180px icon.
 
 The zfront logo: **Hazard Z**. The Z's diagonal is a strip of hazard tape: solid top and bottom bars, a diagonal band cut by 45° gaps. In the wordmark the N's diagonal carries the same tape, so the two letters with diagonals are the two taped letters. One colour only: `signal-400` on `ink-900`, or `ink-900` on `signal-400`.
 

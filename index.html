@@ -154,14 +154,16 @@
     >
       <!-- Main container with responsive padding -->
       <play-page class="contents"></play-page>
-      <!-- The inline pages. Shown only while one is open (body.page-open):
-           the main menu takes the full width on its own. -->
-      <main-layout class="hidden in-[.page-open]:contents">
-        <single-player-modal
-          id="page-single-player"
-          inline
-          class="hidden w-full h-full page-content relative z-50"
-        ></single-player-modal>
+      <!-- Night Shift pages: full width, with their own backdrop. -->
+      <single-player-modal
+        id="page-single-player"
+        inline
+        class="hidden flex-1 min-h-0 w-full page-content relative z-50 [&.block]:flex [&.block]:flex-col"
+      ></single-player-modal>
+      <!-- The inline pages not yet restyled. Shown only while one of them is
+           open: the main menu and the Night Shift pages take the full width
+           on their own. -->
+      <main-layout class="hidden has-[.page-content:not(.hidden)]:contents">
         <user-setting
           id="page-settings"
           inline

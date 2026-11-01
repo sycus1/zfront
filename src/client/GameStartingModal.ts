@@ -33,7 +33,7 @@ export class GameStartingModal extends LitElement {
         }"
       >
         <img
-          src=${assetUrl("images/logo/zfront-lockup-stacked.svg")}
+          src=${assetUrl("brand/zfront-lockup-stacked.svg")}
           alt=${translateText("main.logo_alt")}
           class="block h-[120px] w-auto"
           draggable="false"
