@@ -1,6 +1,14 @@
-import { LitElement, html, type PropertyValues } from "lit";
+import { html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { ifDefined } from "lit/directives/if-defined.js";
 
+let nextSliderId = 0;
+
+/**
+ * A level (Night Shift Slider): label left, value right in the data face,
+ * the range below in signal yellow. The description shows under the range,
+ * or with `compact` only as a tooltip and for screen readers.
+ */
 @customElement("setting-slider")
 export class SettingSlider extends LitElement {
   @property() label = "Setting";
@@ -14,6 +22,10 @@ export class SettingSlider extends LitElement {
   @property({ type: Boolean }) easter = false;
   @property() unit = "%";
   @property({ attribute: false }) formatValue?: (value: number) => string;
+  /** Description as a tooltip only, as on the Settings boards. */
+  @property({ type: Boolean, reflect: true }) compact = false;
+
+  private readonly inputId = `zf-slider-${nextSliderId++}`;
 
   createRenderRoot() {
     return this;
@@ -62,51 +74,43 @@ export class SettingSlider extends LitElement {
   }
 
   render() {
-    const rainbowClass = this.easter
-      ? "bg-[linear-gradient(270deg,#990033,#996600,#336600,#008080,#1c3f99,#5e0099,#990033)] bg-[length:1400%_1400%] animate-rainbow-bg text-white hover:bg-[linear-gradient(270deg,#990033,#996600,#336600,#008080,#1c3f99,#5e0099,#990033)]"
-      : "";
-
+    const descId = `${this.inputId}-desc`;
+    const readout = this.formatValue
+      ? this.formatValue(this.value)
+      : `${this.value}${this.unit}`;
     return html`
       <div
-        class="flex flex-col sm:flex-row sm:items-center sm:justify-between w-full p-4 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all gap-3 sm:gap-4 ${rainbowClass}"
+        class="zf-slider"
+        title=${ifDefined(
+          this.compact && this.description ? this.description : undefined,
+        )}
       >
-        <div class="flex flex-col flex-1 min-w-0 sm:mr-4">
-          <label class="text-white font-bold text-base block mb-1"
-            >${this.label}</label
-          >
-          <div class="text-white/50 text-sm leading-snug">
-            ${this.description}
-          </div>
+        <div class="zf-slider-head">
+          <label for=${this.inputId}>${this.label}</label>
+          <span class="zf-slider-value" dir="ltr">${readout}</span>
         </div>
-
-        <div
-          class="flex flex-col items-start sm:items-end gap-2 shrink-0 sm:w-auto sm:w-[200px]"
-        >
-          <div class="flex items-center gap-2 w-full">
-            <span
-              class="text-white font-bold text-sm shrink-0 text-right min-w-[3ch]"
-              >${
-                this.formatValue
-                  ? this.formatValue(this.value)
-                  : `${this.value}${this.unit}`
-              }</span
-            >
-            <input
-              type="range"
-              class="flex-1 w-auto appearance-none h-2 bg-transparent rounded outline-none 
-              [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded [&::-webkit-slider-runnable-track]:bg-[image:linear-gradient(to_right,var(--color-malibu-blue)_0%,var(--color-malibu-blue)_var(--fill),rgba(255,255,255,0.1)_var(--fill),rgba(255,255,255,0.1)_100%)]
-              [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-[18px] [&::-webkit-slider-thumb]:w-[18px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-malibu-blue [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:-mt-[6px] [&::-webkit-slider-thumb]:shadow-[var(--shadow-malibu-blue-ring-sm)] [&::-webkit-slider-thumb]:transition-all active:[&::-webkit-slider-thumb]:scale-110 active:[&::-webkit-slider-thumb]:shadow-[var(--shadow-malibu-blue-ring-lg)]
-              [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded [&::-moz-range-track]:bg-white/10
-              [&::-moz-range-progress]:h-2 [&::-moz-range-progress]:rounded [&::-moz-range-progress]:bg-malibu-blue
-              [&::-moz-range-thumb]:h-[18px] [&::-moz-range-thumb]:w-[18px] [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-malibu-blue [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-[var(--shadow-malibu-blue-ring-sm)] [&::-moz-range-thumb]:transition-all active:[&::-moz-range-thumb]:scale-110 active:[&::-moz-range-thumb]:shadow-[var(--shadow-malibu-blue-ring-lg)]"
-              min=${this.min}
-              max=${this.max}
-              step=${this.step}
-              .value=${String(this.value)}
-              @input=${this.handleInput}
-            />
-          </div>
-        </div>
+        <input
+          type="range"
+          id=${this.inputId}
+          class="zf-range"
+          min=${this.min}
+          max=${this.max}
+          step=${this.step}
+          aria-describedby=${ifDefined(this.description ? descId : undefined)}
+          .value=${String(this.value)}
+          @input=${this.handleInput}
+        />
+        ${
+          this.description
+            ? html`<p
+                id=${descId}
+                class="zf-setting-desc ${this.compact ? "zf-sr-only" : ""}"
+                style="margin: 0"
+              >
+                ${this.description}
+              </p>`
+            : nothing
+        }
       </div>
     `;
   }

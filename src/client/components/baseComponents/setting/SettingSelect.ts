@@ -1,11 +1,15 @@
-import { LitElement, html } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { zfIcon } from "../../nightshift/Icon";
 
 type SelectOption = {
   value: number | string;
   label: string;
 };
 
+let nextSelectId = 0;
+
+/** A setting picked from a list (Night Shift row with a framed select). */
 @customElement("setting-select")
 export class SettingSelect extends LitElement {
   @property() label = "Setting";
@@ -17,6 +21,8 @@ export class SettingSelect extends LitElement {
   // shell reporting back, so a second change cannot be queued against a value
   // that is still settling.
   @property({ type: Boolean }) disabled = false;
+
+  private readonly selectId = `zf-select-${nextSelectId++}`;
 
   createRenderRoot() {
     return this;
@@ -41,23 +47,21 @@ export class SettingSelect extends LitElement {
 
   render() {
     return html`
-      <div
-        class="flex flex-col w-full p-4 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all gap-3"
-      >
-        <div class="flex flex-col min-w-0">
-          <label
-            class="text-white font-bold text-base block mb-1"
-            for="setting-select-input"
+      <div class="zf-setting">
+        <div class="zf-setting-text">
+          <label class="zf-setting-label" for=${this.selectId}
             >${this.label}</label
           >
-          <div class="text-white/50 text-sm leading-snug">
-            ${this.description}
-          </div>
+          ${
+            this.description
+              ? html`<span class="zf-setting-desc">${this.description}</span>`
+              : nothing
+          }
         </div>
-        <div class="relative w-full">
+        <div class="zf-select-wrap">
           <select
-            id="setting-select-input"
-            class="w-full appearance-none py-2 pl-3 pr-9 border border-white/20 rounded-lg bg-black/40 text-white font-mono text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            id=${this.selectId}
+            class="zf-select"
             .value=${String(this.value)}
             ?disabled=${this.disabled}
             @change=${this.handleChange}
@@ -72,23 +76,7 @@ export class SettingSelect extends LitElement {
                 </option>`,
             )}
           </select>
-          <span
-            class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/60"
-            aria-hidden="true"
-          >
-            <svg
-              class="h-4 w-4"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                fill-rule="evenodd"
-                d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.06 1.06l-4.24 4.24a.75.75 0 0 1-1.06 0L5.21 8.29a.75.75 0 0 1 .02-1.08z"
-                clip-rule="evenodd"
-              />
-            </svg>
-          </span>
+          ${zfIcon("chevron-down", 18, 3)}
         </div>
       </div>
     `;

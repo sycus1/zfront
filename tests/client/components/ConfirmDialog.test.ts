@@ -14,8 +14,9 @@ describe("<confirm-dialog> message", () => {
     await dialog.updateComplete;
 
     // The dialog renders into a portal on <body>, not inside itself.
-    const p = document.body.querySelector("p.whitespace-pre-line")!;
+    const p = document.body.querySelector("p.zf-dialog-message")!;
     expect(p.textContent).toBe("First paragraph.\n\nSecond paragraph.");
-    expect(p.classList.contains("whitespace-pre-line")).toBe(true);
+    // .zf-dialog-message sets white-space: pre-line.
+    expect(p.classList.contains("zf-dialog-message")).toBe(true);
   });
 });

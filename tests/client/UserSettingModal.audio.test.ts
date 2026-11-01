@@ -445,7 +445,10 @@ describe("user-setting audio tab", () => {
         path.join(__dirname, "..", "..", "resources", "lang", "en.json"),
         "utf8",
       ),
-    ) as { user_setting: Record<string, string> };
+    ) as {
+      user_setting: Record<string, string>;
+      zf_settings: Record<string, string>;
+    };
 
     const required = [
       ...CATEGORIES.flatMap((c) => [`audio_${c}`, `audio_${c}_desc`]),
@@ -456,9 +459,10 @@ describe("user-setting audio tab", () => {
       "audio_test",
       "audio_test_muted",
       "audio_test_master_muted",
-      "audio_reset",
     ];
     expect(required.filter((k) => !(k in en.user_setting))).toEqual([]);
+    // The page's "Reset Audio to Defaults" button.
+    expect("reset_tab" in en.zf_settings).toBe(true);
 
     expect("background_music_volume" in en.user_setting).toBe(false);
     expect("sound_effects_volume" in en.user_setting).toBe(false);

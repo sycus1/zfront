@@ -79,6 +79,28 @@ function flip(el: TestModal, id: string) {
   control(el, id).dispatchEvent(new Event("change", { bubbles: true }));
 }
 
+/** Click a preset in the selector's option group. */
+function pickPreset(el: TestModal, value: string) {
+  el.querySelector<HTMLButtonElement>(
+    `graphics-preset-selector [data-value="${value}"]`,
+  )!.click();
+}
+
+/** "Reset Graphics to Defaults", then confirm in the dialog it opens. */
+async function resetGraphicsTab(el: TestModal) {
+  el.querySelector<HTMLButtonElement>("#graphics-reset")!.click();
+  await el.updateComplete;
+  const buttons = document.body.querySelectorAll<HTMLButtonElement>(
+    ".zf-dialog-actions button",
+  );
+  // Confirm is the last button, after Cancel.
+  const confirm = buttons[buttons.length - 1];
+  confirm.click();
+  // The reset runs after the confirm prompt's promise settles.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await el.updateComplete;
+}
+
 function overrides() {
   return new UserSettings().graphicsOverrides();
 }
@@ -257,12 +279,12 @@ describe("Graphics tab: advanced options folded in from the in-game modal", () =
     expect(overrides().terrain?.oceanColor).toBeUndefined();
   });
 
-  it("resets every override from the Advanced fold", async () => {
+  it("resets every override from the page's Reset Graphics button", async () => {
     const el = await mountGraphics();
     slide(el, "territory-alpha-slider", 0.5);
     expect(overrides()).not.toEqual({});
 
-    el.querySelector<HTMLButtonElement>("#graphics-reset")!.click();
+    await resetGraphicsTab(el);
     expect(overrides()).toEqual({});
   });
 });
@@ -376,7 +398,7 @@ describe("Graphics tab: live apply from the in-game instance", () => {
     expect(seen).toHaveLength(3);
   });
 
-  it("follows a preset applied from the dropdown, and re-pushes the layers", async () => {
+  it("follows a preset applied from the preset picker, and re-pushes the layers", async () => {
     // The preset selector writes the graphics key itself. Nothing tells this
     // component, so it listens: without that, the sliders would keep showing
     // the old values and the renderer would never learn the preset's layer
@@ -392,11 +414,7 @@ describe("Graphics tab: live apply from the in-game instance", () => {
     visibility.length = 0;
     alphas.length = 0;
 
-    const dropdown = el.querySelector<HTMLSelectElement>(
-      "graphics-preset-selector select",
-    )!;
-    dropdown.value = "builtin:graphics_setting.preset_night";
-    dropdown.dispatchEvent(new Event("change", { bubbles: true }));
+    pickPreset(el, "builtin:graphics_setting.preset_night");
     await el.updateComplete;
     await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -477,7 +495,7 @@ describe("Graphics tab: live apply from the in-game instance", () => {
     visibility.length = 0;
     alphas.length = 0;
 
-    el.querySelector<HTMLButtonElement>("#graphics-reset")!.click();
+    await resetGraphicsTab(el);
 
     // Back to visible, and back to the manifest default alpha.
     expect(visibility).toEqual([
@@ -535,7 +553,7 @@ describe("Graphics tab: layer state reaches the renderer with Advanced collapsed
     ]);
   });
 
-  it("pushes a preset's layer state when picked from the dropdown", async () => {
+  it("pushes a preset's layer state when picked from the preset picker", async () => {
     const w = wire();
     const el = await mountGraphics({ ...w, advanced: false });
     // Hide a layer first, so the preset has something to undo.
@@ -545,11 +563,7 @@ describe("Graphics tab: layer state reaches the renderer with Advanced collapsed
     w.visibility.length = 0;
     w.alphas.length = 0;
 
-    const dropdown = el.querySelector<HTMLSelectElement>(
-      "graphics-preset-selector select",
-    )!;
-    dropdown.value = "builtin:graphics_setting.preset_night";
-    dropdown.dispatchEvent(new Event("change", { bubbles: true }));
+    pickPreset(el, "builtin:graphics_setting.preset_night");
 
     // Night carries no layer overrides, so every layer returns to visible at
     // its manifest opacity.
@@ -595,11 +609,7 @@ describe("Graphics tab: layer state reaches the renderer with Advanced collapsed
     flip(el, "map-layers-toggle");
     w.visibility.length = 0;
 
-    const dropdown = el.querySelector<HTMLSelectElement>(
-      "graphics-preset-selector select",
-    )!;
-    dropdown.value = "builtin:graphics_setting.preset_night";
-    dropdown.dispatchEvent(new Event("change", { bubbles: true }));
+    pickPreset(el, "builtin:graphics_setting.preset_night");
 
     expect(w.visibility).toEqual([
       ["forest", false],

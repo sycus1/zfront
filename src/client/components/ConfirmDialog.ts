@@ -1,9 +1,15 @@
-import { html, LitElement, render as litRender } from "lit";
+import { html, LitElement, render as litRender, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { translateText } from "../Utils";
+import { zfIcon } from "./nightshift/Icon";
+
+let nextDialogId = 0;
 
 /**
- * A reusable inline confirmation / acknowledgement dialog.
+ * A reusable inline confirmation / acknowledgement dialog (Night Shift): a
+ * clipped, bordered card over a dark scrim. `danger` asks before something
+ * destructive (red border and a red confirm); `warning` before anything
+ * else (yellow).
  *
  * Usage:
  * ```html
@@ -70,40 +76,70 @@ export class ConfirmDialog extends LitElement {
     return html``;
   }
 
+  private dialogId = `zf-dialog-${nextDialogId++}`;
+  private focused = false;
+
+  protected updated() {
+    // Move focus into the dialog once, so keyboard players land on it.
+    if (this.focused || !this.portal) return;
+    const target =
+      this.portal.querySelector<HTMLElement>("textarea") ??
+      this.portal.querySelector<HTMLElement>(".zf-dialog-actions button");
+    if (target) {
+      this.focused = true;
+      target.focus();
+    }
+  }
+
   private renderOverlay() {
     const isDanger = this.variant === "danger";
-    const borderColor = isDanger ? "border-red-500/50" : "border-amber-500/50";
-    const cardBg = "bg-surface";
-    const textColor = isDanger ? "text-red-300" : "text-amber-300";
-    const btnClass = isDanger
-      ? "bg-red-600 text-white hover:bg-red-700"
-      : "bg-amber-600 text-white hover:bg-amber-700";
+    const headingId = `${this.dialogId}-heading`;
+    const messageId = `${this.dialogId}-message`;
+    const button = (label: string, variant: string, onClick: () => void) =>
+      html`<div class="zf-ring">
+        <button
+          type="button"
+          class="zf-btn zf-btn-md zf-btn-${variant} zf-frame zf-sweep"
+          ?disabled=${this.disabled}
+          @click=${onClick}
+        >
+          ${label}
+        </button>
+      </div>`;
 
     return html`
       <div
-        class="fixed inset-0 z-[10020] flex items-center justify-center bg-black/80"
+        class="zf-dialog-scrim"
         @click=${(e: Event) => {
           if (e.target === e.currentTarget) this.handleCancel();
         }}
       >
         <div
-          class="relative mx-4 w-full ${
-            this.wide ? "max-w-md" : "max-w-sm"
-          } p-6 rounded-2xl border ${borderColor} ${cardBg} shadow-2xl"
+          class="zf-dialog zf-frame ${this.wide ? "zf-dialog-wide" : ""} ${
+            isDanger ? "zf-dialog-danger" : ""
+          }"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby=${this.heading ? headingId : messageId}
+          aria-describedby=${this.heading ? messageId : nothing}
         >
           ${
             this.showClose
-              ? html`<button
-                  @click=${() => this.handleCancel()}
-                  class="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-lg text-xl leading-none text-white/50 hover:bg-white/10 hover:text-white transition-all"
-                >
-                  ×
-                </button>`
+              ? html`<div class="zf-dialog-close zf-ring">
+                  <button
+                    type="button"
+                    class="zf-icon-btn zf-frame zf-sweep"
+                    aria-label=${translateText("common.close")}
+                    @click=${() => this.handleCancel()}
+                  >
+                    ${zfIcon("close", 18, 3)}
+                  </button>
+                </div>`
               : ""
           }
           ${
             this.heading
-              ? html`<h2 class="text-lg font-bold text-white mb-2 pr-8">
+              ? html`<h2 id=${headingId} class="zf-dialog-title">
                   ${this.heading}
                 </h2>`
               : ""
@@ -111,44 +147,42 @@ export class ConfirmDialog extends LitElement {
           <!-- A property binding, so the template's own line breaks around
                it never reach pre-line. -->
           <p
-            class="text-sm font-medium ${textColor} mb-5 whitespace-pre-line"
+            id=${messageId}
+            class="zf-dialog-message"
             .textContent=${this.message}
           ></p>
           ${
             this.textareaPlaceholder
               ? html`<textarea
+                  class="zf-dialog-text"
                   .value=${this.text}
                   @input=${(e: Event) =>
                     (this.text = (e.target as HTMLTextAreaElement).value)}
                   maxlength="200"
                   rows="2"
+                  aria-label=${this.textareaPlaceholder}
                   placeholder="${this.textareaPlaceholder}"
-                  class="w-full px-3 py-2 mb-4 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-amber-500/50 text-sm resize-none"
                 ></textarea>`
               : ""
           }
           ${
             this.buttons === "none"
               ? ""
-              : html`<div class="flex gap-3">
+              : html`<div class="zf-dialog-actions">
                   ${
                     this.buttons === "confirmCancel"
-                      ? html`<button
-                          @click=${() => this.handleCancel()}
-                          ?disabled=${this.disabled}
-                          class="flex-1 px-4 py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl bg-white/5 text-white/60 border border-white/10 hover:bg-white/10 hover:text-white/80 transition-all disabled:opacity-50 disabled:pointer-events-none"
-                        >
-                          ${this.cancelText || translateText("common.cancel")}
-                        </button>`
+                      ? button(
+                          this.cancelText || translateText("common.cancel"),
+                          "outline",
+                          () => this.handleCancel(),
+                        )
                       : ""
                   }
-                  <button
-                    @click=${() => this.handleConfirm()}
-                    ?disabled=${this.disabled}
-                    class="flex-1 px-4 py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl ${btnClass} transition-all disabled:opacity-50 disabled:pointer-events-none border-0"
-                  >
-                    ${this.confirmText || translateText("common.confirm")}
-                  </button>
+                  ${button(
+                    this.confirmText || translateText("common.confirm"),
+                    isDanger ? "danger-solid" : "signal",
+                    () => this.handleConfirm(),
+                  )}
                 </div>`
           }
         </div>

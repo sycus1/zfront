@@ -1,11 +1,20 @@
-import { LitElement, PropertyValues, html } from "lit";
+import { html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { documentStylesSheet } from "./SharedStyles";
 
-export type OModalTab = { key: string; label: string };
-
+/**
+ * The frame of a menu page opened over a running game (Night Shift): a dark
+ * scrim and a yellow-bordered, clipped panel that scrolls inside. Full screen
+ * below 1024px. The page (BaseModal) draws its own header, tabs and actions
+ * inside; this only owns open/close, the click-outside and the body scroll
+ * lock.
+ *
+ * A page shown in the menu's content area (`inline`) never renders one of
+ * these: BaseModal draws it as a full-width .zf-page instead.
+ */
 @customElement("o-modal")
 export class OModal extends LitElement {
+  // The document's stylesheet, so the frame's .zf-* classes apply in here.
   static styles = [documentStylesSheet()];
 
   @state() public isModalOpen = false;
@@ -14,41 +23,16 @@ export class OModal extends LitElement {
 
   static openCount = 0;
 
-  @property({ type: Boolean })
-  public inline = false;
-
-  @property({ type: Boolean })
-  public alwaysMaximized = false;
-
-  @property({ type: Boolean })
-  public hideCloseButton = false;
-
+  /** Accessible name of the dialog. */
   @property({ type: String })
-  public title = "";
-
-  @property({ type: Boolean })
-  public hideHeader = false;
-
-  @property({ type: String })
-  public maxWidth = "";
-
-  @property({ type: Array })
-  public tabs: OModalTab[] = [];
-
-  @property({ type: String })
-  public activeTab = "";
-
-  @property({ attribute: false })
-  public onTabChange?: (key: string) => void;
+  public label = "";
 
   public onClose?: () => void;
 
   public open() {
     if (!this.isModalOpen) {
-      if (!this.inline) {
-        OModal.openCount = OModal.openCount + 1;
-        if (OModal.openCount === 1) document.body.style.overflow = "hidden";
-      }
+      OModal.openCount = OModal.openCount + 1;
+      if (OModal.openCount === 1) document.body.style.overflow = "hidden";
       this.isModalOpen = true;
     }
   }
@@ -57,31 +41,8 @@ export class OModal extends LitElement {
     if (this.isModalOpen) {
       this.isModalOpen = false;
       this.onClose?.();
-      if (!this.inline) {
-        OModal.openCount = Math.max(0, OModal.openCount - 1);
-        if (OModal.openCount === 0) document.body.style.overflow = "";
-      }
-    }
-  }
-
-  protected updated(changed: PropertyValues<this>): void {
-    super.updated(changed);
-    // A tab opened directly (a link, the last tab used) may sit past the edge
-    // of a scrolled tab row: scroll the row, and only the row, to it.
-    // scrollIntoView would also scroll the modal's content and the page.
-    if (!changed.has("activeTab") || !this.activeTab) return;
-    const row = this.renderRoot.querySelector<HTMLElement>('[role="tablist"]');
-    if (row === null || row.scrollWidth <= row.clientWidth) return;
-    const tab = [...row.querySelectorAll<HTMLElement>('[role="tab"]')].find(
-      (t) => t.dataset.key === this.activeTab,
-    );
-    if (tab === undefined) return;
-    const rowBox = row.getBoundingClientRect();
-    const tabBox = tab.getBoundingClientRect();
-    if (tabBox.left < rowBox.left) {
-      row.scrollLeft += tabBox.left - rowBox.left;
-    } else if (tabBox.right > rowBox.right) {
-      row.scrollLeft += tabBox.right - rowBox.right;
+      OModal.openCount = Math.max(0, OModal.openCount - 1);
+      if (OModal.openCount === 0) document.body.style.overflow = "";
     }
   }
 
@@ -97,118 +58,31 @@ export class OModal extends LitElement {
 
   disconnectedCallback() {
     // Ensure global counter is decremented if this modal is removed while open.
-    if (this.isModalOpen && !this.inline) {
+    if (this.isModalOpen) {
       OModal.openCount = Math.max(0, OModal.openCount - 1);
       if (OModal.openCount === 0) document.body.style.overflow = "";
     }
     super.disconnectedCallback();
   }
 
-  private handleTabClick(key: string) {
-    this.onTabChange?.(key);
-  }
-
-  private renderTabs() {
-    // One row that scrolls sideways when the tabs don't fit, instead of
-    // wrapping onto a second row. The auto margins on the first and last tab
-    // centre the row when it fits, and unlike justify-center they never push
-    // a tab off the left edge out of reach. Below sm the tabs are compact
-    // (smaller, less tracked, less padded labels, still 40px tall) so five
-    // fit across a 360px phone; the scroll is left for narrower screens and
-    // longer rows.
+  render() {
+    if (!this.isModalOpen) return html``;
     return html`
       <div
-        role="tablist"
-        class="flex flex-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>button:first-of-type]:ms-auto [&>button:last-of-type]:me-auto border-b border-white/10 px-2 sm:px-4 lg:px-6 sm:gap-1 shrink-0"
-      >
-        ${this.tabs.map((tab) => {
-          const active = this.activeTab === tab.key;
-          return html`
-            <button
-              type="button"
-              role="tab"
-              data-key=${tab.key}
-              aria-selected=${active}
-              class="shrink-0 whitespace-nowrap min-h-10 px-2 py-3 text-[11px] leading-4 tracking-wide sm:px-4 sm:text-sm sm:leading-5 sm:tracking-wider font-bold uppercase transition-all relative cursor-pointer ${
-                active ? "text-aquarius" : "text-white/40 hover:text-white/70"
-              }"
-              @click=${() => this.handleTabClick(tab.key)}
-            >
-              ${tab.label}
-              ${
-                active
-                  ? html`<div
-                      class="absolute bottom-0 left-0 right-0 h-0.5 bg-malibu-blue"
-                    ></div>`
-                  : ""
-              }
-            </button>
-          `;
-        })}
-      </div>
-    `;
-  }
-
-  render() {
-    const shouldRender = this.isModalOpen || this.inline;
-    if (!shouldRender) {
-      return html``;
-    }
-
-    const backdropClass = this.inline
-      ? "relative z-10 w-full h-full flex items-stretch bg-transparent"
-      : "fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center overflow-hidden";
-
-    const wrapperClass = this.inline
-      ? "relative flex flex-col w-full h-full m-0 max-w-full max-h-none shadow-none"
-      : `relative flex flex-col w-full h-full lg:w-[90%] lg:h-auto lg:min-w-[400px] lg:max-w-[900px] lg:m-8 lg:rounded-lg lg:max-h-[calc(100vh-4rem)] ${
-          this.alwaysMaximized ? "h-auto" : ""
-        }`;
-    const wrapperStyle =
-      !this.inline && this.maxWidth ? `max-width: ${this.maxWidth};` : "";
-
-    const hasTabs = this.tabs.length > 0;
-    const sectionClass =
-      "relative flex-1 min-h-0 flex flex-col text-white bg-black/70 backdrop-blur-xl lg:rounded-2xl lg:border border-white/10 overflow-hidden";
-
-    return html`
-      <aside
-        class="${backdropClass}"
-        @click=${this.inline ? null : () => this.close()}
+        class="zf-overlay"
+        @click=${(e: Event) => {
+          if (e.target === e.currentTarget) this.close();
+        }}
       >
         <div
-          @click=${(e: Event) => e.stopPropagation()}
-          class="${wrapperClass}"
-          style="${wrapperStyle}"
+          class="zf-overlay-panel zf-frame"
+          role="dialog"
+          aria-modal="true"
+          aria-label=${this.label}
         >
-          ${
-            this.inline || this.hideCloseButton
-              ? html``
-              : html`<div
-                  class="absolute top-5 right-5 z-10 text-white cursor-pointer"
-                  @click=${() => this.close()}
-                >
-                  ✕
-                </div>`
-          }
-          ${
-            !this.hideHeader && this.title
-              ? html`<div
-                  class="px-[1.4rem] py-[1rem] text-2xl font-bold text-white"
-                >
-                  ${this.title}
-                </div>`
-              : html``
-          }
-          <section class="${sectionClass}">
-            <slot name="header"></slot>
-            ${hasTabs ? this.renderTabs() : html``}
-            <div data-modal-scroll class="flex-1 min-h-0 overflow-y-auto">
-              <slot></slot>
-            </div>
-          </section>
+          <div class="zf-overlay-scroll" data-modal-scroll><slot></slot></div>
         </div>
-      </aside>
+      </div>
     `;
   }
 }

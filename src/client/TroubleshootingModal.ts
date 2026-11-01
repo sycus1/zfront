@@ -1,14 +1,17 @@
-import { assetUrl } from "@openfront/shared/AssetUrls";
 import { html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { BaseModal } from "./components/BaseModal";
-import { modalHeader } from "./components/ui/ModalHeader";
+import {
+  zfAlert,
+  zfButton,
+  zfNote,
+  zfTile,
+} from "./components/nightshift/Primitives";
 import {
   collectGraphicsDiagnostics,
   GraphicsDiagnostics,
 } from "./utilities/Diagnostic";
 import { translateText } from "./Utils";
-const infoIcon = assetUrl("images/InfoIcon.svg");
 
 @customElement("troubleshooting-modal")
 export class TroubleshootingModal extends BaseModal {
@@ -30,135 +33,114 @@ export class TroubleshootingModal extends BaseModal {
     this.initialized = true;
   }
 
-  protected renderHeaderSlot() {
-    return modalHeader({
-      titleContent: html` <div
-        class="w-full flex flex-col sm:flex-row justify-between gap-2"
-      >
-        <span
-          class="text-white text-xl sm:text-2xl md:text-3xl font-bold uppercase tracking-widest break-words hyphens-auto"
-        >
-          <a
-            class="hover:text-blue-200 text-blue-400 cursor-pointer"
-            @click=${this.close}
-            >${translateText("main.help")}</a
-          >
-          / ${translateText("troubleshooting.title")}
-        </span>
-        <o-button
-          variant="primary"
-          size="sm"
-          translationKey="common.copy"
-          @click=${this.copyDiagnostics}
-        ></o-button>
-      </div>`,
-      onBack: () => this.close(),
-      ariaLabel: translateText("common.back"),
+  protected pageTitle(): string {
+    return translateText("troubleshooting.title");
+  }
+
+  /** Opened from Help, so its back button returns there. */
+  protected backLabel(): string {
+    return translateText("main.help");
+  }
+
+  protected renderTitleAside() {
+    return zfButton({
+      id: "troubleshooting-copy",
+      label: translateText("troubleshooting.copy_diagnostics"),
+      icon: "copy",
+      variant: "outline-signal",
+      disabled: this.loading,
+      onClick: () => void this.copyDiagnostics(),
     });
   }
 
   protected renderBody() {
     if (this.loading) return html``;
+    const d = this.diagnostics!;
     return html`
-      <div class="px-1">
-        ${this.section(
-          "",
-          html`${this.infoTip(
-            translateText("troubleshooting.hardware_acceleration_tip"),
-            true,
-          )}`,
-        )}
+      ${zfAlert({
+        title: translateText("troubleshooting.hardware_acceleration_title"),
+        text: translateText("troubleshooting.hardware_acceleration_tip"),
+      })}
+      <div class="zf-panel-grid">
         ${this.section(
           translateText("troubleshooting.environment"),
-          html`
-            ${this.row(
-              translateText("troubleshooting.browser"),
-              this.diagnostics!.browser.engine,
-            )}
-            ${this.row(
-              translateText("troubleshooting.platform"),
-              this.diagnostics!.browser.platform,
-            )}
-            ${this.row(
-              translateText("troubleshooting.os"),
-              this.diagnostics!.browser.os,
-            )}
-            ${this.row(
+          [
+            [translateText("troubleshooting.browser"), d.browser.engine],
+            [translateText("troubleshooting.platform"), d.browser.platform],
+            [translateText("troubleshooting.os"), d.browser.os],
+            [
               translateText("troubleshooting.device_pixel_ratio"),
-              this.diagnostics!.browser.dpr,
-            )}
-            ${this.infoTip(translateText("troubleshooting.chromium_tip"))}
-          `,
+              d.browser.dpr,
+            ],
+          ],
+          translateText("troubleshooting.chromium_tip"),
         )}
         ${this.section(
           translateText("troubleshooting.rendering"),
-          html`
-            ${this.row(
+          [
+            [
               translateText("troubleshooting.renderer"),
-              this.describeRenderer(this.diagnostics!.rendering),
-            )}
-            ${this.row(
+              this.describeRenderer(d.rendering),
+            ],
+            [
               translateText("troubleshooting.max_texture_size"),
-              this.diagnostics!.rendering.maxTextureSize ??
+              d.rendering.maxTextureSize ??
                 translateText("troubleshooting.unknown"),
-            )}
-            ${this.row(
+            ],
+            [
               translateText("troubleshooting.high_precision_shaders"),
-              this.diagnostics!.rendering.shaderHighp === true
+              d.rendering.shaderHighp === true
                 ? translateText("troubleshooting.yes")
                 : translateText("troubleshooting.no"),
-            )}${this.row(
+            ],
+            [
               translateText("troubleshooting.gpu"),
-              !this.diagnostics!.rendering.gpu ||
-                this.diagnostics!.rendering.gpu.unavailable
+              !d.rendering.gpu || d.rendering.gpu.unavailable
                 ? translateText("troubleshooting.unavailable")
-                : `${this.diagnostics!.rendering.gpu.vendor} — ${this.diagnostics!.rendering.gpu.renderer}`,
-            )}
-            ${this.infoTip(translateText("troubleshooting.gpu_tip"))}
-          `,
+                : `${d.rendering.gpu.vendor} — ${d.rendering.gpu.renderer}`,
+            ],
+          ],
+          translateText("troubleshooting.gpu_tip"),
         )}
         ${this.section(
           translateText("troubleshooting.power"),
-          html`
-            ${
-              this.diagnostics!.power.unavailable
-                ? this.row(
-                    translateText("troubleshooting.battery"),
-                    translateText("troubleshooting.unavailable"),
-                  )
-                : html`
-                    ${this.row(
-                      translateText("troubleshooting.charging"),
-                      this.diagnostics!.power.charging
-                        ? translateText("troubleshooting.yes")
-                        : translateText("troubleshooting.no"),
-                    )}
-                    ${this.row(
-                      translateText("troubleshooting.battery_level"),
-                      this.diagnostics!.power.level,
-                    )}
-                  `
-            }
-            ${this.infoTip(translateText("troubleshooting.power_saving_tip"))}
-          `,
+          d.power.unavailable
+            ? [
+                [
+                  translateText("troubleshooting.battery"),
+                  translateText("troubleshooting.unavailable"),
+                ],
+              ]
+            : [
+                [
+                  translateText("troubleshooting.charging"),
+                  d.power.charging
+                    ? translateText("troubleshooting.yes")
+                    : translateText("troubleshooting.no"),
+                ],
+                [translateText("troubleshooting.battery_level"), d.power.level],
+              ],
+          translateText("troubleshooting.power_saving_tip"),
         )}
       </div>
     `;
   }
 
-  private infoTip(text: string, warning?: boolean): unknown {
-    return html`
-      <div
-        class="mt-2 ${
-          warning ? "bg-orange-500/10" : "bg-white/10"
-        } flex gap-2 text-white py-1 px-3 rounded-sm  border-1 ${
-          warning ? "border-orange-400" : "border-white/40"
-        }"
-      >
-        <img src="${infoIcon}" class="w-4" />
-        ${text}
-      </div>
-    `;
+  /** A tile of label/value rows (values in the data face), then a tip. */
+  private section(title: string, rows: [string, unknown][], tip: string) {
+    return zfTile({
+      title,
+      body: html`<dl class="zf-data-rows">
+          ${rows.map(
+            ([label, value]) =>
+              html`<div class="zf-data-row">
+                <dt>${label}</dt>
+                <dd dir="ltr">${value}</dd>
+              </div>`,
+          )}
+        </dl>
+        ${zfNote(tip)}`,
+    });
   }
 
   protected onOpen(): void {
@@ -166,28 +148,6 @@ export class TroubleshootingModal extends BaseModal {
       this.initialized = true;
       this.loadDiagnostics();
     }
-  }
-
-  private section(title: string, content: unknown) {
-    return html`
-      <div class="px-4 py-3">
-        <h4
-          class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400"
-        >
-          ${title}
-        </h4>
-        <div class="space-y-1">${content}</div>
-      </div>
-    `;
-  }
-
-  private row(label: string, value: unknown) {
-    return html`
-      <div class="flex justify-between gap-4 text-sm">
-        <span class="text-slate-400">${label}</span>
-        <span class="text-right text-white max-w-100">${value}</span>
-      </div>
-    `;
   }
 
   private async copyDiagnostics() {

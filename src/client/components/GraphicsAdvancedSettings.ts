@@ -907,19 +907,12 @@ export class GraphicsAdvancedSettings extends LitElement {
 
   // ---- Reset ----
 
-  private onResetClick() {
-    this.writeOverrides({});
-    this.requestUpdate();
-  }
-
   // ---- Rendering ----
 
   private static section(labelKey: string) {
-    return html`<div
-      class="text-white/60 text-xs font-semibold uppercase tracking-wider px-1 pt-3"
-    >
+    return html`<h3 class="zf-tile-title zf-advanced-heading">
       ${translateText(labelKey)}
-    </div>`;
+    </h3>`;
   }
 
   /**
@@ -1417,19 +1410,6 @@ export class GraphicsAdvancedSettings extends LitElement {
       ></setting-slider>
 
       ${this.renderCosmetics()}
-
-      <button
-        id="graphics-reset"
-        class="flex flex-col items-start w-full p-4 mt-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all text-left"
-        @click=${this.onResetClick}
-      >
-        <div class="text-white font-bold text-base block mb-1">
-          ${translateText("graphics_setting.reset_label")}
-        </div>
-        <div class="text-white/50 text-sm leading-snug">
-          ${translateText("graphics_setting.reset_desc")}
-        </div>
-      </button>
     `;
   }
 }

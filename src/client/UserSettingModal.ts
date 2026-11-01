@@ -21,7 +21,12 @@ import "./components/GraphicsAdvancedSettings";
 import type { GraphicsAdvancedSettings } from "./components/GraphicsAdvancedSettings";
 import "./components/GraphicsPresetSelector";
 import "./components/GraphicsPresetTools";
-import { modalHeader } from "./components/ui/ModalHeader";
+import {
+  zfButton,
+  zfNote,
+  zfPrimaryButton,
+  zfTile,
+} from "./components/nightshift/Primitives";
 import { KeyboardLayoutController } from "./KeyboardLayout";
 import { pushMapLayerState } from "./MapLayerSettings";
 import { Platform } from "./Platform";
@@ -62,6 +67,305 @@ const PREVIEWABLE: readonly CueCategory[] = ["effects", "alerts", "interface"];
  * the longest preview cue; it only ever fires when a preview cannot settle.
  */
 const PREVIEW_CEILING_MS = 10_000;
+
+interface KeybindRow {
+  action: string;
+  /** Translation keys. */
+  label: string;
+  desc: string;
+  descArgs?: (ctx: {
+    increment: number;
+    resetGfxKey: string;
+  }) => Record<string, string | number>;
+  /** A bare modifier (Shift, Ctrl…) is a valid key for this action. */
+  allowModifiers?: boolean;
+}
+
+const row = (
+  action: string,
+  label: string,
+  desc: string,
+  extra: Partial<KeybindRow> = {},
+): KeybindRow => ({ action, label, desc, ...extra });
+
+/** The Keybinds tab: one Tile of KeyBindRows per group. */
+const KEYBIND_GROUPS: readonly { title: string; rows: KeybindRow[] }[] = [
+  {
+    title: "user_setting.build_controls",
+    rows: [
+      row(
+        "buildCity",
+        "user_setting.build_city",
+        "user_setting.build_city_desc",
+      ),
+      row(
+        "buildFactory",
+        "user_setting.build_factory",
+        "user_setting.build_factory_desc",
+      ),
+      row(
+        "buildPort",
+        "user_setting.build_port",
+        "user_setting.build_port_desc",
+      ),
+      row(
+        "buildDefensePost",
+        "user_setting.build_defense_post",
+        "user_setting.build_defense_post_desc",
+      ),
+      row(
+        "buildWall",
+        "user_setting.build_wall",
+        "user_setting.build_wall_desc",
+      ),
+      row(
+        "buildOutpost",
+        "user_setting.build_outpost",
+        "user_setting.build_outpost_desc",
+      ),
+      row(
+        "buildDepot",
+        "user_setting.build_depot",
+        "user_setting.build_depot_desc",
+      ),
+      row(
+        "buildMine",
+        "user_setting.build_mine",
+        "user_setting.build_mine_desc",
+      ),
+      row(
+        "buildNoiseBeacon",
+        "user_setting.build_noise_beacon",
+        "user_setting.build_noise_beacon_desc",
+      ),
+      row(
+        "buildMissileSilo",
+        "user_setting.build_missile_silo",
+        "user_setting.build_missile_silo_desc",
+      ),
+      row(
+        "buildSamLauncher",
+        "user_setting.build_sam_launcher",
+        "user_setting.build_sam_launcher_desc",
+      ),
+      row(
+        "buildWarship",
+        "user_setting.build_warship",
+        "user_setting.build_warship_desc",
+      ),
+      row(
+        "buildAtomBomb",
+        "user_setting.build_atom_bomb",
+        "user_setting.build_atom_bomb_desc",
+      ),
+      row(
+        "buildHydrogenBomb",
+        "user_setting.build_hydrogen_bomb",
+        "user_setting.build_hydrogen_bomb_desc",
+      ),
+      row(
+        "buildMIRV",
+        "user_setting.build_mirv",
+        "user_setting.build_mirv_desc",
+      ),
+    ],
+  },
+  {
+    title: "user_setting.camera_movement",
+    rows: [
+      row(
+        "centerCamera",
+        "user_setting.center_camera",
+        "user_setting.center_camera_desc",
+      ),
+      row("moveUp", "user_setting.move_up", "user_setting.move_up_desc"),
+      row("moveUpArrow", "user_setting.move_up", "user_setting.move_up_desc"),
+      row("moveLeft", "user_setting.move_left", "user_setting.move_left_desc"),
+      row(
+        "moveLeftArrow",
+        "user_setting.move_left",
+        "user_setting.move_left_desc",
+      ),
+      row("moveDown", "user_setting.move_down", "user_setting.move_down_desc"),
+      row(
+        "moveDownArrow",
+        "user_setting.move_down",
+        "user_setting.move_down_desc",
+      ),
+      row(
+        "moveRight",
+        "user_setting.move_right",
+        "user_setting.move_right_desc",
+      ),
+      row(
+        "moveRightArrow",
+        "user_setting.move_right",
+        "user_setting.move_right_desc",
+      ),
+    ],
+  },
+  {
+    title: "user_setting.zoom_controls",
+    rows: [
+      row("zoomOut", "user_setting.zoom_out", "user_setting.zoom_out_desc"),
+      row(
+        "zoomOutMinus",
+        "user_setting.zoom_out",
+        "user_setting.zoom_out_desc",
+      ),
+      row(
+        "zoomOutNumpad",
+        "user_setting.zoom_out",
+        "user_setting.zoom_out_desc",
+      ),
+      row("zoomIn", "user_setting.zoom_in", "user_setting.zoom_in_desc"),
+      row("zoomInEqual", "user_setting.zoom_in", "user_setting.zoom_in_desc"),
+      row("zoomInNumpad", "user_setting.zoom_in", "user_setting.zoom_in_desc"),
+    ],
+  },
+  {
+    title: "user_setting.menu_shortcuts",
+    rows: [
+      row(
+        "buildMenuModifier",
+        "user_setting.build_menu_modifier",
+        "user_setting.build_menu_modifier_desc",
+        {
+          allowModifiers: true,
+        },
+      ),
+      row(
+        "emojiMenuModifier",
+        "user_setting.emoji_menu_modifier",
+        "user_setting.emoji_menu_modifier_desc",
+        {
+          allowModifiers: true,
+        },
+      ),
+      row(
+        "boxSelectWarships",
+        "user_setting.box_select_warships",
+        "user_setting.box_select_warships_desc",
+        {
+          allowModifiers: true,
+        },
+      ),
+      row(
+        "selectAllWarships",
+        "user_setting.select_all_warships",
+        "user_setting.select_all_warships_desc",
+      ),
+      row(
+        "pauseGame",
+        "user_setting.pause_game",
+        "user_setting.pause_game_desc",
+      ),
+      row(
+        "gameSpeedUp",
+        "user_setting.game_speed_up",
+        "user_setting.game_speed_up_desc",
+      ),
+      row(
+        "gameSpeedDown",
+        "user_setting.game_speed_down",
+        "user_setting.game_speed_down_desc",
+      ),
+    ],
+  },
+  {
+    title: "user_setting.view_options",
+    rows: [
+      row(
+        "toggleView",
+        "user_setting.toggle_view",
+        "user_setting.toggle_view_desc",
+      ),
+      {
+        action: "coordinateGrid",
+        label: "user_setting.coordinate_grid_label",
+        desc: "user_setting.coordinate_grid_desc",
+      },
+      {
+        action: "altKey",
+        label: "user_setting.graphics_refresh_modifier",
+        desc: "user_setting.graphics_refresh_modifier_desc",
+        descArgs: ({ resetGfxKey }) => ({ key: resetGfxKey }),
+        allowModifiers: true,
+      },
+      {
+        action: "resetGfx",
+        label: "help_modal.action_reset_gfx",
+        desc: "user_setting.reset_gfx_desc",
+      },
+    ],
+  },
+  {
+    title: "user_setting.attack_ratio_controls",
+    rows: [
+      row(
+        "attackRatioDown",
+        "user_setting.attack_ratio_down",
+        "user_setting.attack_ratio_down_desc",
+        {
+          descArgs: ({ increment }) => ({ amount: increment }),
+        },
+      ),
+      row(
+        "attackRatioUp",
+        "user_setting.attack_ratio_up",
+        "user_setting.attack_ratio_up_desc",
+        {
+          descArgs: ({ increment }) => ({ amount: increment }),
+        },
+      ),
+    ],
+  },
+  {
+    title: "user_setting.attack_keybinds",
+    rows: [
+      row(
+        "boatAttack",
+        "user_setting.boat_attack",
+        "user_setting.boat_attack_desc",
+      ),
+      row(
+        "groundAttack",
+        "user_setting.ground_attack",
+        "user_setting.ground_attack_desc",
+      ),
+      row(
+        "retaliateAttack",
+        "user_setting.retaliate_attack",
+        "user_setting.retaliate_attack_desc",
+      ),
+      row(
+        "swapDirection",
+        "user_setting.swap_direction",
+        "user_setting.swap_direction_desc",
+      ),
+    ],
+  },
+  {
+    title: "user_setting.ally_keybinds",
+    rows: [
+      row(
+        "targetPlayer",
+        "user_setting.target_player",
+        "user_setting.target_player_desc",
+      ),
+      row(
+        "emojiMenu",
+        "user_setting.emoji_menu",
+        "user_setting.emoji_menu_desc",
+      ),
+      row(
+        "quickChat",
+        "user_setting.quick_chat",
+        "user_setting.quick_chat_desc",
+      ),
+    ],
+  },
+];
 
 @customElement("user-setting")
 export class UserSettingModal extends BaseModal {
@@ -616,28 +920,22 @@ export class UserSettingModal extends BaseModal {
       ? "user_setting.audio_test_master_muted"
       : "user_setting.audio_test_muted";
     const pending = this.previewing.has(category);
-    return html`
-      <button
-        id="audio-${category}-test"
-        class="self-end px-3 py-1 text-sm font-medium rounded-lg border border-white/10 text-white transition-colors ${
-          muted || pending
-            ? "opacity-40 cursor-not-allowed"
-            : "bg-white/5 hover:bg-white/15"
-        }"
-        ?disabled=${muted || pending}
-        title=${muted ? translateText(hint) : ""}
-        @click=${() => this.playTestCue(category)}
-      >
-        ${translateText("user_setting.audio_test")}
-      </button>
-    `;
+    return zfButton({
+      id: `audio-${category}-test`,
+      label: translateText("user_setting.audio_test"),
+      size: "sm",
+      disabled: muted || pending,
+      title: muted ? translateText(hint) : "",
+      onClick: () => void this.playTestCue(category),
+    });
   }
 
   private renderVolumeSlider(category: AudioCategory) {
     const controls = audioControls();
     return html`
-      <div class="flex flex-col gap-2">
+      <div class="zf-volume-row">
         <setting-slider
+          compact
           label="${translateText(`user_setting.audio_${category}`)}"
           description="${translateText(`user_setting.audio_${category}_desc`)}"
           id="audio-${category}-slider"
@@ -650,10 +948,8 @@ export class UserSettingModal extends BaseModal {
         ></setting-slider>
         ${
           controls !== null && PREVIEWABLE.includes(category as CueCategory)
-            ? html`<div class="flex justify-end">
-                ${this.renderTestButton(controls, category as CueCategory)}
-              </div>`
-            : ""
+            ? this.renderTestButton(controls, category as CueCategory)
+            : nothing
         }
       </div>
     `;
@@ -662,39 +958,38 @@ export class UserSettingModal extends BaseModal {
   private renderAudioSettings() {
     const muteOnBlur = this.userSettings.muteOnBlur();
     return html`
-      ${AUDIO_TAB_ORDER.map((category) => this.renderVolumeSlider(category))}
-
-      <setting-toggle
-        label="${translateText("user_setting.audio_mute_on_blur")}"
-        description="${translateText("user_setting.audio_mute_on_blur_desc")}"
-        id="audio-mute-on-blur-toggle"
-        .checked=${muteOnBlur}
-        @change=${this.toggleMuteOnBlur}
-      ></setting-toggle>
-
-      <!-- Dependent on the row above: meaningless when nothing is muted. -->
-      <div class="pl-6">
-        <setting-toggle
-          label="${translateText("user_setting.audio_alerts_when_unfocused")}"
-          description="${translateText(
-            "user_setting.audio_alerts_when_unfocused_desc",
-          )}"
-          id="audio-alerts-when-unfocused-toggle"
-          .checked=${this.userSettings.alertsWhenUnfocused()}
-          ?disabled=${!muteOnBlur}
-          @change=${this.toggleAlertsWhenUnfocused}
-        ></setting-toggle>
-      </div>
-
-      <div class="flex justify-end pt-2">
-        <button
-          id="audio-reset"
-          class="px-3 py-1 text-sm font-medium rounded-lg border border-white/10 text-white bg-white/5 hover:bg-white/15 transition-colors"
-          @click=${this.resetAudio}
-        >
-          ${translateText("user_setting.audio_reset")}
-        </button>
-      </div>
+      ${zfTile({
+        title: translateText("zf_settings.tile_volume"),
+        body: html`<div class="zf-volume-grid">
+          ${AUDIO_TAB_ORDER.map((category) => this.renderVolumeSlider(category))}
+        </div>`,
+      })}
+      ${zfTile({
+        title: translateText("zf_settings.tile_unfocused"),
+        body: html`<div class="zf-chips">
+          <setting-toggle
+            chip
+            label="${translateText("user_setting.audio_mute_on_blur")}"
+            description="${translateText("user_setting.audio_mute_on_blur_desc")}"
+            id="audio-mute-on-blur-toggle"
+            .checked=${muteOnBlur}
+            @change=${this.toggleMuteOnBlur}
+          ></setting-toggle>
+          <!-- Dependent on the switch before it: meaningless when nothing is
+               muted. -->
+          <setting-toggle
+            chip
+            label="${translateText("user_setting.audio_alerts_when_unfocused")}"
+            description="${translateText(
+              "user_setting.audio_alerts_when_unfocused_desc",
+            )}"
+            id="audio-alerts-when-unfocused-toggle"
+            .checked=${this.userSettings.alertsWhenUnfocused()}
+            ?disabled=${!muteOnBlur}
+            @change=${this.toggleAlertsWhenUnfocused}
+          ></setting-toggle>
+        </div>`,
+      })}
     `;
   }
 
@@ -728,33 +1023,101 @@ export class UserSettingModal extends BaseModal {
     };
   }
 
-  protected renderHeaderSlot() {
-    return modalHeader({
-      title: translateText("user_setting.title"),
-      onBack: () => this.close(),
-      ariaLabel: translateText("common.back"),
-      showDivider: true,
-    });
+  protected pageTitle(): string {
+    return translateText("user_setting.title");
   }
 
   protected renderBody(tab: string) {
-    let body;
     switch (tab) {
       case "keybinds":
-        body = this.renderKeybindSettings();
-        break;
+        return this.renderKeybindSettings();
       case "audio":
-        body = this.renderAudioSettings();
+        return this.renderAudioSettings();
+      case "graphics":
+        return this.renderGraphicsSettings();
+      default:
+        return this.renderGameplaySettings();
+    }
+  }
+
+  /**
+   * The end of the page: "Reset <tab> to Defaults" (danger, so red), then the
+   * yellow strip with DONE. Settings save as they change, so DONE only leaves.
+   */
+  protected renderActions() {
+    const tab = this.activeTab || "gameplay";
+    const tabLabel =
+      this.modalConfig().tabs.find((t) => t.key === tab)?.label ?? "";
+    return html`
+      <div class="zf-reset-row">
+        ${zfButton({
+          id: `${tab}-reset`,
+          label: translateText("zf_settings.reset_tab", { tab: tabLabel }),
+          variant: "danger",
+          icon: "reset",
+          onClick: () => void this.resetTab(tab, tabLabel),
+        })}
+      </div>
+      <div
+        class="zf-strip zf-strip-compact zf-settings-strip zf-frame zf-frame-lg"
+      >
+        <div class="zf-strip-items">
+          <span class="zf-strip-hint">
+            ${translateText("zf_settings.saved_hint")}
+          </span>
+        </div>
+        <div class="zf-strip-action">
+          ${zfPrimaryButton({
+            id: "settings-done",
+            label: translateText("zf_settings.done"),
+            icon: "check",
+            onClick: () => this.close(),
+          })}
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Back to the defaults for one tab. Audio and Gameplay reset at once:
+   * nothing is lost that a player cannot put back with a switch or a slider.
+   * Graphics and Keybinds ask first, since a tuned look or a remapped
+   * keyboard takes a while to rebuild.
+   */
+  private async resetTab(tab: string, tabLabel: string) {
+    const ask = (messageKey: string) =>
+      this.askConfirm({
+        heading: translateText("zf_settings.reset_confirm_heading", {
+          tab: tabLabel,
+        }),
+        message: translateText(messageKey),
+        confirmText: translateText("zf_settings.reset_confirm"),
+        variant: "danger",
+      });
+    switch (tab) {
+      case "audio":
+        this.resetAudio();
+        return;
+      case "gameplay":
+        this.userSettings.resetGameplay();
         break;
       case "graphics":
-        body = this.renderGraphicsSettings();
+        if (!(await ask("zf_settings.reset_graphics_confirm"))) return;
+        this.userSettings.resetGraphics();
+        document.documentElement.style.setProperty(
+          "--hud-opacity",
+          String(this.userSettings.hudOpacity()),
+        );
+        break;
+      case "keybinds":
+        if (!(await ask("zf_settings.reset_keybinds_confirm"))) return;
+        this.userSettings.resetKeybinds();
+        this.loadKeybindsFromStorage();
         break;
       default:
-        body = this.renderGameplaySettings();
+        return;
     }
-    return html`
-      <div class="flex flex-col gap-2 p-4 lg:p-[1.4rem]">${body}</div>
-    `;
+    this.requestUpdate();
   }
 
   protected updated(): void {
@@ -788,586 +1151,37 @@ export class UserSettingModal extends BaseModal {
     onReturn?.();
   }
 
+  private keybindRow(row: KeybindRow) {
+    return html`<setting-keybind
+      action=${row.action}
+      .allowModifiers=${row.allowModifiers ?? false}
+      label=${translateText(row.label)}
+      description=${translateText(
+        row.desc,
+        row.descArgs?.({
+          increment: this.userSettings.attackRatioIncrement(),
+          resetGfxKey: this.getKeyChar("resetGfx").toUpperCase(),
+        }),
+      )}
+      .defaultKey=${this.defaultKeybinds[row.action]}
+      .value=${this.getKeyValue(row.action)}
+      .display=${this.getKeyChar(row.action)}
+      @change=${this.handleKeybindChange}
+    ></setting-keybind>`;
+  }
+
   private renderKeybindSettings() {
     return html`
-      <div
-        class="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-300/70 text-xs"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-3.5 w-3.5 shrink-0 opacity-70"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-        ${translateText("user_setting.keybinds_hint")}
-      </div>
-
-      <h2
-        class="text-blue-200 text-xl font-bold mt-4 mb-3 border-b border-white/10 pb-2"
-      >
-        ${translateText("user_setting.view_options")}
-      </h2>
-
-      <setting-keybind
-        action="toggleView"
-        label=${translateText("user_setting.toggle_view")}
-        description=${translateText("user_setting.toggle_view_desc")}
-        defaultKey=${this.defaultKeybinds.toggleView}
-        .value=${this.getKeyValue("toggleView")}
-        .display=${this.getKeyChar("toggleView")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="coordinateGrid"
-        label=${translateText("user_setting.coordinate_grid_label")}
-        description=${translateText("user_setting.coordinate_grid_desc")}
-        defaultKey=${this.defaultKeybinds.coordinateGrid}
-        .value=${this.getKeyValue("coordinateGrid")}
-        .display=${this.getKeyChar("coordinateGrid")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="altKey"
-        .allowModifiers=${true}
-        label=${translateText("user_setting.graphics_refresh_modifier")}
-        description=${translateText(
-          "user_setting.graphics_refresh_modifier_desc",
-          { key: this.getKeyChar("resetGfx").toUpperCase() },
+      ${zfNote(translateText("user_setting.keybinds_hint"), "keyboard")}
+      <div class="zf-panel-grid zf-keybind-grid">
+        ${KEYBIND_GROUPS.map((group) =>
+          zfTile({
+            title: translateText(group.title),
+            className: "zf-tile-rows",
+            body: html`${group.rows.map((row) => this.keybindRow(row))}`,
+          }),
         )}
-        .defaultKey=${this.defaultKeybinds.altKey}
-        .value=${this.getKeyValue("altKey")}
-        .display=${this.getKeyChar("altKey")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="resetGfx"
-        label=${translateText("help_modal.action_reset_gfx")}
-        description=${translateText("user_setting.reset_gfx_desc")}
-        .defaultKey=${this.defaultKeybinds.resetGfx}
-        .value=${this.getKeyValue("resetGfx")}
-        .display=${this.getKeyChar("resetGfx")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <h2
-        class="text-blue-200 text-xl font-bold mt-8 mb-3 border-b border-white/10 pb-2"
-      >
-        ${translateText("user_setting.build_controls")}
-      </h2>
-
-      <setting-keybind
-        action="buildCity"
-        label=${translateText("user_setting.build_city")}
-        description=${translateText("user_setting.build_city_desc")}
-        defaultKey=${this.defaultKeybinds.buildCity}
-        .value=${this.getKeyValue("buildCity")}
-        .display=${this.getKeyChar("buildCity")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="buildFactory"
-        label=${translateText("user_setting.build_factory")}
-        description=${translateText("user_setting.build_factory_desc")}
-        defaultKey=${this.defaultKeybinds.buildFactory}
-        .value=${this.getKeyValue("buildFactory")}
-        .display=${this.getKeyChar("buildFactory")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="buildPort"
-        label=${translateText("user_setting.build_port")}
-        description=${translateText("user_setting.build_port_desc")}
-        defaultKey=${this.defaultKeybinds.buildPort}
-        .value=${this.getKeyValue("buildPort")}
-        .display=${this.getKeyChar("buildPort")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="buildDefensePost"
-        label=${translateText("user_setting.build_defense_post")}
-        description=${translateText("user_setting.build_defense_post_desc")}
-        defaultKey=${this.defaultKeybinds.buildDefensePost}
-        .value=${this.getKeyValue("buildDefensePost")}
-        .display=${this.getKeyChar("buildDefensePost")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="buildWall"
-        label=${translateText("user_setting.build_wall")}
-        description=${translateText("user_setting.build_wall_desc")}
-        defaultKey=${this.defaultKeybinds.buildWall}
-        .value=${this.getKeyValue("buildWall")}
-        .display=${this.getKeyChar("buildWall")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="buildOutpost"
-        label=${translateText("user_setting.build_outpost")}
-        description=${translateText("user_setting.build_outpost_desc")}
-        defaultKey=${this.defaultKeybinds.buildOutpost}
-        .value=${this.getKeyValue("buildOutpost")}
-        .display=${this.getKeyChar("buildOutpost")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="buildDepot"
-        label=${translateText("user_setting.build_depot")}
-        description=${translateText("user_setting.build_depot_desc")}
-        defaultKey=${this.defaultKeybinds.buildDepot}
-        .value=${this.getKeyValue("buildDepot")}
-        .display=${this.getKeyChar("buildDepot")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="buildMine"
-        label=${translateText("user_setting.build_mine")}
-        description=${translateText("user_setting.build_mine_desc")}
-        defaultKey=${this.defaultKeybinds.buildMine}
-        .value=${this.getKeyValue("buildMine")}
-        .display=${this.getKeyChar("buildMine")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="buildNoiseBeacon"
-        label=${translateText("user_setting.build_noise_beacon")}
-        description=${translateText("user_setting.build_noise_beacon_desc")}
-        defaultKey=${this.defaultKeybinds.buildNoiseBeacon}
-        .value=${this.getKeyValue("buildNoiseBeacon")}
-        .display=${this.getKeyChar("buildNoiseBeacon")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="buildMissileSilo"
-        label=${translateText("user_setting.build_missile_silo")}
-        description=${translateText("user_setting.build_missile_silo_desc")}
-        defaultKey=${this.defaultKeybinds.buildMissileSilo}
-        .value=${this.getKeyValue("buildMissileSilo")}
-        .display=${this.getKeyChar("buildMissileSilo")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="buildSamLauncher"
-        label=${translateText("user_setting.build_sam_launcher")}
-        description=${translateText("user_setting.build_sam_launcher_desc")}
-        defaultKey=${this.defaultKeybinds.buildSamLauncher}
-        .value=${this.getKeyValue("buildSamLauncher")}
-        .display=${this.getKeyChar("buildSamLauncher")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="buildWarship"
-        label=${translateText("user_setting.build_warship")}
-        description=${translateText("user_setting.build_warship_desc")}
-        defaultKey=${this.defaultKeybinds.buildWarship}
-        .value=${this.getKeyValue("buildWarship")}
-        .display=${this.getKeyChar("buildWarship")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="buildAtomBomb"
-        label=${translateText("user_setting.build_atom_bomb")}
-        description=${translateText("user_setting.build_atom_bomb_desc")}
-        defaultKey=${this.defaultKeybinds.buildAtomBomb}
-        .value=${this.getKeyValue("buildAtomBomb")}
-        .display=${this.getKeyChar("buildAtomBomb")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="buildHydrogenBomb"
-        label=${translateText("user_setting.build_hydrogen_bomb")}
-        description=${translateText("user_setting.build_hydrogen_bomb_desc")}
-        defaultKey=${this.defaultKeybinds.buildHydrogenBomb}
-        .value=${this.getKeyValue("buildHydrogenBomb")}
-        .display=${this.getKeyChar("buildHydrogenBomb")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="buildMIRV"
-        label=${translateText("user_setting.build_mirv")}
-        description=${translateText("user_setting.build_mirv_desc")}
-        defaultKey=${this.defaultKeybinds.buildMIRV}
-        .value=${this.getKeyValue("buildMIRV")}
-        .display=${this.getKeyChar("buildMIRV")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <h2
-        class="text-blue-200 text-xl font-bold mt-8 mb-3 border-b border-white/10 pb-2"
-      >
-        ${translateText("user_setting.menu_shortcuts")}
-      </h2>
-
-      <setting-keybind
-        action="buildMenuModifier"
-        .allowModifiers=${true}
-        label=${translateText("user_setting.build_menu_modifier")}
-        description=${translateText("user_setting.build_menu_modifier_desc")}
-        .defaultKey=${this.defaultKeybinds.buildMenuModifier}
-        .value=${this.getKeyValue("buildMenuModifier")}
-        .display=${this.getKeyChar("buildMenuModifier")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="emojiMenuModifier"
-        .allowModifiers=${true}
-        label=${translateText("user_setting.emoji_menu_modifier")}
-        description=${translateText("user_setting.emoji_menu_modifier_desc")}
-        .defaultKey=${this.defaultKeybinds.emojiMenuModifier}
-        .value=${this.getKeyValue("emojiMenuModifier")}
-        .display=${this.getKeyChar("emojiMenuModifier")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="boxSelectWarships"
-        .allowModifiers=${true}
-        label=${translateText("user_setting.box_select_warships")}
-        description=${translateText("user_setting.box_select_warships_desc")}
-        .defaultKey=${this.defaultKeybinds.boxSelectWarships}
-        .value=${this.getKeyValue("boxSelectWarships")}
-        .display=${this.getKeyChar("boxSelectWarships")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="selectAllWarships"
-        label=${translateText("user_setting.select_all_warships")}
-        description=${translateText("user_setting.select_all_warships_desc")}
-        .defaultKey=${this.defaultKeybinds.selectAllWarships}
-        .value=${this.getKeyValue("selectAllWarships")}
-        .display=${this.getKeyChar("selectAllWarships")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="pauseGame"
-        label=${translateText("user_setting.pause_game")}
-        description=${translateText("user_setting.pause_game_desc")}
-        .defaultKey=${this.defaultKeybinds.pauseGame}
-        .value=${this.getKeyValue("pauseGame")}
-        .display=${this.getKeyChar("pauseGame")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="gameSpeedUp"
-        label=${translateText("user_setting.game_speed_up")}
-        description=${translateText("user_setting.game_speed_up_desc")}
-        .defaultKey=${this.defaultKeybinds.gameSpeedUp}
-        .value=${this.getKeyValue("gameSpeedUp")}
-        .display=${this.getKeyChar("gameSpeedUp")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="gameSpeedDown"
-        label=${translateText("user_setting.game_speed_down")}
-        description=${translateText("user_setting.game_speed_down_desc")}
-        .defaultKey=${this.defaultKeybinds.gameSpeedDown}
-        .value=${this.getKeyValue("gameSpeedDown")}
-        .display=${this.getKeyChar("gameSpeedDown")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <h2
-        class="text-blue-200 text-xl font-bold mt-8 mb-3 border-b border-white/10 pb-2"
-      >
-        ${translateText("user_setting.attack_ratio_controls")}
-      </h2>
-
-      <setting-keybind
-        action="attackRatioDown"
-        label=${translateText("user_setting.attack_ratio_down")}
-        description=${translateText("user_setting.attack_ratio_down_desc", {
-          amount: this.userSettings.attackRatioIncrement(),
-        })}
-        defaultKey=${this.defaultKeybinds.attackRatioDown}
-        .value=${this.getKeyValue("attackRatioDown")}
-        .display=${this.getKeyChar("attackRatioDown")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="attackRatioUp"
-        label=${translateText("user_setting.attack_ratio_up")}
-        description=${translateText("user_setting.attack_ratio_up_desc", {
-          amount: this.userSettings.attackRatioIncrement(),
-        })}
-        defaultKey=${this.defaultKeybinds.attackRatioUp}
-        .value=${this.getKeyValue("attackRatioUp")}
-        .display=${this.getKeyChar("attackRatioUp")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <h2
-        class="text-blue-200 text-xl font-bold mt-8 mb-3 border-b border-white/10 pb-2"
-      >
-        ${translateText("user_setting.attack_keybinds")}
-      </h2>
-
-      <setting-keybind
-        action="boatAttack"
-        label=${translateText("user_setting.boat_attack")}
-        description=${translateText("user_setting.boat_attack_desc")}
-        defaultKey=${this.defaultKeybinds.boatAttack}
-        .value=${this.getKeyValue("boatAttack")}
-        .display=${this.getKeyChar("boatAttack")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="groundAttack"
-        label=${translateText("user_setting.ground_attack")}
-        description=${translateText("user_setting.ground_attack_desc")}
-        defaultKey=${this.defaultKeybinds.groundAttack}
-        .value=${this.getKeyValue("groundAttack")}
-        .display=${this.getKeyChar("groundAttack")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="retaliateAttack"
-        label=${translateText("user_setting.retaliate_attack")}
-        description=${translateText("user_setting.retaliate_attack_desc")}
-        defaultKey=${this.defaultKeybinds.retaliateAttack}
-        .value=${this.getKeyValue("retaliateAttack")}
-        .display=${this.getKeyChar("retaliateAttack")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="swapDirection"
-        label=${translateText("user_setting.swap_direction")}
-        description=${translateText("user_setting.swap_direction_desc")}
-        .defaultKey=${this.defaultKeybinds.swapDirection}
-        .value=${this.getKeyValue("swapDirection")}
-        .display=${this.getKeyChar("swapDirection")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <h2
-        class="text-blue-200 text-xl font-bold mt-8 mb-3 border-b border-white/10 pb-2"
-      >
-        ${translateText("user_setting.ally_keybinds")}
-      </h2>
-
-      <setting-keybind
-        action="targetPlayer"
-        label=${translateText("user_setting.target_player")}
-        description=${translateText("user_setting.target_player_desc")}
-        defaultKey=${this.defaultKeybinds.targetPlayer}
-        .value=${this.getKeyValue("targetPlayer")}
-        .display=${this.getKeyChar("targetPlayer")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="emojiMenu"
-        label=${translateText("user_setting.emoji_menu")}
-        description=${translateText("user_setting.emoji_menu_desc")}
-        defaultKey=${this.defaultKeybinds.emojiMenu}
-        .value=${this.getKeyValue("emojiMenu")}
-        .display=${this.getKeyChar("emojiMenu")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="quickChat"
-        label=${translateText("user_setting.quick_chat")}
-        description=${translateText("user_setting.quick_chat_desc")}
-        defaultKey=${this.defaultKeybinds.quickChat}
-        .value=${this.getKeyValue("quickChat")}
-        .display=${this.getKeyChar("quickChat")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <h2
-        class="text-blue-200 text-xl font-bold mt-8 mb-3 border-b border-white/10 pb-2"
-      >
-        ${translateText("user_setting.zoom_controls")}
-      </h2>
-
-      <setting-keybind
-        action="zoomOut"
-        label=${translateText("user_setting.zoom_out")}
-        description=${translateText("user_setting.zoom_out_desc")}
-        defaultKey=${this.defaultKeybinds.zoomOut}
-        .value=${this.getKeyValue("zoomOut")}
-        .display=${this.getKeyChar("zoomOut")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="zoomOutMinus"
-        label=${translateText("user_setting.zoom_out")}
-        description=${translateText("user_setting.zoom_out_desc")}
-        defaultKey=${this.defaultKeybinds.zoomOutMinus}
-        .value=${this.getKeyValue("zoomOutMinus")}
-        .display=${this.getKeyChar("zoomOutMinus")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="zoomOutNumpad"
-        label=${translateText("user_setting.zoom_out")}
-        description=${translateText("user_setting.zoom_out_desc")}
-        defaultKey=${this.defaultKeybinds.zoomOutNumpad}
-        .value=${this.getKeyValue("zoomOutNumpad")}
-        .display=${this.getKeyChar("zoomOutNumpad")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="zoomIn"
-        label=${translateText("user_setting.zoom_in")}
-        description=${translateText("user_setting.zoom_in_desc")}
-        defaultKey=${this.defaultKeybinds.zoomIn}
-        .value=${this.getKeyValue("zoomIn")}
-        .display=${this.getKeyChar("zoomIn")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="zoomInEqual"
-        label=${translateText("user_setting.zoom_in")}
-        description=${translateText("user_setting.zoom_in_desc")}
-        defaultKey=${this.defaultKeybinds.zoomInEqual}
-        .value=${this.getKeyValue("zoomInEqual")}
-        .display=${this.getKeyChar("zoomInEqual")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="zoomInNumpad"
-        label=${translateText("user_setting.zoom_in")}
-        description=${translateText("user_setting.zoom_in_desc")}
-        defaultKey=${this.defaultKeybinds.zoomInNumpad}
-        .value=${this.getKeyValue("zoomInNumpad")}
-        .display=${this.getKeyChar("zoomInNumpad")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <h2
-        class="text-blue-200 text-xl font-bold mt-8 mb-3 border-b border-white/10 pb-2"
-      >
-        ${translateText("user_setting.camera_movement")}
-      </h2>
-
-      <setting-keybind
-        action="centerCamera"
-        label=${translateText("user_setting.center_camera")}
-        description=${translateText("user_setting.center_camera_desc")}
-        defaultKey=${this.defaultKeybinds.centerCamera}
-        .value=${this.getKeyValue("centerCamera")}
-        .display=${this.getKeyChar("centerCamera")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="moveUp"
-        label=${translateText("user_setting.move_up")}
-        description=${translateText("user_setting.move_up_desc")}
-        defaultKey=${this.defaultKeybinds.moveUp}
-        .value=${this.getKeyValue("moveUp")}
-        .display=${this.getKeyChar("moveUp")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="moveUpArrow"
-        label=${translateText("user_setting.move_up")}
-        description=${translateText("user_setting.move_up_desc")}
-        .defaultKey=${this.defaultKeybinds.moveUpArrow}
-        .value=${this.getKeyValue("moveUpArrow")}
-        .display=${this.getKeyChar("moveUpArrow")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="moveLeft"
-        label=${translateText("user_setting.move_left")}
-        description=${translateText("user_setting.move_left_desc")}
-        defaultKey=${this.defaultKeybinds.moveLeft}
-        .value=${this.getKeyValue("moveLeft")}
-        .display=${this.getKeyChar("moveLeft")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="moveLeftArrow"
-        label=${translateText("user_setting.move_left")}
-        description=${translateText("user_setting.move_left_desc")}
-        .defaultKey=${this.defaultKeybinds.moveLeftArrow}
-        .value=${this.getKeyValue("moveLeftArrow")}
-        .display=${this.getKeyChar("moveLeftArrow")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="moveDown"
-        label=${translateText("user_setting.move_down")}
-        description=${translateText("user_setting.move_down_desc")}
-        defaultKey=${this.defaultKeybinds.moveDown}
-        .value=${this.getKeyValue("moveDown")}
-        .display=${this.getKeyChar("moveDown")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="moveDownArrow"
-        label=${translateText("user_setting.move_down")}
-        description=${translateText("user_setting.move_down_desc")}
-        .defaultKey=${this.defaultKeybinds.moveDownArrow}
-        .value=${this.getKeyValue("moveDownArrow")}
-        .display=${this.getKeyChar("moveDownArrow")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="moveRight"
-        label=${translateText("user_setting.move_right")}
-        description=${translateText("user_setting.move_right_desc")}
-        defaultKey=${this.defaultKeybinds.moveRight}
-        .value=${this.getKeyValue("moveRight")}
-        .display=${this.getKeyChar("moveRight")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
-
-      <setting-keybind
-        action="moveRightArrow"
-        label=${translateText("user_setting.move_right")}
-        description=${translateText("user_setting.move_right_desc")}
-        .defaultKey=${this.defaultKeybinds.moveRightArrow}
-        .value=${this.getKeyValue("moveRightArrow")}
-        .display=${this.getKeyChar("moveRightArrow")}
-        @change=${this.handleKeybindChange}
-      ></setting-keybind>
+      </div>
     `;
   }
 
@@ -1378,247 +1192,282 @@ export class UserSettingModal extends BaseModal {
    */
   private renderGraphicsSettings() {
     return html`
-      <setting-slider
-        label=${translateText("user_setting.hud_opacity_label")}
-        description=${translateText("user_setting.hud_opacity_desc")}
-        id="hud-opacity-slider"
-        .value=${this.userSettings.hudOpacity() * 100}
-        @change=${(e: CustomEvent<{ value: number }>) => {
-          this.userSettings.setHudOpacity(e.detail.value / 100);
-          document.documentElement.style.setProperty(
-            "--hud-opacity",
-            String(this.userSettings.hudOpacity()),
-          );
-        }}
-      ></setting-slider>
-      <!-- 🎨 Graphics preset -->
-      <div
-        class="flex flex-col w-full p-4 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all gap-3"
-      >
-        <div class="flex flex-col min-w-0">
-          <div class="text-white font-bold text-base block mb-1">
-            ${translateText("user_setting.graphics_preset_label")}
-          </div>
-          <div class="text-white/50 text-sm leading-snug">
+      ${zfTile({
+        title: translateText("user_setting.graphics_preset_label"),
+        body: html`<p class="zf-setting-desc" style="margin: 0">
             ${translateText("user_setting.graphics_preset_desc")}
-          </div>
-        </div>
-        <graphics-preset-selector></graphics-preset-selector>
+          </p>
+          <graphics-preset-selector></graphics-preset-selector>`,
+      })}
+      <div class="zf-panel-grid">
+        ${zfTile({
+          title: translateText("zf_settings.tile_effects"),
+          body: html`<div class="zf-chips">
+            <setting-toggle
+              chip
+              label="${translateText("user_setting.emojis_label")}"
+              description="${translateText("user_setting.emojis_desc")}"
+              id="emoji-toggle"
+              .checked=${this.userSettings.emojis()}
+              @change=${this.toggleEmojis}
+            ></setting-toggle>
+            <setting-toggle
+              chip
+              label="${translateText("user_setting.performance_overlay_label")}"
+              description="${translateText(
+                "user_setting.performance_overlay_desc",
+              )}"
+              id="performance-overlay-toggle"
+              .checked=${this.userSettings.performanceOverlay()}
+              @change=${this.togglePerformanceOverlay}
+            ></setting-toggle>
+            <setting-toggle
+              chip
+              label="${translateText("user_setting.map_layers_label")}"
+              description="${translateText("user_setting.map_layers_desc")}"
+              id="map-layers-toggle"
+              .checked=${this.userSettings.mapLayers()}
+              @change=${this.toggleMapLayers}
+            ></setting-toggle>
+          </div>`,
+        })}
+        ${zfTile({
+          title: translateText("zf_settings.tile_hud"),
+          body: html`<setting-slider
+            compact
+            label=${translateText("user_setting.hud_opacity_label")}
+            description=${translateText("user_setting.hud_opacity_desc")}
+            id="hud-opacity-slider"
+            .value=${this.userSettings.hudOpacity() * 100}
+            @change=${(e: CustomEvent<{ value: number }>) => {
+              this.userSettings.setHudOpacity(e.detail.value / 100);
+              document.documentElement.style.setProperty(
+                "--hud-opacity",
+                String(this.userSettings.hudOpacity()),
+              );
+            }}
+          ></setting-slider>`,
+        })}
+        ${zfTile({
+          // Save / share the whole configuration. Not inside Advanced: a
+          // player who never expands the fold should still find it.
+          title: translateText("zf_settings.tile_save_share"),
+          body: html`<graphics-preset-tools></graphics-preset-tools>`,
+        })}
       </div>
-
-      <!-- 💾 Save / share the whole configuration. Top level, not inside
-           Advanced: a player who never expands the fold should still find it. -->
-      <graphics-preset-tools></graphics-preset-tools>
-
-      <!-- 😊 Emojis -->
-      <setting-toggle
-        label="${translateText("user_setting.emojis_label")}"
-        description="${translateText("user_setting.emojis_desc")}"
-        id="emoji-toggle"
-        .checked=${this.userSettings.emojis()}
-        @change=${this.toggleEmojis}
-      ></setting-toggle>
-
-      <!-- 📱 Performance Overlay -->
-      <setting-toggle
-        label="${translateText("user_setting.performance_overlay_label")}"
-        description="${translateText("user_setting.performance_overlay_desc")}"
-        id="performance-overlay-toggle"
-        .checked=${this.userSettings.performanceOverlay()}
-        @change=${this.togglePerformanceOverlay}
-      ></setting-toggle>
-
-      <!-- 🗺️ Map Layers -->
-      <setting-toggle
-        label="${translateText("user_setting.map_layers_label")}"
-        description="${translateText("user_setting.map_layers_desc")}"
-        id="map-layers-toggle"
-        .checked=${this.userSettings.mapLayers()}
-        @change=${this.toggleMapLayers}
-      ></setting-toggle>
-
-      <!-- 🔧 Advanced -->
-      <setting-toggle
-        label="${translateText("graphics_setting.advanced_label")}"
-        description="${translateText("graphics_setting.advanced_desc")}"
-        id="graphics-advanced-toggle"
-        .checked=${this.graphicsAdvancedOpen}
-        @change=${this.toggleGraphicsAdvanced}
-      ></setting-toggle>
-
-      ${
-        this.graphicsAdvancedOpen
-          ? html`<graphics-advanced-settings></graphics-advanced-settings>`
-          : nothing
-      }
+      ${zfTile({
+        title: translateText("graphics_setting.advanced_label"),
+        body: html`
+          <setting-toggle
+            chip
+            label="${translateText("graphics_setting.advanced_desc")}"
+            id="graphics-advanced-toggle"
+            .checked=${this.graphicsAdvancedOpen}
+            @change=${this.toggleGraphicsAdvanced}
+          ></setting-toggle>
+          ${
+            this.graphicsAdvancedOpen
+              ? html`<graphics-advanced-settings></graphics-advanced-settings>`
+              : nothing
+          }
+        `,
+      })}
     `;
   }
 
   private renderGameplaySettings() {
     return html`
-      <!-- 🚨 Alert frame -->
-      <setting-toggle
-        label="${translateText("user_setting.alert_frame_label")}"
-        description="${translateText("user_setting.alert_frame_desc")}"
-        id="alert-frame-toggle"
-        .checked=${this.userSettings.alertFrame()}
-        @change=${this.toggleAlertFrame}
-      ></setting-toggle>
+      <div class="zf-panel-grid">
+        ${zfTile({
+          title: translateText("zf_settings.tile_interface"),
+          body: html`<div class="zf-chips">
+            <setting-toggle
+              chip
+              label="${translateText("user_setting.help_messages_label")}"
+              description="${translateText("user_setting.help_messages_desc")}"
+              id="help-messages-toggle"
+              .checked=${this.userSettings.helpMessages()}
+              @change=${this.toggleHelpMessages}
+            ></setting-toggle>
+            <setting-toggle
+              chip
+              label="${translateText("user_setting.left_click_label")}"
+              description="${translateText("user_setting.left_click_desc")}"
+              id="left-click-toggle"
+              .checked=${this.userSettings.leftClickOpensMenu()}
+              @change=${this.toggleLeftClickOpensMenu}
+            ></setting-toggle>
+            <setting-toggle
+              chip
+              label="${translateText("user_setting.go_to_player_label")}"
+              description="${translateText("user_setting.go_to_player_desc")}"
+              id="go-to-player-toggle"
+              .checked=${this.userSettings.goToPlayer()}
+              @change=${this.toggleGoToPlayer}
+            ></setting-toggle>
+            <setting-toggle
+              chip
+              label="${translateText(
+                "user_setting.attacking_troops_overlay_label",
+              )}"
+              description="${translateText(
+                "user_setting.attacking_troops_overlay_desc",
+              )}"
+              id="attacking-troops-overlay-toggle"
+              .checked=${this.userSettings.attackingTroopsOverlay()}
+              @change=${this.toggleAttackingTroopsOverlay}
+            ></setting-toggle>
+          </div>`,
+        })}
+        ${zfTile({
+          title: translateText("zf_settings.tile_building"),
+          body: html`<div class="zf-chips">
+            <setting-toggle
+              chip
+              label="${translateText("user_setting.snap_build_preview_label")}"
+              description="${translateText(
+                "user_setting.snap_build_preview_desc",
+              )}"
+              id="snap-build-preview-toggle"
+              .checked=${this.userSettings.snapBuildPreview()}
+              @change=${this.toggleSnapBuildPreview}
+            ></setting-toggle>
+            <setting-toggle
+              chip
+              label="${translateText("user_setting.cursor_cost_label_label")}"
+              description="${translateText(
+                "user_setting.cursor_cost_label_desc",
+              )}"
+              id="cursor_cost_label-toggle"
+              .checked=${this.userSettings.cursorCostLabel()}
+              @change=${this.toggleCursorCostLabel}
+            ></setting-toggle>
+          </div>`,
+        })}
+        ${zfTile({
+          title: translateText("zf_settings.tile_alerts_privacy"),
+          body: html`<div class="zf-chips">
+            <setting-toggle
+              chip
+              label="${translateText("user_setting.lobby_start_alerts_label")}"
+              description="${translateText(
+                "user_setting.lobby_start_alerts_desc",
+              )}"
+              id="lobby-start-alerts-toggle"
+              .checked=${this.userSettings.lobbyStartAlerts()}
+              @change=${this.toggleLobbyStartAlerts}
+            ></setting-toggle>
+            <setting-toggle
+              chip
+              label="${translateText("user_setting.alert_frame_label")}"
+              description="${translateText("user_setting.alert_frame_desc")}"
+              id="alert-frame-toggle"
+              .checked=${this.userSettings.alertFrame()}
+              @change=${this.toggleAlertFrame}
+            ></setting-toggle>
+            <setting-toggle
+              chip
+              label="${translateText("user_setting.anonymous_names_label")}"
+              description="${translateText(
+                "user_setting.anonymous_names_desc",
+              )}"
+              id="anonymous-names-toggle"
+              .checked=${this.userSettings.anonymousNames()}
+              @change=${this.toggleAnonymousNames}
+            ></setting-toggle>
+            <setting-toggle
+              chip
+              label="${translateText("user_setting.lobby_id_visibility_label")}"
+              description="${translateText(
+                "user_setting.lobby_id_visibility_desc",
+              )}"
+              id="lobby-id-visibility-toggle"
+              .checked=${!this.userSettings.lobbyIdVisibility()}
+              @change=${this.toggleLobbyIdVisibility}
+            ></setting-toggle>
+          </div>`,
+        })}
+        ${zfTile({
+          title: translateText("zf_settings.tile_attack"),
+          body: html`
+            <setting-slider
+              compact
+              label="${translateText("user_setting.attack_ratio_label")}"
+              description="${translateText("user_setting.attack_ratio_desc")}"
+              id="attack-ratio-slider"
+              min="1"
+              max="100"
+              .value=${Math.round(this.currentAttackRatio() * 100)}
+              @change=${this.sliderAttackRatio}
+            ></setting-slider>
+            <setting-select
+              label=${translateText("user_setting.attack_ratio_increment_label")}
+              description=${translateText(
+                "user_setting.attack_ratio_increment_desc",
+              )}
+              .options=${[
+                { value: 1, label: "1%" },
+                { value: 2, label: "2%" },
+                { value: 5, label: "5%" },
+                { value: 10, label: "10%" },
+                { value: 20, label: "20%" },
+              ]}
+              .value=${String(this.userSettings.attackRatioIncrement())}
+              @change=${this.changeAttackRatioIncrement}
+            ></setting-select>
+          `,
+        })}
+        ${
+          this.showEasterEggSettings
+            ? zfTile({
+                title: translateText("user_setting.development_only"),
+                body: html`
+                  <setting-slider
+                    label="${translateText(
+                      "user_setting.easter_writing_speed_label",
+                    )}"
+                    description="${translateText(
+                      "user_setting.easter_writing_speed_desc",
+                    )}"
+                    min="0"
+                    max="100"
+                    value="40"
+                    easter="true"
+                    @change=${(e: CustomEvent) => {
+                      const value = e.detail?.value;
+                      if (value !== undefined) {
+                        console.log("Changed:", value);
+                      } else {
+                        console.warn("Slider event missing detail.value", e);
+                      }
+                    }}
+                  ></setting-slider>
 
-      <!-- 💰 Cursor Price Pill -->
-      <setting-toggle
-        label="${translateText("user_setting.cursor_cost_label_label")}"
-        description="${translateText("user_setting.cursor_cost_label_desc")}"
-        id="cursor_cost_label-toggle"
-        .checked=${this.userSettings.cursorCostLabel()}
-        @change=${this.toggleCursorCostLabel}
-      ></setting-toggle>
-
-      <!-- 🧲 Snap Build Preview -->
-      <setting-toggle
-        label="${translateText("user_setting.snap_build_preview_label")}"
-        description="${translateText("user_setting.snap_build_preview_desc")}"
-        id="snap-build-preview-toggle"
-        .checked=${this.userSettings.snapBuildPreview()}
-        @change=${this.toggleSnapBuildPreview}
-      ></setting-toggle>
-
-      <!-- 🖱️ Left Click Menu -->
-      <setting-toggle
-        label="${translateText("user_setting.left_click_label")}"
-        description="${translateText("user_setting.left_click_desc")}"
-        id="left-click-toggle"
-        .checked=${this.userSettings.leftClickOpensMenu()}
-        @change=${this.toggleLeftClickOpensMenu}
-      ></setting-toggle>
-
-      <!-- 🙈 Anonymous Names -->
-      <setting-toggle
-        label="${translateText("user_setting.anonymous_names_label")}"
-        description="${translateText("user_setting.anonymous_names_desc")}"
-        id="anonymous-names-toggle"
-        .checked=${this.userSettings.anonymousNames()}
-        @change=${this.toggleAnonymousNames}
-      ></setting-toggle>
-
-      <!-- 👁️ Hidden Lobby IDs -->
-      <setting-toggle
-        label="${translateText("user_setting.lobby_id_visibility_label")}"
-        description="${translateText("user_setting.lobby_id_visibility_desc")}"
-        id="lobby-id-visibility-toggle"
-        .checked=${!this.userSettings.lobbyIdVisibility()}
-        @change=${this.toggleLobbyIdVisibility}
-      ></setting-toggle>
-
-      <!-- 🔔 Lobby start alerts -->
-      <setting-toggle
-        label="${translateText("user_setting.lobby_start_alerts_label")}"
-        description="${translateText("user_setting.lobby_start_alerts_desc")}"
-        id="lobby-start-alerts-toggle"
-        .checked=${this.userSettings.lobbyStartAlerts()}
-        @change=${this.toggleLobbyStartAlerts}
-      ></setting-toggle>
-
-      <!-- 🔍 Go to player -->
-      <setting-toggle
-        label="${translateText("user_setting.go_to_player_label")}"
-        description="${translateText("user_setting.go_to_player_desc")}"
-        id="go-to-player-toggle"
-        .checked=${this.userSettings.goToPlayer()}
-        @change=${this.toggleGoToPlayer}
-      ></setting-toggle>
-
-      <!-- Help messages (moved here from the in-game menu) -->
-      <setting-toggle
-        label="${translateText("user_setting.help_messages_label")}"
-        description="${translateText("user_setting.help_messages_desc")}"
-        id="help-messages-toggle"
-        .checked=${this.userSettings.helpMessages()}
-        @change=${this.toggleHelpMessages}
-      ></setting-toggle>
-
-      <!-- Attacking troops overlay (moved here from the in-game menu) -->
-      <setting-toggle
-        label="${translateText("user_setting.attacking_troops_overlay_label")}"
-        description="${translateText(
-          "user_setting.attacking_troops_overlay_desc",
-        )}"
-        id="attacking-troops-overlay-toggle"
-        .checked=${this.userSettings.attackingTroopsOverlay()}
-        @change=${this.toggleAttackingTroopsOverlay}
-      ></setting-toggle>
-
-      <!-- ⚔️ Attack Ratio -->
-      <setting-slider
-        label="${translateText("user_setting.attack_ratio_label")}"
-        description="${translateText("user_setting.attack_ratio_desc")}"
-        id="attack-ratio-slider"
-        min="1"
-        max="100"
-        .value=${Math.round(this.currentAttackRatio() * 100)}
-        @change=${this.sliderAttackRatio}
-      ></setting-slider>
-
-      <!-- ⚔️ Attack Ratio Increment -->
-      <setting-select
-        label=${translateText("user_setting.attack_ratio_increment_label")}
-        description=${translateText("user_setting.attack_ratio_increment_desc")}
-        .options=${[
-          { value: 1, label: "1%" },
-          { value: 2, label: "2%" },
-          { value: 5, label: "5%" },
-          { value: 10, label: "10%" },
-          { value: 20, label: "20%" },
-        ]}
-        .value=${String(this.userSettings.attackRatioIncrement())}
-        @change=${this.changeAttackRatioIncrement}
-      ></setting-select>
-
-      ${
-        this.showEasterEggSettings
-          ? html`
-              <setting-slider
-                label="${translateText(
-                  "user_setting.easter_writing_speed_label",
-                )}"
-                description="${translateText(
-                  "user_setting.easter_writing_speed_desc",
-                )}"
-                min="0"
-                max="100"
-                value="40"
-                easter="true"
-                @change=${(e: CustomEvent) => {
-                  const value = e.detail?.value;
-                  if (value !== undefined) {
-                    console.log("Changed:", value);
-                  } else {
-                    console.warn("Slider event missing detail.value", e);
-                  }
-                }}
-              ></setting-slider>
-
-              <setting-number
-                label="${translateText("user_setting.easter_bug_count_label")}"
-                description="${translateText(
-                  "user_setting.easter_bug_count_desc",
-                )}"
-                value="100"
-                min="0"
-                max="1000"
-                easter="true"
-                @change=${(e: CustomEvent) => {
-                  const value = e.detail?.value;
-                  if (value !== undefined) {
-                    console.log("Changed:", value);
-                  } else {
-                    console.warn("Slider event missing detail.value", e);
-                  }
-                }}
-              ></setting-number>
-            `
-          : null
-      }
+                  <setting-number
+                    label="${translateText(
+                      "user_setting.easter_bug_count_label",
+                    )}"
+                    description="${translateText(
+                      "user_setting.easter_bug_count_desc",
+                    )}"
+                    value="100"
+                    min="0"
+                    max="1000"
+                    easter="true"
+                    @change=${(e: CustomEvent) => {
+                      const value = e.detail?.value;
+                      if (value !== undefined) {
+                        console.log("Changed:", value);
+                      } else {
+                        console.warn("Slider event missing detail.value", e);
+                      }
+                    }}
+                  ></setting-number>
+                `,
+              })
+            : nothing
+        }
+      </div>
     `;
   }
 
