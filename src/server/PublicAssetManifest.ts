@@ -11,6 +11,8 @@ const HASHED_PUBLIC_ASSET_GLOBS = [
   "changelog.md",
   "manifest.json",
   "atlases/**/*",
+  // zfront logo kit: favicon, wordmark, lockups, PWA icons.
+  "brand/**/*",
   "cosmetics/**/*",
   "flags/**/*",
   "fonts/**/*",
