@@ -7,7 +7,9 @@ import "../../src/client/GameModeSelector";
 import "../../src/client/UsernameInput";
 import {
   buildHorde,
+  canvasScale,
   LIVE_FEED_HORDES,
+  MAX_CANVAS_SIDE,
   zombieAt,
 } from "../../src/client/components/nightshift/LiveFeedBackdrop";
 import { initNavigation } from "../../src/client/Navigation";
@@ -159,5 +161,19 @@ describe("live feed horde", () => {
     expect([dead.x, dead.y]).toEqual([z.x1, z.y1]);
     expect(dead.rgb).toEqual([0x59, 0x10, 0x09]);
     expect(zombieAt(z, 1).alpha).toBeCloseTo(0);
+  });
+});
+
+describe("live feed canvas", () => {
+  it("caps the backing store under the GPU texture limit", () => {
+    // A 3440px ultrawide at 2x: its own ratio would make a 6880px canvas.
+    const scale = canvasScale(3440, 1320, 2);
+    expect(3440 * scale).toBeLessThanOrEqual(MAX_CANVAS_SIDE);
+    expect(1320 * scale).toBeLessThanOrEqual(MAX_CANVAS_SIDE);
+  });
+
+  it("uses the screen's ratio up to 1.5 when it fits", () => {
+    expect(canvasScale(1440, 900, 1)).toBe(1);
+    expect(canvasScale(390, 844, 3)).toBe(1.5);
   });
 });

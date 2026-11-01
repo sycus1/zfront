@@ -291,40 +291,6 @@
     background: var(--color-zf-ink-900);
     isolation: isolate;
   }
-  .zf-feed-box {
-    position: absolute;
-  }
-  .zf-feed-pan {
-    position: absolute;
-    inset: 0;
-    will-change: transform;
-  }
-  .zf-feed-map {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    image-rendering: pixelated;
-  }
-  .zf-feed-sprite {
-    position: absolute;
-    width: 3.4%;
-    height: auto;
-    transform: translate(-50%, -50%);
-    image-rendering: pixelated;
-    filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.35));
-  }
-  .zf-feed-tint {
-    position: absolute;
-    inset: 0;
-    background: var(--color-zf-amber-500);
-    mix-blend-mode: multiply;
-  }
-  .zf-feed-shade {
-    position: absolute;
-    inset: 0;
-    background: #000000;
-  }
   .zf-feed-canvas {
     position: absolute;
     inset: 0;

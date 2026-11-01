@@ -14,6 +14,9 @@ import "./IOSAddToHomeScreenBanner";
  * Phone (under 640px): the wordmark at the top, the panel full-bleed along the
  * bottom with the links as three icon buttons.
  *
+ * On a wide screen the row stops at 1680px and centres, so the panel stays
+ * beside the wordmark rather than drifting to the far edge.
+ *
  * The wordmark's clear space is a quarter of its cap height, and the hazard
  * stripe is the one element allowed that close (Logos README).
  */
@@ -27,7 +30,7 @@ export class PlayPage extends LitElement {
     return html`
       <div
         id="page-play"
-        class="relative flex flex-1 flex-col w-full min-h-0 font-zf-body text-zf-signal-400
+        class="relative flex flex-1 flex-col w-full min-h-0 mx-auto max-w-[1680px] font-zf-body text-zf-signal-400
           [--zf-logo-h:102px] sm:[--zf-logo-h:clamp(96px,15.2vw,224px)]
           sm:flex-row sm:flex-wrap sm:items-start sm:gap-[clamp(24px,4vw,56px)]
           sm:px-(--zf-gutter) sm:py-[clamp(24px,4vw,56px)]"
