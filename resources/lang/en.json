@@ -167,7 +167,6 @@
     "cap_label": "Cap",
     "cap_tooltip": "Recipient’s remaining capacity",
     "close": "Close",
-    "collapse_all": "Collapse all",
     "confirm": "Confirm",
     "copied": "Copied!",
     "copy": "Copy",
@@ -176,10 +175,7 @@
     "duration_minute_short": "min",
     "duration_second_short": "s",
     "enabled": "Enabled",
-    "expand_all": "Expand all",
     "failed_copy": "Failed to copy",
-    "loading": "Loading...",
-    "map_default": "Map default",
     "none": "None",
     "preset_max": "Max",
     "send": "Send",
@@ -326,7 +322,6 @@
   "game_settings": {
     "bots": "Tribes: ",
     "compact_map": "Compact Map",
-    "disable_units": "Disable Units",
     "doomsday_clock": "Doomsday Clock",
     "gold_multiplier": "Gold multiplier",
     "infinite_gold": "Infinite gold",
@@ -335,12 +330,8 @@
     "max_timer": "Game length (minutes)",
     "mins_placeholder": "Mins",
     "nations": "Nations: ",
-    "options": "Options",
     "overtime": "Overtime after (minutes)",
     "random_spawn": "Random spawn",
-    "start": "Start Game",
-    "starting": "Starting…",
-    "starting_gold": "Starting Gold (Millions)",
     "water_nukes": "Water nukes"
   },
   "game_starting_modal": {
@@ -684,7 +675,6 @@
     "play_solo": "PLAY SOLO",
     "privacy_policy": "Privacy Policy",
     "settings": "Settings",
-    "solo": "Solo",
     "terms_of_service": "Terms of Service",
     "title": "zFront (ALPHA)",
     "troubleshooting": "Troubleshooting",
@@ -721,15 +711,6 @@
     "special": "Special",
     "tournament": "Tournament",
     "world": "World"
-  },
-  "map_component": {
-    "error": "Error",
-    "favorite": "Add to favourites",
-    "favorites_empty": "Click the star on any map to favourite it",
-    "no_results": "No maps found",
-    "search_maps": "Search maps...",
-    "search_results": "Search Results",
-    "unfavorite": "Remove from favourites"
   },
   "map_layers": {
     "brland": "brland",
@@ -851,7 +832,6 @@
     "water_nukes": "Water Nukes"
   },
   "public_lobby": {
-    "teams": "{num} teams",
     "teams_hvn": "Humans vs Nations",
     "teams_hvn_detailed": "{num} Humans vs {num} Nations"
   },
@@ -885,9 +865,6 @@
     "available_tooltip": "Your current available troops",
     "capacity_note": "Receiver can accept only {amount} right now.",
     "title_with_name": "Send Troops to {name}"
-  },
-  "single_modal": {
-    "max_timer_invalid": "Please enter a valid max timer value (1-120 minutes)"
   },
   "spawn_timer": {
     "team_percent_tooltip": "{team}: {percent}"
@@ -1203,5 +1180,47 @@
     "spectate": "Spectate",
     "you_won": "You Won!",
     "your_team": "Your team won!"
+  },
+  "zf_play": {
+    "advanced": "Advanced",
+    "back_change_map": "Change Map",
+    "back_menu": "Menu",
+    "briefing": "Briefing",
+    "buildings": "Buildings Allowed",
+    "cash_multiplier": "Cash Multiplier",
+    "coming_soon": "Coming Soon",
+    "continue": "CONTINUE",
+    "difficulty": "Difficulty",
+    "economy": "Economy",
+    "kind_city": "City",
+    "kind_region": "Region",
+    "kind_town": "Town",
+    "map_title": "MAP SELECTION",
+    "maps": "Maps",
+    "rule_infinite_cash": "Infinite Cash",
+    "rule_instant_build": "Instant Build",
+    "rule_interest": "Interest Between Waves",
+    "rule_random_spawn": "Random Spawn",
+    "rules": "Rules",
+    "scale_tiles": "{w} × {h} tiles",
+    "scale_town": "{km} km square · {w} × {h} tiles of {m} m",
+    "selected_ground": "Selected Ground",
+    "setup_title": "GAME RULES",
+    "start": "START GAME",
+    "starting": "STARTING…",
+    "starting_cash": "Bonus Starting Cash",
+    "step_map": "01 Map",
+    "step_setup": "02 Setup",
+    "steps": "Steps",
+    "summary_buildings": "Buildings",
+    "summary_buildings_value": "{n} of {total}",
+    "summary_map": "Map",
+    "tag_km": "{kind} · {km} km",
+    "tag_region": "{kind} · GB",
+    "terrain": "Terrain",
+    "terrain_open": "Open Ground",
+    "terrain_solid": "Solid (Buildings, Cliffs)",
+    "terrain_water": "Water",
+    "waves": "Waves to Survive"
   }
 }

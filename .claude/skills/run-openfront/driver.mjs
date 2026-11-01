@@ -84,8 +84,8 @@ export async function gotoHome(page) {
   await page.waitForTimeout(3000);
 }
 
-// The single-player button is labeled "Solo". There are multiple Solo
-// buttons in the DOM (responsive layouts) — only one is visible.
+// The main menu's primary action is "PLAY SOLO"; it opens the solo flow on
+// its first step, map selection.
 export async function openSoloModal(page) {
   await page.locator("button:visible", { hasText: /solo/i }).first().click();
   await page.waitForTimeout(1500);
@@ -103,11 +103,11 @@ if (isMain) {
   await page.screenshot({ path: `${outDir}/solo-modal.png` });
   // Reach into a Lit component for ground-truth state (light DOM, no shadow
   // root — properties are directly on the element).
-  const picker = await page.evaluate(() => {
-    const p = document.querySelector("map-picker");
-    return { selectedMap: p?.selectedMap, activeTab: p?.activeTab };
+  const solo = await page.evaluate(() => {
+    const m = document.querySelector("single-player-modal");
+    return { step: m?.step, selectedMap: m?.selectedMap };
   });
-  console.log("map-picker state:", JSON.stringify(picker));
+  console.log("solo flow state:", JSON.stringify(solo));
   console.log(`screenshots: ${outDir}/home.png ${outDir}/solo-modal.png`);
   await browser.close();
 }

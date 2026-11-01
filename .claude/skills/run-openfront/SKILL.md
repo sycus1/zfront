@@ -65,7 +65,7 @@ await gotoHome(page);
 await openSoloModal(page);
 // Lit components use light DOM — query and read properties directly:
 const s = await page.evaluate(
-  () => document.querySelector("map-picker")?.selectedMap,
+  () => document.querySelector("single-player-modal")?.selectedMap,
 );
 await browser.close();
 ```
@@ -187,9 +187,10 @@ npx vitest tests/MapConsistency.test.ts --run # single file
   `FONTCONFIG_FILE` pointing at `~/.cache/openfront-run/`; diagnose new
   missing libs with `DEBUG=pw:browser` and
   `ldd .../chrome-headless-shell | grep "not found"`.
-- **The single-player button is labeled "Solo"** (`main.solo`), and the DOM has more
-  than one (responsive layouts) — use `button:visible` with
-  `hasText: /solo/i`.
+- **The single-player button is labeled "PLAY SOLO"** (`main.play_solo`); use
+  `button:visible` with `hasText: /solo/i`. It opens the two-step solo flow
+  (`single-player-modal`, `step` "map" then "setup"); START GAME is the
+  button in `.zf-strip-action` on the setup step.
 - **Lit + Vite HMR**: custom elements can't be re-registered, so an
   already-open tab keeps old component code after an edit. Hard-reload
   (or re-`goto`) before judging behavior.

@@ -1,37 +1,57 @@
 import {
   Difficulty,
+  Duos,
   GameMapSize,
   GameMapType,
   GameMode,
   GameType,
+  Quads,
+  Trios,
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
 import { TeamCountConfig } from "@openfront/engine-api/Schemas";
-import { DoomsdayClockSpeed } from "@openfront/engine-lib/game/DoomsdayClock";
+import {
+  DOOMSDAY_CLOCK_SPEEDS,
+  DoomsdayClockSpeed,
+} from "@openfront/engine-lib/game/DoomsdayClock";
+import { assetUrl } from "@openfront/shared/AssetUrls";
 import { generateID } from "@openfront/shared/SharedUtil";
 import { PlayerCosmetics } from "@openfront/shared/WireSchemas";
-import { html } from "lit";
+import { html, nothing, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { translateText } from "../client/Utils";
-import "./components/baseComponents/Button";
-import "./components/baseComponents/Modal";
 import { BaseModal } from "./components/BaseModal";
-import "./components/GameConfigSettings";
-import "./components/ToggleInputCard";
-import { modalHeader } from "./components/ui/ModalHeader";
+import type { IconName } from "./components/nightshift/Icon";
+import {
+  MAP_FACTS,
+  type MapFacts,
+  mapFacts,
+} from "./components/nightshift/MapFacts";
+import {
+  zfActionStrip,
+  zfBackButton,
+  zfMapBackdrop,
+  zfMapCard,
+  zfOptionGroup,
+  zfPageHeader,
+  zfPageTitle,
+  zfPrimaryButton,
+  zfSteps,
+  zfSwitchChip,
+  zfTerrainBars,
+  zfTextField,
+  zfTile,
+  zfToggleChip,
+} from "./components/nightshift/Primitives";
 import { GameStartingModal } from "./GameStartingModal";
-import { showInGameAlert } from "./InGameModal";
 import { JoinLobbyEvent } from "./Main";
 import { fallbackPlayerName, ResolvedPlayerName } from "./PlayerName";
 import { UsernameInput } from "./UsernameInput";
 import { UserSettings } from "./UserSettings";
 import {
-  getRandomMapType,
-  getUpdatedDisabledUnits,
   parseBoundedFloatFromInput,
   parseBoundedIntegerFromInput,
   preventDisallowedKeys,
-  toOptionalNumber,
 } from "./utilities/GameConfigHelpers";
 
 /** What a start has to wait for before it can dispatch join-lobby. */
@@ -40,56 +60,96 @@ type StartPreparation = {
   cosmetics: PlayerCosmetics;
 };
 
+type Step = "map" | "setup";
+
 const DEFAULT_OPTIONS = {
-  selectedMap: GameMapType.Britannia,
+  selectedMap: GameMapType.Bath,
   selectedDifficulty: Difficulty.Easy,
   infiniteGold: false,
   infiniteTroops: false,
   compactMap: false,
-  maxTimer: false,
   maxTimerValue: undefined as number | undefined,
   instantBuild: false,
   randomSpawn: false,
-  useRandomMap: false,
   gameMode: GameMode.FFA,
   teamCount: 2 as TeamCountConfig,
-  goldMultiplier: false,
   goldMultiplierValue: undefined as number | undefined,
-  startingGold: false,
   startingGoldValue: undefined as number | undefined,
   disabledUnits: [] as UnitType[],
   waterNukes: false,
   doomsdayClock: false,
   doomsdayClockSpeed: "normal" as DoomsdayClockSpeed,
-  overtime: false,
   overtimeStartMinutes: undefined as number | undefined,
 } as const;
 
+/** The buildings a game can allow or leave out, in build-menu order. */
+export const RULE_BUILDINGS: {
+  unit: UnitType;
+  labelKey: string;
+  icon: IconName;
+}[] = [
+  { unit: UnitType.Wall, labelKey: "unit_type.wall", icon: "walls" },
+  {
+    unit: UnitType.DefensePost,
+    labelKey: "unit_type.defense_post",
+    icon: "turret",
+  },
+  { unit: UnitType.Mine, labelKey: "unit_type.mine", icon: "mine" },
+  {
+    unit: UnitType.NoiseBeacon,
+    labelKey: "unit_type.noise_beacon",
+    icon: "beacon",
+  },
+  { unit: UnitType.Depot, labelKey: "unit_type.depot", icon: "depot" },
+  {
+    unit: UnitType.MissileSilo,
+    labelKey: "unit_type.missile_silo",
+    icon: "mortar",
+  },
+  { unit: UnitType.Outpost, labelKey: "unit_type.outpost", icon: "outpost" },
+];
+
+/**
+ * Shown, per the design, but disabled: the engine has no setting for them in
+ * solo zombie games yet (waves are set per map; difficulty only tunes AI
+ * players, and solo games have none).
+ */
+const DIFFICULTIES = [
+  Difficulty.Easy,
+  Difficulty.Medium,
+  Difficulty.Hard,
+  Difficulty.Impossible,
+] as const;
+const WAVE_OPTIONS = [5, 10, 15, 20, 30] as const;
+
+const TEAM_COUNTS: TeamCountConfig[] = [2, 3, 4, 5, 6, 7, Quads, Trios, Duos];
+
+/**
+ * The solo game flow (Night Shift): 01 MAP, the map picker, then 02 SETUP,
+ * the game rules, ending in START GAME. An inline page; the main menu's PLAY
+ * SOLO opens it.
+ */
 @customElement("single-player-modal")
 export class SinglePlayerModal extends BaseModal {
   protected routerName = "single-player";
 
+  @state() private step: Step = "map";
   @state() private selectedMap: GameMapType = DEFAULT_OPTIONS.selectedMap;
   @state() private selectedDifficulty: Difficulty =
     DEFAULT_OPTIONS.selectedDifficulty;
   @state() private infiniteGold: boolean = DEFAULT_OPTIONS.infiniteGold;
   @state() private infiniteTroops: boolean = DEFAULT_OPTIONS.infiniteTroops;
   @state() private compactMap: boolean = DEFAULT_OPTIONS.compactMap;
-  @state() private maxTimer: boolean = DEFAULT_OPTIONS.maxTimer;
   @state() private maxTimerValue: number | undefined =
     DEFAULT_OPTIONS.maxTimerValue;
   @state() private instantBuild: boolean = DEFAULT_OPTIONS.instantBuild;
   @state() private randomSpawn: boolean = DEFAULT_OPTIONS.randomSpawn;
-  @state() private useRandomMap: boolean = DEFAULT_OPTIONS.useRandomMap;
   @state() private gameMode: GameMode = DEFAULT_OPTIONS.gameMode;
   @state() private teamCount: TeamCountConfig = DEFAULT_OPTIONS.teamCount;
-  @state() private goldMultiplier: boolean = DEFAULT_OPTIONS.goldMultiplier;
   @state() private goldMultiplierValue: number | undefined =
     DEFAULT_OPTIONS.goldMultiplierValue;
-  @state() private startingGold: boolean = DEFAULT_OPTIONS.startingGold;
   @state() private startingGoldValue: number | undefined =
     DEFAULT_OPTIONS.startingGoldValue;
-
   @state() private disabledUnits: UnitType[] = [
     ...DEFAULT_OPTIONS.disabledUnits,
   ];
@@ -97,7 +157,6 @@ export class SinglePlayerModal extends BaseModal {
   @state() private doomsdayClock: boolean = DEFAULT_OPTIONS.doomsdayClock;
   @state() private doomsdayClockSpeed: DoomsdayClockSpeed =
     DEFAULT_OPTIONS.doomsdayClockSpeed;
-  @state() private overtime: boolean = DEFAULT_OPTIONS.overtime;
   @state() private overtimeStartMinutes: number | undefined =
     DEFAULT_OPTIONS.overtimeStartMinutes;
   // Drives the Start Game button's busy state. Without it the click produces
@@ -111,178 +170,469 @@ export class SinglePlayerModal extends BaseModal {
   // cleanup cannot hide the overlay a newer attempt has shown.
   private overlayAttempt: number = 0;
 
-  protected renderHeaderSlot() {
-    return modalHeader({
-      title: translateText("main.solo") || "Solo",
-      onBack: () => this.close(),
-      ariaLabel: translateText("common.back"),
-    });
+  /**
+   * The page is drawn here rather than in BaseModal's <o-modal>: Night Shift
+   * pages are full-width with their own backdrop. BaseModal still owns
+   * open/close, Escape and the router.
+   */
+  render(): TemplateResult {
+    const facts = mapFacts(this.selectedMap);
+    return html`<section
+      class="zf-page"
+      aria-labelledby=${this.step === "map" ? "zf-map-title" : "zf-setup-title"}
+    >
+      ${zfMapBackdrop(assetUrl(facts.preview))}
+      <div class="zf-page-inner">
+        ${this.step === "map" ? this.renderMapStep(facts) : this.renderSetupStep(facts)}
+      </div>
+    </section>`;
   }
 
-  protected renderBody() {
-    const inputCards = [
-      html`<toggle-input-card
-        .labelKey=${"game_settings.max_timer"}
-        .checked=${this.maxTimer}
-        .inputId=${"end-timer-value"}
-        .inputMin=${1}
-        .inputMax=${120}
-        .inputValue=${this.maxTimerValue}
-        .inputAriaLabel=${translateText("game_settings.max_timer")}
-        .inputPlaceholder=${translateText("game_settings.mins_placeholder")}
-        .defaultInputValue=${30}
-        .minValidOnEnable=${1}
-        .onToggle=${this.handleMaxTimerToggle}
-        .onInput=${this.handleMaxTimerValueChanges}
-        .onKeyDown=${this.handleMaxTimerValueKeyDown}
-      ></toggle-input-card>`,
-      html`<toggle-input-card
-        .labelKey=${"game_settings.gold_multiplier"}
-        .checked=${this.goldMultiplier}
-        .inputId=${"gold-multiplier-value"}
-        .inputMin=${0.1}
-        .inputMax=${1000}
-        .inputStep=${"any"}
-        .inputValue=${this.goldMultiplierValue}
-        .inputAriaLabel=${translateText("game_settings.gold_multiplier")}
-        .inputPlaceholder=${"2.0x"}
-        .defaultInputValue=${2}
-        .minValidOnEnable=${0.1}
-        .onToggle=${this.handleGoldMultiplierToggle}
-        .onChange=${this.handleGoldMultiplierValueChanges}
-        .onKeyDown=${this.handleGoldMultiplierValueKeyDown}
-      ></toggle-input-card>`,
-      html`<toggle-input-card
-        .labelKey=${"game_settings.starting_gold"}
-        .checked=${this.startingGold}
-        .inputId=${"starting-gold-value"}
-        .inputMin=${0.1}
-        .inputMax=${1000}
-        .inputStep=${"any"}
-        .inputValue=${this.startingGoldValue}
-        .inputAriaLabel=${translateText("game_settings.starting_gold")}
-        .inputPlaceholder=${"5"}
-        .defaultInputValue=${5}
-        .minValidOnEnable=${0.1}
-        .onToggle=${this.handleStartingGoldToggle}
-        .onChange=${this.handleStartingGoldValueChanges}
-        .onKeyDown=${this.handleStartingGoldValueKeyDown}
-      ></toggle-input-card>`,
-      html`<toggle-input-card
-        .labelKey=${"game_settings.overtime"}
-        .checked=${this.overtime}
-        .inputMin=${1}
-        .inputMax=${120}
-        .inputStep=${1}
-        .inputValue=${this.overtimeStartMinutes}
-        .inputAriaLabel=${translateText("game_settings.overtime")}
-        .inputPlaceholder=${translateText("game_settings.mins_placeholder")}
-        .defaultInputValue=${30}
-        .minValidOnEnable=${1}
-        .onToggle=${this.handleOvertimeToggle}
-        .onInput=${this.handleOvertimeMinutesInput}
-        .onKeyDown=${this.handleOvertimeMinutesKeyDown}
-      ></toggle-input-card>`,
-    ];
+  private steps(): TemplateResult {
+    const onMap = this.step === "map";
+    return zfSteps(translateText("zf_play.steps"), [
+      {
+        label: translateText("zf_play.step_map"),
+        state: onMap ? "current" : "done",
+      },
+      {
+        label: translateText("zf_play.step_setup"),
+        state: onMap ? "upcoming" : "current",
+      },
+    ]);
+  }
 
+  private mapName(facts: MapFacts): string {
+    return translateText(`map.${facts.map.toLowerCase()}`);
+  }
+
+  private mapTag(facts: MapFacts): string {
+    const kind = translateText(`zf_play.kind_${facts.kind}`);
+    return facts.km !== undefined
+      ? translateText("zf_play.tag_km", { kind, km: facts.km })
+      : translateText("zf_play.tag_region", { kind });
+  }
+
+  private mapScale(facts: MapFacts): string {
+    return facts.km !== undefined && facts.metresPerTile !== undefined
+      ? translateText("zf_play.scale_town", {
+          km: facts.km,
+          w: facts.tilesWide,
+          h: facts.tilesHigh,
+          m: facts.metresPerTile,
+        })
+      : translateText("zf_play.scale_tiles", {
+          w: facts.tilesWide,
+          h: facts.tilesHigh,
+        });
+  }
+
+  private terrain(facts: MapFacts): TemplateResult {
+    return zfTerrainBars([
+      {
+        label: translateText("zf_play.terrain_open"),
+        pct: facts.open,
+        kind: "open",
+      },
+      {
+        label: translateText("zf_play.terrain_solid"),
+        pct: facts.solid,
+        kind: "solid",
+      },
+      {
+        label: translateText("zf_play.terrain_water"),
+        pct: facts.water,
+        kind: "water",
+      },
+    ]);
+  }
+
+  private renderMapStep(facts: MapFacts): TemplateResult {
+    const name = this.mapName(facts);
     return html`
-      <div class="flex flex-col h-full">
-        <div
-          class="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-6 pt-4 pb-6 mr-1 mx-auto w-full max-w-5xl"
-        >
-          <game-config-settings
-            class="block"
-            .sectionGapClass=${"space-y-6"}
-            .settings=${{
-              map: {
-                selected: this.selectedMap,
-                useRandom: this.useRandomMap,
-                showMedals: false,
-                mapWins: new Map(),
-              },
-              difficulty: {
-                selected: this.selectedDifficulty,
-                // Difficulty only tunes the AI players, which solo games
-                // don't have.
-                disabled: true,
-              },
-              gameMode: {
-                selected: this.gameMode,
-              },
-              teamCount: {
-                selected: this.teamCount,
-              },
-              options: {
-                titleKey: "game_settings.options",
-                toggles: [
-                  {
-                    labelKey: "game_settings.instant_build",
-                    checked: this.instantBuild,
-                  },
-                  {
-                    labelKey: "game_settings.random_spawn",
-                    checked: this.randomSpawn,
-                  },
-                  {
-                    labelKey: "game_settings.infinite_gold",
-                    checked: this.infiniteGold,
-                  },
-                  {
-                    labelKey: "game_settings.infinite_troops",
-                    checked: this.infiniteTroops,
-                  },
-                  {
-                    labelKey: "game_settings.compact_map",
-                    checked: this.compactMap,
-                  },
-                  {
-                    labelKey: "game_settings.water_nukes",
-                    checked: this.waterNukes,
-                  },
-                  {
-                    labelKey: "game_settings.doomsday_clock",
-                    checked: this.doomsdayClock,
-                    doomsdayClockSpeed: this.doomsdayClockSpeed,
-                  },
-                ],
-                inputCards,
-              },
-              unitTypes: {
-                titleKey: "game_settings.disable_units",
-                disabledUnits: this.disabledUnits,
-              },
-            }}
-            @map-selected=${this.handleConfigMapSelected}
-            @random-map-selected=${this.handleConfigRandomMapSelected}
-            @difficulty-selected=${this.handleConfigDifficultySelected}
-            @doomsday-clock-speed-selected=${
-              this.handleConfigDoomsdayClockSpeedSelected
-            }
-            @game-mode-selected=${this.handleConfigGameModeSelected}
-            @team-count-selected=${this.handleConfigTeamCountSelected}
-            @option-toggle-changed=${this.handleConfigOptionToggleChanged}
-            @unit-toggle-changed=${this.handleConfigUnitToggleChanged}
-          ></game-config-settings>
-        </div>
-
-        <!-- Footer Action -->
-        <div class="p-6 border-t border-white/10 bg-black/20 shrink-0">
-          <o-button
-            variant="primary"
-            width="block"
-            size="lg"
-            translationKey=${
-              this.starting ? "game_settings.starting" : "game_settings.start"
-            }
-            .disable=${this.starting}
-            @click=${this.startGame}
-          ></o-button>
-        </div>
+      ${zfPageHeader(
+        zfBackButton({
+          label: translateText("zf_play.back_menu"),
+          onClick: () => this.close(),
+        }),
+        this.steps(),
+      )}
+      ${zfPageTitle("zf-map-title", translateText("zf_play.map_title"))}
+      <div
+        class="zf-maps"
+        role="radiogroup"
+        aria-label=${translateText("zf_play.maps")}
+      >
+        ${MAP_FACTS.map((f) =>
+          zfMapCard({
+            name: this.mapName(f),
+            tag: this.mapTag(f),
+            image: assetUrl(f.preview),
+            imagePosition: f.previewPosition,
+            selected: f.map === this.selectedMap,
+            onSelect: () => (this.selectedMap = f.map),
+          }),
+        )}
       </div>
+      <section
+        class="zf-selected-map zf-frame zf-frame-lg"
+        aria-label=${translateText("zf_play.selected_ground")}
+      >
+        <img
+          src=${assetUrl(facts.preview)}
+          alt=""
+          draggable="false"
+          style="object-position: ${facts.previewPosition}"
+        />
+        <div class="zf-selected-map-body">
+          <div class="zf-selected-map-head">
+            <span class="zf-ground-title">${name}</span>
+            <span class="zf-selected-map-scale">${this.mapScale(facts)}</span>
+          </div>
+          <span class="zf-strip-label zf-selected-map-rule"
+            >${translateText("zf_play.terrain")}</span
+          >
+          ${this.terrain(facts)}
+        </div>
+      </section>
+      ${zfActionStrip({
+        label: translateText("zf_play.selected_ground"),
+        content: html`
+          <div class="zf-ground">
+            <div class="zf-ground-name">
+              <span class="zf-strip-label"
+                >${translateText("zf_play.selected_ground")}</span
+              >
+              <h2 class="zf-ground-title">${name}</h2>
+              <span class="zf-ground-scale">${this.mapScale(facts)}</span>
+            </div>
+            <div class="zf-ground-terrain">
+              <span class="zf-strip-label"
+                >${translateText("zf_play.terrain")}</span
+              >
+              ${this.terrain(facts)}
+            </div>
+          </div>
+        `,
+        action: zfPrimaryButton({
+          label: translateText("zf_play.continue"),
+          onClick: () => this.goTo("setup"),
+        }),
+        compact: true,
+      })}
     `;
   }
 
-  // Check if any options other than map and difficulty have been changed from defaults
+  private renderSetupStep(facts: MapFacts): TemplateResult {
+    const allowed = RULE_BUILDINGS.filter(
+      (b) => !this.disabledUnits.includes(b.unit),
+    ).length;
+    const comingSoon = translateText("zf_play.coming_soon");
+    return html`
+      ${zfPageHeader(
+        zfBackButton({
+          label: translateText("zf_play.back_change_map"),
+          onClick: () => this.goTo("map"),
+        }),
+        this.steps(),
+      )}
+      ${zfPageTitle("zf-setup-title", translateText("zf_play.setup_title"))}
+      <div class="zf-tiles">
+        ${zfTile({
+          title: translateText("zf_play.difficulty"),
+          note: comingSoon,
+          disabled: true,
+          body: zfOptionGroup({
+            label: translateText("zf_play.difficulty"),
+            options: DIFFICULTIES.map((d) => ({
+              value: d,
+              label: translateText(`difficulty.${d.toLowerCase()}`),
+            })),
+            value: undefined as Difficulty | undefined,
+            onSelect: () => {},
+            columns: 2,
+            disabled: true,
+          }),
+        })}
+        ${zfTile({
+          title: translateText("zf_play.waves"),
+          note: comingSoon,
+          disabled: true,
+          body: zfOptionGroup({
+            label: translateText("zf_play.waves"),
+            options: WAVE_OPTIONS.map((n) => ({ value: n, label: String(n) })),
+            value: undefined as number | undefined,
+            onSelect: () => {},
+            fontSize: "34px",
+            disabled: true,
+          }),
+        })}
+        ${zfTile({
+          title: translateText("zf_play.economy"),
+          body: html`<div class="zf-field-pair">
+            ${zfTextField({
+              id: "zf-starting-cash",
+              label: translateText("zf_play.starting_cash"),
+              type: "number",
+              inputmode: "numeric",
+              placeholder: "0",
+              min: 0,
+              max: 10_000_000,
+              step: 1,
+              value: this.startingGoldValue?.toString() ?? "",
+              onInput: this.handleStartingCashInput,
+              onKeyDown: (e) =>
+                preventDisallowedKeys(e, ["-", "+", "e", "E", "."]),
+            })}
+            ${zfTextField({
+              id: "zf-cash-multiplier",
+              label: translateText("zf_play.cash_multiplier"),
+              type: "number",
+              inputmode: "decimal",
+              placeholder: "1",
+              min: 0.1,
+              max: 1000,
+              step: "any",
+              value: this.goldMultiplierValue?.toString() ?? "",
+              onInput: this.handleCashMultiplierInput,
+              onKeyDown: (e) => preventDisallowedKeys(e, ["-", "+", "e", "E"]),
+            })}
+          </div>`,
+        })}
+      </div>
+      ${zfTile({
+        title: translateText("zf_play.rules"),
+        body: html`<div class="zf-chips">
+          ${zfSwitchChip({
+            label: translateText("zf_play.rule_interest"),
+            checked: false,
+            onToggle: () => {},
+            disabled: true,
+          })}
+          ${zfSwitchChip({
+            label: translateText("zf_play.rule_instant_build"),
+            checked: this.instantBuild,
+            onToggle: (v) => (this.instantBuild = v),
+          })}
+          ${zfSwitchChip({
+            label: translateText("zf_play.rule_infinite_cash"),
+            checked: this.infiniteGold,
+            onToggle: (v) => (this.infiniteGold = v),
+          })}
+          ${zfSwitchChip({
+            label: translateText("zf_play.rule_random_spawn"),
+            checked: this.randomSpawn,
+            onToggle: (v) => (this.randomSpawn = v),
+          })}
+        </div>`,
+      })}
+      ${zfTile({
+        title: translateText("zf_play.buildings"),
+        body: html`<div class="zf-chips">
+          ${RULE_BUILDINGS.map((b) =>
+            zfToggleChip({
+              label: translateText(b.labelKey),
+              icon: b.icon,
+              pressed: !this.disabledUnits.includes(b.unit),
+              onToggle: (on) => this.setUnitAllowed(b.unit, on),
+            }),
+          )}
+        </div>`,
+      })}
+      ${this.renderAdvanced()}
+      ${zfActionStrip({
+        label: translateText("zf_play.briefing"),
+        items: [
+          {
+            label: translateText("zf_play.summary_map"),
+            value: this.mapName(facts),
+          },
+          {
+            label: translateText("zf_play.summary_buildings"),
+            value: translateText("zf_play.summary_buildings_value", {
+              n: allowed,
+              total: RULE_BUILDINGS.length,
+            }),
+          },
+        ],
+        action: zfPrimaryButton({
+          label: translateText(
+            this.starting ? "zf_play.starting" : "zf_play.start",
+          ),
+          busy: this.starting,
+          disabled: this.starting,
+          onClick: () => void this.startGame(),
+        }),
+      })}
+    `;
+  }
+
+  /** OpenFront's options that aren't on the Night Shift board, kept here. */
+  private renderAdvanced(): TemplateResult {
+    return html`<details class="zf-advanced zf-frame zf-frame-lg">
+      <summary class="zf-advanced-summary">
+        <span class="zf-tile-title">${translateText("zf_play.advanced")}</span>
+      </summary>
+      <div class="zf-advanced-body">
+        <div class="zf-chips">
+          ${zfSwitchChip({
+            label: translateText("game_settings.infinite_troops"),
+            checked: this.infiniteTroops,
+            onToggle: (v) => (this.infiniteTroops = v),
+          })}
+          ${zfSwitchChip({
+            label: translateText("game_settings.compact_map"),
+            checked: this.compactMap,
+            onToggle: (v) => (this.compactMap = v),
+          })}
+          ${zfSwitchChip({
+            label: translateText("game_settings.water_nukes"),
+            checked: this.waterNukes,
+            onToggle: (v) => (this.waterNukes = v),
+          })}
+          ${zfSwitchChip({
+            label: translateText("game_settings.doomsday_clock"),
+            checked: this.doomsdayClock,
+            onToggle: (v) => (this.doomsdayClock = v),
+          })}
+        </div>
+        ${
+          this.doomsdayClock
+            ? zfOptionGroup({
+                label: translateText("game_settings.doomsday_clock"),
+                options: DOOMSDAY_CLOCK_SPEEDS.map((s) => ({
+                  value: s,
+                  label: translateText(`doomsday_clock_speed.${s}`),
+                })),
+                value: this.doomsdayClockSpeed,
+                onSelect: (s) => (this.doomsdayClockSpeed = s),
+                fontSize: "20px",
+              })
+            : nothing
+        }
+        <div class="zf-field-pair">
+          ${zfTextField({
+            id: "zf-max-timer",
+            label: translateText("game_settings.max_timer"),
+            type: "number",
+            inputmode: "numeric",
+            placeholder: translateText("game_settings.mins_placeholder"),
+            min: 1,
+            max: 120,
+            step: 1,
+            value: this.maxTimerValue?.toString() ?? "",
+            onInput: this.handleMaxTimerInput,
+            onKeyDown: (e) =>
+              preventDisallowedKeys(e, ["-", "+", "e", "E", "."]),
+          })}
+          ${zfTextField({
+            id: "zf-overtime",
+            label: translateText("game_settings.overtime"),
+            type: "number",
+            inputmode: "numeric",
+            placeholder: translateText("game_settings.mins_placeholder"),
+            min: 1,
+            max: 120,
+            step: 1,
+            value: this.overtimeStartMinutes?.toString() ?? "",
+            onInput: this.handleOvertimeInput,
+            onKeyDown: (e) =>
+              preventDisallowedKeys(e, ["-", "+", "e", "E", "."]),
+          })}
+        </div>
+        ${zfOptionGroup({
+          label: translateText("host_modal.mode"),
+          options: [
+            { value: GameMode.FFA, label: translateText("game_mode.ffa") },
+            { value: GameMode.Team, label: translateText("game_mode.teams") },
+          ],
+          value: this.gameMode,
+          onSelect: (m) => (this.gameMode = m),
+          fontSize: "22px",
+        })}
+        ${
+          this.gameMode === GameMode.Team
+            ? zfOptionGroup({
+                label: translateText("host_modal.team_count"),
+                options: TEAM_COUNTS.map((c) => ({
+                  value: c,
+                  label:
+                    typeof c === "number"
+                      ? String(c)
+                      : translateText(`host_modal.teams_${c}`),
+                })),
+                value: this.teamCount,
+                onSelect: (c) => (this.teamCount = c),
+                columns: 3,
+                fontSize: "20px",
+              })
+            : nothing
+        }
+      </div>
+    </details>`;
+  }
+
+  /** Moves between the two steps and back to the top of the page. */
+  private goTo(step: Step) {
+    this.step = step;
+    this.updateComplete.then(() => {
+      this.querySelector(".zf-page")?.scrollTo?.({ top: 0 });
+      this.querySelector<HTMLElement>(".zf-page-title")?.focus?.();
+    });
+  }
+
+  private setUnitAllowed(unit: UnitType, allowed: boolean) {
+    const without = this.disabledUnits.filter((u) => u !== unit);
+    this.disabledUnits = allowed ? without : [...without, unit];
+  }
+
+  private handleStartingCashInput = (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    this.startingGoldValue =
+      input.value === ""
+        ? undefined
+        : parseBoundedIntegerFromInput(input, {
+            min: 0,
+            max: 10_000_000,
+            stripPattern: /[e+.-]/gi,
+          });
+  };
+
+  private handleCashMultiplierInput = (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    this.goldMultiplierValue =
+      input.value === ""
+        ? undefined
+        : parseBoundedFloatFromInput(input, { min: 0.1, max: 1000 });
+  };
+
+  private handleMaxTimerInput = (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    this.maxTimerValue =
+      input.value === ""
+        ? undefined
+        : parseBoundedIntegerFromInput(input, {
+            min: 1,
+            max: 120,
+            stripPattern: /[e+.-]/gi,
+          });
+  };
+
+  private handleOvertimeInput = (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    this.overtimeStartMinutes =
+      input.value === ""
+        ? undefined
+        : parseBoundedIntegerFromInput(input, {
+            min: 1,
+            max: 120,
+            stripPattern: /[e+.-]/gi,
+          });
+  };
+
+  protected onOpen(): void {
+    this.step = "map";
+  }
 
   protected onClose(): void {
     // Retires whatever start is still in flight. resetOptions() below hands
@@ -308,8 +658,8 @@ export class SinglePlayerModal extends BaseModal {
 
   /**
    * Starts a solo game on the default settings without opening the modal,
-   * with the in-game tutorial switched back on (the play page's Tutorial
-   * card for new players).
+   * with the in-game tutorial switched back on (the main menu's Tutorial
+   * link).
    */
   public async startTutorial(): Promise<void> {
     this.resetOptions();
@@ -323,235 +673,24 @@ export class SinglePlayerModal extends BaseModal {
     // the modal must always give the player a live Start button back, whatever
     // left the previous attempt in flight.
     this.starting = false;
+    this.step = "map";
     this.selectedMap = DEFAULT_OPTIONS.selectedMap;
     this.selectedDifficulty = DEFAULT_OPTIONS.selectedDifficulty;
     this.gameMode = DEFAULT_OPTIONS.gameMode;
-    this.useRandomMap = DEFAULT_OPTIONS.useRandomMap;
     this.infiniteGold = DEFAULT_OPTIONS.infiniteGold;
     this.infiniteTroops = DEFAULT_OPTIONS.infiniteTroops;
     this.compactMap = DEFAULT_OPTIONS.compactMap;
-    this.maxTimer = DEFAULT_OPTIONS.maxTimer;
     this.maxTimerValue = DEFAULT_OPTIONS.maxTimerValue;
     this.instantBuild = DEFAULT_OPTIONS.instantBuild;
     this.randomSpawn = DEFAULT_OPTIONS.randomSpawn;
     this.teamCount = DEFAULT_OPTIONS.teamCount;
     this.disabledUnits = [...DEFAULT_OPTIONS.disabledUnits];
-    this.goldMultiplier = DEFAULT_OPTIONS.goldMultiplier;
     this.goldMultiplierValue = DEFAULT_OPTIONS.goldMultiplierValue;
-    this.startingGold = DEFAULT_OPTIONS.startingGold;
     this.startingGoldValue = DEFAULT_OPTIONS.startingGoldValue;
     this.waterNukes = DEFAULT_OPTIONS.waterNukes;
     this.doomsdayClock = DEFAULT_OPTIONS.doomsdayClock;
     this.doomsdayClockSpeed = DEFAULT_OPTIONS.doomsdayClockSpeed;
-    this.overtime = DEFAULT_OPTIONS.overtime;
     this.overtimeStartMinutes = DEFAULT_OPTIONS.overtimeStartMinutes;
-  }
-
-  private handleSelectRandomMap() {
-    this.useRandomMap = true;
-    this.selectedMap = getRandomMapType();
-  }
-
-  private handleConfigRandomMapSelected = () => {
-    this.handleSelectRandomMap();
-  };
-
-  private handleMapSelection(value: GameMapType) {
-    this.selectedMap = value;
-    this.useRandomMap = false;
-  }
-
-  private handleConfigMapSelected = (e: Event) => {
-    const customEvent = e as CustomEvent<{ map: GameMapType }>;
-    this.handleMapSelection(customEvent.detail.map);
-  };
-
-  private handleDifficultySelection(value: Difficulty) {
-    this.selectedDifficulty = value;
-  }
-
-  private handleConfigDifficultySelected = (e: Event) => {
-    const customEvent = e as CustomEvent<{ difficulty: Difficulty }>;
-    this.handleDifficultySelection(customEvent.detail.difficulty);
-  };
-
-  private handleConfigDoomsdayClockSpeedSelected = (e: Event) => {
-    const customEvent = e as CustomEvent<{ speed: DoomsdayClockSpeed }>;
-    this.doomsdayClockSpeed = customEvent.detail.speed;
-  };
-
-  private handleConfigGameModeSelected = (e: Event) => {
-    const customEvent = e as CustomEvent<{ mode: GameMode }>;
-    this.handleGameModeSelection(customEvent.detail.mode);
-  };
-
-  private handleConfigTeamCountSelected = (e: Event) => {
-    const customEvent = e as CustomEvent<{ count: TeamCountConfig }>;
-    this.handleTeamCountSelection(customEvent.detail.count);
-  };
-
-  private handleCompactMapChange(val: boolean) {
-    this.compactMap = val;
-  }
-
-  private handleConfigOptionToggleChanged = (e: Event) => {
-    const customEvent = e as CustomEvent<{
-      labelKey: string;
-      checked: boolean;
-    }>;
-    const { labelKey, checked } = customEvent.detail;
-
-    switch (labelKey) {
-      case "game_settings.instant_build":
-        this.instantBuild = checked;
-        break;
-      case "game_settings.random_spawn":
-        this.randomSpawn = checked;
-        break;
-      case "game_settings.infinite_gold":
-        this.infiniteGold = checked;
-        break;
-      case "game_settings.infinite_troops":
-        this.infiniteTroops = checked;
-        break;
-      case "game_settings.compact_map":
-        this.handleCompactMapChange(checked);
-        break;
-      case "game_settings.water_nukes":
-        this.waterNukes = checked;
-        break;
-      case "game_settings.doomsday_clock":
-        this.doomsdayClock = checked;
-        break;
-      default:
-        break;
-    }
-  };
-
-  private handleConfigUnitToggleChanged = (e: Event) => {
-    const customEvent = e as CustomEvent<{ unit: UnitType; checked: boolean }>;
-    const { unit, checked } = customEvent.detail;
-    this.disabledUnits = getUpdatedDisabledUnits(
-      this.disabledUnits,
-      unit,
-      checked,
-    );
-  };
-
-  private handleMaxTimerToggle = (
-    checked: boolean,
-    value: number | string | undefined,
-  ) => {
-    this.maxTimer = checked;
-    this.maxTimerValue = toOptionalNumber(value);
-  };
-
-  private handleGoldMultiplierToggle = (
-    checked: boolean,
-    value: number | string | undefined,
-  ) => {
-    this.goldMultiplier = checked;
-    this.goldMultiplierValue = toOptionalNumber(value);
-  };
-
-  private handleStartingGoldToggle = (
-    checked: boolean,
-    value: number | string | undefined,
-  ) => {
-    this.startingGold = checked;
-    this.startingGoldValue = toOptionalNumber(value);
-  };
-
-  private handleOvertimeToggle = (
-    checked: boolean,
-    value: number | string | undefined,
-  ) => {
-    this.overtime = checked;
-    this.overtimeStartMinutes = toOptionalNumber(value);
-  };
-
-  private handleOvertimeMinutesKeyDown = (e: KeyboardEvent) => {
-    preventDisallowedKeys(e, ["-", "+", "e"]);
-  };
-
-  private handleOvertimeMinutesInput = (e: Event) => {
-    const input = e.target as HTMLInputElement;
-    const value = parseBoundedIntegerFromInput(input, {
-      min: 1,
-      max: 120,
-      stripPattern: /[e+-]/gi,
-    });
-    if (value === undefined) {
-      return;
-    }
-    this.overtimeStartMinutes = value;
-  };
-
-  private handleMaxTimerValueKeyDown = (e: KeyboardEvent) => {
-    preventDisallowedKeys(e, ["-", "+", "e"]);
-  };
-
-  private getEndTimerInput(): HTMLInputElement | null {
-    return (
-      (this.renderRoot.querySelector(
-        "#end-timer-value",
-      ) as HTMLInputElement | null) ??
-      (this.querySelector("#end-timer-value") as HTMLInputElement | null)
-    );
-  }
-
-  private handleMaxTimerValueChanges = (e: Event) => {
-    const input = e.target as HTMLInputElement;
-    const value = parseBoundedIntegerFromInput(input, {
-      min: 1,
-      max: 120,
-      stripPattern: /[e+-]/gi,
-    });
-
-    this.maxTimerValue = value;
-  };
-
-  private handleGoldMultiplierValueKeyDown = (e: KeyboardEvent) => {
-    preventDisallowedKeys(e, ["+", "-", "e", "E"]);
-  };
-
-  private handleGoldMultiplierValueChanges = (e: Event) => {
-    const input = e.target as HTMLInputElement;
-    const value = parseBoundedFloatFromInput(input, { min: 0.1, max: 1000 });
-
-    if (value === undefined) {
-      this.goldMultiplierValue = undefined;
-      input.value = "";
-    } else {
-      this.goldMultiplierValue = value;
-    }
-  };
-
-  private handleStartingGoldValueKeyDown = (e: KeyboardEvent) => {
-    preventDisallowedKeys(e, ["-", "+", "e", "E"]);
-  };
-
-  private handleStartingGoldValueChanges = (e: Event) => {
-    const input = e.target as HTMLInputElement;
-    const value = parseBoundedFloatFromInput(input, {
-      min: 0.1,
-      max: 1000,
-    });
-
-    if (value === undefined) {
-      this.startingGoldValue = undefined;
-      input.value = "";
-    } else {
-      this.startingGoldValue = value;
-    }
-  };
-
-  private handleGameModeSelection(value: GameMode) {
-    this.gameMode = value;
-  }
-
-  private handleTeamCountSelection(value: TeamCountConfig) {
-    this.teamCount = value;
   }
 
   /** The player's name, once the one-shot name seed has settled. */
@@ -570,31 +709,13 @@ export class SinglePlayerModal extends BaseModal {
     // A second click while the first is still resolving would dispatch a
     // second join-lobby for a different gameID.
     if (this.starting) return;
-    // Validate and clamp maxTimer setting before starting
-    let finalMaxTimerValue: number | undefined = undefined;
-    if (this.maxTimer) {
-      if (!this.maxTimerValue || this.maxTimerValue <= 0) {
-        console.error("Max timer is enabled but no valid value is set");
-        await showInGameAlert(
-          translateText("single_modal.max_timer_invalid") ||
-            "Please enter a valid max timer value (1-120 minutes)",
-        );
-        // Focus the input
-        const input = this.getEndTimerInput();
-        if (input) {
-          input.focus();
-          input.select();
-        }
-        return;
-      }
-      // Clamp value to valid range
-      finalMaxTimerValue = Math.max(1, Math.min(120, this.maxTimerValue));
-    }
+    const finalMaxTimerValue =
+      this.maxTimerValue === undefined
+        ? undefined
+        : Math.max(1, Math.min(120, this.maxTimerValue));
 
     await this.launch(async ({ resolvedName, cosmetics }, usernameInput) => {
-      console.log(
-        `Starting single player game with map: ${GameMapType[this.selectedMap as keyof typeof GameMapType]}${this.useRandomMap ? " (Randomly selected)" : ""}`,
-      );
+      console.log(`Starting single player game with map: ${this.selectedMap}`);
       const clientID = generateID();
       const gameID = generateID();
       return {
@@ -630,13 +751,12 @@ export class SinglePlayerModal extends BaseModal {
               Object.values(UnitType).includes(unit),
             ),
             nations: "disabled",
-            ...(this.goldMultiplier && this.goldMultiplierValue
+            ...(this.goldMultiplierValue !== undefined
               ? { goldMultiplier: this.goldMultiplierValue }
               : {}),
-            ...(this.startingGold && this.startingGoldValue !== undefined
-              ? {
-                  startingGold: Math.round(this.startingGoldValue * 1_000_000),
-                }
+            // Gold on top of the horde's own starting gold.
+            ...(this.startingGoldValue !== undefined
+              ? { startingGold: Math.round(this.startingGoldValue) }
               : {}),
             ...(this.waterNukes ? { waterNukes: true } : {}),
             // zfront spike: every solo game has zombie waves.
@@ -649,11 +769,11 @@ export class SinglePlayerModal extends BaseModal {
                   },
                 }
               : {}),
-            ...(this.overtime
+            ...(this.overtimeStartMinutes !== undefined
               ? {
                   overtime: {
                     enabled: true,
-                    startMinutes: this.overtimeStartMinutes ?? 30,
+                    startMinutes: this.overtimeStartMinutes,
                   },
                 }
               : {}),

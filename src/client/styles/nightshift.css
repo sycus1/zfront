@@ -556,3 +556,654 @@
     outline-offset: 2px;
   }
 }
+
+/* ---- Menu pages: layout, header, title ----------------------------------- */
+
+@layer components {
+  /* A menu page fills the content area and scrolls inside it. */
+  .zf-page {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    color: var(--color-zf-cream-100);
+    font-family: var(--font-zf-body);
+  }
+  .zf-page-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    width: 100%;
+    max-width: 1680px;
+    margin: 0 auto;
+    padding: 0 var(--zf-gutter) 32px;
+    flex: 1 0 auto;
+  }
+  .zf-page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-top: 24px;
+  }
+  .zf-page-title {
+    margin: 0;
+    padding: 20px 0;
+    font-family: var(--font-zf-display);
+    font-weight: 900;
+    font-size: clamp(56px, 7vw, 104px);
+    line-height: 0.85;
+    color: var(--color-zf-signal-400);
+    text-transform: uppercase;
+  }
+  .zf-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+  }
+
+  /* BackButton: outline arrow and destination; the arrow alone on phone. */
+  .zf-back {
+    --zf-border: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-signal-400);
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: var(--zf-control-min);
+    padding: 0 16px 0 10px;
+    border: 0;
+    margin: 0;
+    font-family: var(--font-zf-body);
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  /* Steps */
+  .zf-steps {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    gap: 6px;
+    font-family: var(--font-zf-body);
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .zf-step {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 12px;
+  }
+  .zf-step-current {
+    --zf-fill: var(--color-zf-signal-400);
+    --zf-border: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-ink-900);
+  }
+  .zf-step-done {
+    --zf-border: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-signal-400);
+  }
+  .zf-step-upcoming {
+    --zf-border: var(--color-zf-line-500);
+    --zf-ink: var(--color-zf-muted-300);
+  }
+
+  /* Tile: a fieldset whose legend is the title. */
+  .zf-tile {
+    --zf-cut: var(--zf-cut-lg);
+    --zf-fill: var(--color-zf-tile-fill);
+    --zf-border: var(--color-zf-line-600);
+    margin: 0;
+    min-width: 0;
+    border: 0;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .zf-tile > legend {
+    float: left;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 4px 12px;
+    color: var(--color-zf-signal-400);
+  }
+  .zf-tile-note {
+    color: var(--color-zf-muted-300);
+    letter-spacing: 0.14em;
+  }
+  .zf-tile-body {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .zf-tile:disabled .zf-tile-body {
+    opacity: 0.45;
+  }
+
+  /* OptionGroup */
+  .zf-options {
+    display: grid;
+    grid-template-columns: repeat(var(--zf-cols, 2), minmax(0, 1fr));
+    gap: 8px;
+    flex-grow: 1;
+  }
+  .zf-option {
+    --zf-border: var(--color-zf-line-600);
+    --zf-ink: var(--color-zf-cream-100);
+    width: 100%;
+    min-height: var(--zf-option-min);
+    border: 0;
+    margin: 0;
+    padding: 0 8px;
+    font-family: var(--font-zf-display);
+    font-weight: 900;
+    font-size: 26px;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .zf-option[aria-checked="true"] {
+    --zf-fill: var(--color-zf-signal-400);
+    --zf-border: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-ink-900);
+  }
+
+  /* Chips: SwitchChip (role=switch) and ToggleChip (aria-pressed) */
+  .zf-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .zf-chip {
+    --zf-border: var(--color-zf-line-500);
+    --zf-ink: var(--color-zf-cream-100);
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: var(--zf-control-min);
+    padding: 0 12px 0 14px;
+    border: 0;
+    margin: 0;
+    font-family: var(--font-zf-body);
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: 0.04em;
+  }
+  .zf-chip[aria-checked="true"],
+  .zf-chip[aria-pressed="true"] {
+    --zf-fill: var(--color-zf-signal-wash);
+    --zf-border: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-signal-400);
+  }
+  .zf-chip-toggle {
+    gap: 8px;
+    padding: 0 14px;
+  }
+  .zf-chip-toggle[aria-pressed="false"] {
+    --zf-border: var(--color-zf-line-600);
+    --zf-ink: var(--color-zf-muted-400);
+    text-decoration: line-through;
+  }
+  .zf-switch {
+    width: 34px;
+    height: 18px;
+    padding: 2px;
+    display: flex;
+    justify-content: flex-start;
+    border: 2px solid var(--color-zf-line-500);
+  }
+  .zf-switch > span {
+    width: 10px;
+    height: 10px;
+    background: var(--color-zf-muted-400);
+  }
+  [aria-checked="true"] > .zf-switch {
+    justify-content: flex-end;
+    border-color: var(--color-zf-signal-400);
+    background: var(--color-zf-signal-400);
+  }
+  [aria-checked="true"] > .zf-switch > span {
+    background: var(--color-zf-ink-900);
+  }
+
+  /* Disabled controls (a disabled tile, a choice the engine can't make). */
+  .zf-option:disabled,
+  .zf-chip:disabled {
+    cursor: not-allowed;
+  }
+
+  /* TextField */
+  .zf-text-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+  .zf-text-field-label {
+    font-family: var(--font-zf-body);
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .zf-field-number {
+    font-family: var(--font-zf-data);
+    font-weight: 700;
+    font-size: 17px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* MapCard */
+  .zf-map {
+    --zf-cut: var(--zf-cut-lg);
+    --zf-bw: var(--zf-border-3);
+    --zf-fill: var(--color-zf-ink-900);
+    --zf-border: var(--color-zf-line-600);
+    --zf-ink: var(--color-zf-cream-100);
+    padding: 0;
+    border: 0;
+    margin: 0;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    display: flex;
+    flex-direction: column;
+  }
+  .zf-map img {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    image-rendering: pixelated;
+    display: block;
+    padding: 3px 3px 0;
+  }
+  .zf-map-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px 12px;
+  }
+  .zf-map-name {
+    font-family: var(--font-zf-display);
+    font-weight: 900;
+    font-size: 34px;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .zf-map-tag {
+    font-family: var(--font-zf-body);
+    font-weight: 800;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .zf-map[aria-checked="true"] {
+    --zf-fill: var(--color-zf-signal-400);
+    --zf-border: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-ink-900);
+  }
+  .zf-maps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+  }
+
+  /* TerrainBars, on yellow */
+  .zf-terrain {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    color: var(--color-zf-ink-900);
+  }
+  .zf-terrain-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 56px;
+    gap: 4px 10px;
+    align-items: center;
+    font-family: var(--font-zf-body);
+    font-weight: 800;
+    font-size: 14px;
+  }
+  .zf-terrain-pct {
+    text-align: right;
+    font-family: var(--font-zf-data);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .zf-terrain-track {
+    grid-column: 1 / -1;
+    height: 12px;
+    background: rgb(17 17 17 / 0.18);
+  }
+  .zf-terrain-fill {
+    height: 100%;
+  }
+  .zf-terrain-open {
+    background: var(--color-zf-ink-900);
+  }
+  .zf-terrain-solid {
+    background: #6b5f54; /* terrain-rock */
+  }
+  .zf-terrain-water {
+    background: #2f6aa8; /* bar-water */
+  }
+
+  /* ActionStrip */
+  .zf-strip {
+    --zf-cut: var(--zf-cut-lg);
+    --zf-bw: var(--zf-border-3);
+    --zf-fill: var(--color-zf-signal-400);
+    --zf-border: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-ink-900);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+  .zf-strip-items {
+    flex: 999 1 420px;
+    margin: 0;
+    padding: 14px 22px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 32px;
+  }
+  .zf-strip-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .zf-strip-item dt,
+  .zf-strip-label {
+    font-family: var(--font-zf-body);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .zf-strip-item dd {
+    margin: 0;
+    font-family: var(--font-zf-display);
+    font-weight: 900;
+    font-size: 30px;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .zf-strip-action {
+    flex: 1 1 280px;
+    display: flex;
+  }
+  .zf-strip-action .zf-ring,
+  .zf-strip-action .zf-btn {
+    width: 100%;
+  }
+
+  /* MapBackdrop (MapBackdrop.ts) */
+  zf-map-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    display: block;
+    overflow: hidden;
+    pointer-events: none;
+    background: var(--color-zf-ink-900);
+  }
+  .zf-backdrop-map {
+    position: absolute;
+    inset: -2%;
+    width: 104%;
+    height: 104%;
+    object-fit: cover;
+    image-rendering: pixelated;
+  }
+  .zf-backdrop-scan {
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      var(--color-zf-scanline) 0 2px,
+      transparent 2px 4px
+    );
+  }
+}
+
+/* Phone: icon-only back button, smaller strip, map cards as rows, the strip
+   sticky under the thumb. */
+@media (max-width: 639.98px) {
+  .zf-page-header {
+    padding-top: 16px;
+  }
+  .zf-page-title {
+    padding: 16px 0 6px;
+  }
+  .zf-back {
+    width: var(--zf-control-min);
+    padding: 0;
+    justify-content: center;
+  }
+  .zf-back-label {
+    display: none;
+  }
+  .zf-steps {
+    font-size: 12px;
+    letter-spacing: 0.14em;
+  }
+  .zf-strip {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+  }
+  .zf-strip-items {
+    padding: 10px 14px;
+    gap: 6px 20px;
+  }
+  .zf-strip-item dd {
+    font-size: 22px;
+  }
+  .zf-maps {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .zf-map {
+    flex-direction: row;
+    align-items: stretch;
+  }
+  .zf-map img {
+    width: 112px;
+    height: 72px;
+    aspect-ratio: auto;
+    flex-shrink: 0;
+    padding: 3px 0 3px 3px;
+  }
+  .zf-map-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px 12px;
+  }
+  .zf-map-name {
+    font-size: 30px;
+  }
+}
+
+/* ---- Play flow: the map strip, field pairs, the Advanced tile ------------ */
+
+@layer components {
+  .zf-ground {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 14px 22px;
+    width: 100%;
+  }
+  .zf-ground-name {
+    flex: 1 1 260px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .zf-ground-title {
+    margin: 0;
+    font-family: var(--font-zf-display);
+    font-weight: 900;
+    font-size: 56px;
+    line-height: 0.85;
+    text-transform: uppercase;
+  }
+  .zf-ground-scale {
+    font-weight: 600;
+    font-size: 13px;
+    line-height: 18px;
+  }
+  .zf-ground-terrain {
+    flex: 2 1 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .zf-field-pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .zf-advanced {
+    --zf-cut: var(--zf-cut-lg);
+    --zf-fill: var(--color-zf-tile-fill);
+    --zf-border: var(--color-zf-line-600);
+  }
+  .zf-advanced-summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: var(--zf-control-min);
+    padding: 0 18px;
+    color: var(--color-zf-signal-400);
+    cursor: pointer;
+    list-style: none;
+  }
+  .zf-advanced-summary::-webkit-details-marker {
+    display: none;
+  }
+  .zf-advanced-summary::before {
+    content: "+";
+    font-family: var(--font-zf-data);
+    font-weight: 700;
+    font-size: 18px;
+  }
+  .zf-advanced[open] > .zf-advanced-summary::before {
+    content: "−";
+  }
+  .zf-advanced-summary:focus-visible {
+    outline: 3px solid var(--color-zf-focus-ring);
+    outline-offset: -5px;
+  }
+  .zf-advanced-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 0 18px 18px;
+  }
+  .zf-page-title:focus {
+    outline: none;
+  }
+}
+
+@media (max-width: 639.98px) {
+  .zf-ground-title {
+    font-size: 44px;
+  }
+  /* On phone the strip is sticky; the terrain moves out of it. */
+  .zf-ground-terrain {
+    display: none;
+  }
+  .zf-ground-scale {
+    display: none;
+  }
+  .zf-ground-name .zf-ground-title {
+    font-size: 28px;
+  }
+}
+
+/* The phone's selected-map panel (desktop puts all this in the strip). */
+@layer components {
+  .zf-selected-map {
+    --zf-cut: var(--zf-cut-lg);
+    --zf-bw: var(--zf-border-3);
+    --zf-fill: var(--color-zf-signal-400);
+    --zf-border: var(--color-zf-signal-400);
+    --zf-ink: var(--color-zf-ink-900);
+    display: none;
+    flex-direction: column;
+  }
+  .zf-selected-map img {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    image-rendering: pixelated;
+    display: block;
+  }
+  .zf-selected-map-body {
+    padding: 14px 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .zf-selected-map-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 12px;
+  }
+  .zf-selected-map-scale {
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .zf-selected-map-rule {
+    border-top: 3px solid var(--color-zf-ink-900);
+    padding-top: 10px;
+  }
+}
+
+@media (max-width: 639.98px) {
+  .zf-selected-map {
+    display: flex;
+  }
+  .zf-selected-map .zf-ground-title {
+    font-size: 44px;
+  }
+}
+
+@media (max-width: 639.98px) {
+  .zf-strip-compact {
+    flex-wrap: nowrap;
+  }
+  .zf-strip-compact .zf-strip-items {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .zf-strip-compact .zf-strip-action {
+    flex: 0 0 auto;
+  }
+  .zf-strip-compact .zf-btn-lg {
+    min-height: 68px;
+    padding: 0 16px;
+    font-size: 30px;
+  }
+}
