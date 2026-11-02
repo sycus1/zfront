@@ -1,5 +1,6 @@
 import { TileRef } from "@openfront/engine-api/game/GameMap";
 import {
+  DistrictWalls,
   MessageType,
   PlayerType,
   UnitType,
@@ -36,6 +37,12 @@ import {
   maskSectors,
   SECTOR_KEYS,
 } from "./Alerts";
+import {
+  BorderWallOptions,
+  BorderWalls,
+  BorderWallsState,
+  MAX_WALL_TIER,
+} from "./BorderWalls";
 import { BuildingOptions, beaconSounding, detonate } from "./Buildings";
 import {
   applyClaims,
@@ -86,7 +93,9 @@ import {
  * press on them until they fall. Walls are obstacles too, but not targets:
  * the horde goes round them where it can and breaks through where it must.
  * Each new wall post links to nearby posts and mountains with spans that
- * block like walls (see WallLinks). Defense Posts stand in for turrets and
+ * block like walls (see WallLinks). On town maps walls aren't placed by
+ * hand: they follow the borders of the districts a player holds (see
+ * BorderWalls). Defense Posts stand in for turrets and
  * Missile Silos for mortars (see Mortars). The WaveDirector plans each
  * wave's size and directions.
  *
@@ -108,7 +117,8 @@ export interface HordeOptions
     BuildingOptions,
     CrateOptions,
     MortarOptions,
-    DistrictOptions {
+    DistrictOptions,
+    BorderWallOptions {
   /** Ticks from the end of the spawn phase to the first wave. */
   firstWaveDelay: number;
   /**
@@ -320,6 +330,10 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   wallSnapRadius: WALL_SNAP_RADIUS,
   spanCostPerCell: 1_000,
   wallClearRadius: 3,
+  // Walls on district borders are for town maps (TownScale.ts).
+  districtWalls: 0,
+  stoneWallCostPerCell: 1_000,
+  reinforcedWallCostPerCell: 2_000,
   repairDelay: 50,
   repairInterval: 10,
   repairHp: 100,
@@ -433,6 +447,9 @@ export interface HordeStats {
   /** Wall spans standing, and broken open waiting to be rebuilt. */
   spans: number;
   spansBroken: number;
+  /** Cells of district border wall standing, and broken open. */
+  borderWalls: number;
+  borderWallsBroken: number;
   outcome: HordeOutcome;
   recomputes: number;
   lastRecomputeMs: number;
@@ -463,6 +480,7 @@ export class HordeExecution implements Execution {
   private crates!: Crates;
   private mortars!: Mortars;
   private districts!: Districts;
+  private borderWalls!: BorderWalls;
 
   private wave = 0;
   private wavesSurvived = 0;
@@ -504,6 +522,8 @@ export class HordeExecution implements Execution {
   private linkedWalls = new Set<number>();
   /** Standing span cells from the latest scan. */
   private hordeSpanAt = new Map<number, WallSpan>();
+  /** Standing border wall cells from the latest scan. */
+  private hordeBorderAt = new Set<number>();
   /** Damage taken by unit id, and the tick each was last attacked. */
   private damage = new Map<number, number>();
   private lastHit = new Map<number, number>();
@@ -592,6 +612,12 @@ export class HordeExecution implements Execution {
       (c) => this.terrainCost[c] !== 0,
       mg.mapDistricts(),
     );
+    this.borderWalls = new BorderWalls(
+      this.districts.map,
+      this.width,
+      this.height,
+      (c) => this.terrainCost[c] !== 0,
+    );
     mg.setOutpostSiteRule(
       this.districtLand() ? (p, t) => this.outpostSite(p, t) : null,
     );
@@ -600,6 +626,7 @@ export class HordeExecution implements Execution {
     this.hordeMortars = [];
     this.hordeHqAt = new Map();
     this.hordeSpanAt = new Map();
+    this.hordeBorderAt = new Set();
     this.damage = new Map();
     this.lastHit = new Map();
     this.beaconSince = new Map();
@@ -709,6 +736,7 @@ export class HordeExecution implements Execution {
       }
     }
     if (before !== null) this.syncDistrictLand(before);
+    if (changed && this.districtWalls()) this.raiseBorderWalls();
     const plan = this.nextPlan;
     if (!changed || plan === null) return;
     const blocked = this.nextLandings.some((c) =>
@@ -725,6 +753,61 @@ export class HordeExecution implements Execution {
         this.random,
       );
     }
+  }
+
+  /** Whether walls follow district borders (HordeOptions.districtWalls). */
+  private districtWalls(): boolean {
+    return this.opts.districtWalls !== 0 && this.districts.enabled();
+  }
+
+  /**
+   * Walls follow the borders of the held land: up on new borders, down
+   * where a border is now inside it (BorderWalls.update). A wall can't go
+   * up on top of the horde, so it starts broken there.
+   */
+  private raiseBorderWalls(): void {
+    const density = this.field.density;
+    const elites = new Set(this.elites.cell.subarray(0, this.elites.count));
+    this.borderWalls.update(
+      (d) => this.districts.claimedBy(d) !== 0,
+      (c) => density[c] !== 0 || elites.has(c),
+      this.ticks,
+      this.opts.repairDelay,
+    );
+  }
+
+  /**
+   * The border walls of the district `tile` is in, when `player` holds it
+   * and walls follow borders, for the "Upgrade walls" action; else null.
+   */
+  districtWallsAt(player: Player, tile: TileRef): DistrictWalls | null {
+    if (this.mg === null || !this.districtWalls()) return null;
+    if (!this.mg.isValidRef(tile)) return null;
+    const d = this.districts.districtOf(this.cellOf(tile));
+    if (this.districts.claimedBy(d) !== player.smallID()) return null;
+    return {
+      tier: this.borderWalls.tier(d),
+      cells: this.borderWalls.wallCount(d),
+      upgradeCost: this.borderWalls.upgradeCost(d, this.opts),
+    };
+  }
+
+  /**
+   * `player` raises the walls of the district `tile` is in a tier, paying
+   * for every cell of wall along its border. Returns false, and changes
+   * nothing, when it isn't theirs, has no wall, is already reinforced or
+   * they can't pay.
+   */
+  upgradeDistrictWalls(player: Player, tile: TileRef): boolean {
+    if (this.outcome === "lost") return false;
+    const walls = this.districtWallsAt(player, tile);
+    if (walls === null || walls.tier >= MAX_WALL_TIER) return false;
+    if (walls.upgradeCost <= 0n || player.gold() < walls.upgradeCost) {
+      return false;
+    }
+    player.removeGold(walls.upgradeCost);
+    this.borderWalls.upgrade(this.districts.districtOf(this.cellOf(tile)));
+    return true;
   }
 
   /** Whether districts are the land (HordeOptions.districtLand). */
@@ -864,6 +947,8 @@ export class HordeExecution implements Execution {
       hqsFallen: this.hqsFallen,
       spans: this.spans.filter((s) => !s.broken).length,
       spansBroken: this.spans.filter((s) => s.broken).length,
+      borderWalls: this.borderWalls?.standingCount() ?? 0,
+      borderWallsBroken: this.borderWalls?.brokenCount() ?? 0,
       outcome: this.outcome,
       ...this.hordeProfile,
     };
@@ -949,7 +1034,9 @@ export class HordeExecution implements Execution {
       const level =
         span !== undefined
           ? this.spanTier(span)
-          : (this.hordeStructureAt.get(c)?.level() ?? 1);
+          : this.hordeBorderAt.has(c)
+            ? this.borderWalls.tierAt(c)
+            : (this.hordeStructureAt.get(c)?.level() ?? 1);
       cells[c] = 251 + Math.min(3, Math.max(1, level));
     }
     for (let k = 0; k < this.elites.count; k++) {
@@ -1025,6 +1112,12 @@ export class HordeExecution implements Execution {
       const max = this.spanMaxHp(s);
       const mid = s.cells[s.cells.length >> 1];
       out.push(this.tileOfCell(mid), Math.max(0, max - s.damage), max, 0);
+    }
+    if (this.districtWalls()) {
+      this.borderWalls.forEachDamaged((cell, damage) => {
+        const max = this.wallTierHp(this.borderWalls.tierAt(cell));
+        out.push(this.tileOfCell(cell), Math.max(0, max - damage), max, 0);
+      });
     }
     return Int32Array.from(out);
   }
@@ -1126,6 +1219,7 @@ export class HordeExecution implements Execution {
     this.crates.hash(mix);
     this.mortars.hash(mix);
     this.districts.hash(mix);
+    if (this.districtWalls()) this.borderWalls.hash(mix);
     return h >>> 0;
   }
 
@@ -1265,7 +1359,11 @@ export class HordeExecution implements Execution {
     for (const s of this.spans) {
       sig = Math.imul(sig ^ (s.broken ? -s.id : s.id), 16777619);
     }
-    sig = Math.imul(sig ^ this.spans.length, 16777619) >>> 0;
+    sig = Math.imul(sig ^ this.spans.length, 16777619);
+    if (this.districtWalls()) {
+      sig = Math.imul(sig ^ this.borderWalls.stateVersion(), 16777619);
+    }
+    sig >>>= 0;
     const changed = sig !== this.hordeStructureSig;
     if (changed || this.hordeObstaclesStale) {
       this.rebuildObstacles(units, walls, bait, hqs, hqOwners);
@@ -1376,6 +1474,16 @@ export class HordeExecution implements Execution {
         wallCells.push(cell);
         this.hordeSpanAt.set(cell, s);
       }
+    }
+    // And the walls on district borders.
+    this.hordeBorderAt.clear();
+    if (this.districtWalls()) {
+      this.borderWalls.forEachStanding((cell) => {
+        if (obstacle[cell] !== 0) return;
+        obstacle[cell] = 1;
+        wallCells.push(cell);
+        this.hordeBorderAt.add(cell);
+      });
     }
     this.hordeWallCells = wallCells;
   }
@@ -1525,10 +1633,14 @@ export class HordeExecution implements Execution {
     return false;
   }
 
-  /** Whether a span (standing or broken) runs through `tile`'s cell. */
+  /**
+   * Whether a span, or a wall on a district border, standing or broken,
+   * runs through `tile`'s cell.
+   */
   isSpanCell(tile: TileRef): boolean {
     if (this.mg === null) return false;
     const cell = this.cellOf(tile);
+    if (this.districtWalls() && this.borderWalls.isWall(cell)) return true;
     return this.spans.some((s) => s.cells.includes(cell));
   }
 
@@ -1540,8 +1652,7 @@ export class HordeExecution implements Execution {
   }
 
   private spanMaxHp(s: WallSpan): number {
-    const o = this.opts;
-    return [o.wallHp, o.stoneWallHp, o.reinforcedWallHp][this.spanTier(s) - 1];
+    return this.wallTierHp(this.spanTier(s));
   }
 
   /**
@@ -1880,6 +1991,7 @@ export class HordeExecution implements Execution {
   private isStandingWall(cell: number): boolean {
     const span = this.hordeSpanAt.get(cell);
     if (span !== undefined) return !span.broken;
+    if (this.hordeBorderAt.has(cell)) return true;
     const u = this.hordeStructureAt.get(cell);
     return u !== undefined && u.isActive() && u.type() === UnitType.Wall;
   }
@@ -1966,6 +2078,16 @@ export class HordeExecution implements Execution {
         this.damageSpan(span, pressure);
         return;
       }
+      if (this.hordeBorderAt.has(cell)) {
+        // Broken open, it is cleared by the next scan, as a span is.
+        this.borderWalls.hit(
+          cell,
+          pressure >> this.opts.pressureShift,
+          this.ticks,
+          this.wallTierHp(this.borderWalls.tierAt(cell)),
+        );
+        return;
+      }
       const u = this.hordeStructureAt.get(cell);
       if (u === undefined || !u.isActive()) {
         const owner = this.hordeHqAt.get(cell);
@@ -2001,9 +2123,14 @@ export class HordeExecution implements Execution {
   private maxHp(u: Unit): number {
     if (u.type() === UnitType.DefensePost) return this.opts.turretHp;
     if (u.type() !== UnitType.Wall) return this.opts.structureHp;
+    return this.wallTierHp(u.level());
+  }
+
+  /** Full health of a wall of `tier`: barricade, stone, reinforced. */
+  private wallTierHp(tier: number): number {
     const o = this.opts;
-    const tier = Math.min(3, Math.max(1, u.level()));
-    return [o.wallHp, o.stoneWallHp, o.reinforcedWallHp][tier - 1];
+    const t = Math.min(3, Math.max(1, tier));
+    return [o.wallHp, o.stoneWallHp, o.reinforcedWallHp][t - 1];
   }
 
   private turretRangeAt(tile: TileRef): number {
@@ -2019,6 +2146,19 @@ export class HordeExecution implements Execution {
     const o = this.opts;
     if (o.repairHp <= 0) return;
     this.repairSpans();
+    if (this.districtWalls()) {
+      this.borderWalls.repair(
+        this.ticks,
+        o,
+        (cell) => {
+          const p = this.mg!.playerBySmallID(
+            this.districts.claimedBy(this.districts.districtOf(cell)),
+          );
+          return p.isPlayer() ? (p as Player) : null;
+        },
+        (cells) => !this.hordeNearCells(cells),
+      );
+    }
     for (const [id, damage] of this.damage) {
       const u = this.mg!.unit(id);
       if (u === undefined || !u.isActive()) {
@@ -2159,6 +2299,7 @@ export class HordeExecution implements Execution {
       crates: this.mg !== null ? this.crates.state() : null,
       mortars: this.mg !== null ? this.mortars.state() : null,
       districts: this.mg !== null ? this.districts.state() : null,
+      borderWalls: this.mg !== null ? this.borderWalls.state() : null,
     });
   }
 
@@ -2186,6 +2327,7 @@ export class HordeExecution implements Execution {
     this.hordeTargetCells = [];
     this.hordeWallCells = [];
     this.hordeBaitCells = [];
+    this.hordeBorderAt = new Set();
     let at = 0;
     this.spans = s.spanIds.map((id, k) => {
       const n = s.spanCellCounts[k];
@@ -2233,6 +2375,7 @@ export class HordeExecution implements Execution {
     if (s.crates !== null) this.crates.restore(s.crates);
     if (s.mortars !== null) this.mortars.restore(s.mortars);
     if (s.districts !== null) this.districts.restore(s.districts);
+    if (s.borderWalls !== null) this.borderWalls.restore(s.borderWalls);
     if (s.flowCells !== null) {
       this.computeFlow(s.flowCells, s.flowWalls, s.flowBait);
     }
@@ -2384,6 +2527,9 @@ const HordeOptionsSchema = z.object({
   districtOverrunTicks: zInt(),
   districtCorePercent: zInt(),
   districtLand: zInt(),
+  districtWalls: zInt(),
+  stoneWallCostPerCell: zInt(),
+  reinforcedWallCostPerCell: zInt(),
   mortarRange: zInt(),
   mortarMinRange: zInt(),
   mortarReload: zInt(),
@@ -2434,6 +2580,16 @@ const DistrictsStateSchema = z.object({
   status: z.array(zInt()),
   timer: z.array(zInt()),
 }) satisfies z.ZodType<DistrictsState>;
+
+const BorderWallsStateSchema = z.object({
+  cells: z.array(zInt()),
+  stretch: z.array(zInt()),
+  damage: z.array(zInt()),
+  lastHit: z.array(zInt()),
+  broken: z.array(z.boolean()),
+  tiers: z.array(zInt()),
+  version: zInt(),
+}) satisfies z.ZodType<BorderWallsState>;
 
 const WavePlanSchema = z.object({
   wave: zInt(),
@@ -2500,6 +2656,8 @@ const HordeStateSchema = z.object({
   mortars: MortarStateSchema.nullable(),
   /** Null before init. */
   districts: DistrictsStateSchema.nullable(),
+  /** Null before init. */
+  borderWalls: BorderWallsStateSchema.nullable(),
 });
 type HordeState = z.infer<typeof HordeStateSchema>;
 
@@ -2529,7 +2687,7 @@ export function hordeOf(game: Game): HordeExecution | null {
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 20,
+  version: 21,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -2809,6 +2967,18 @@ export const HordeExecutionSnapshot = execSnapshotType({
     19: (d) => ({
       ...d,
       options: { ...d.options, districtLand: 0 },
+    }),
+    // 20 -> 21: walls follow district borders. Old games keep the walls
+    // their players built.
+    20: (d) => ({
+      ...d,
+      options: {
+        ...d.options,
+        districtWalls: 0,
+        stoneWallCostPerCell: 0,
+        reinforcedWallCostPerCell: 0,
+      },
+      borderWalls: null,
     }),
   },
   cls: () => HordeExecution,

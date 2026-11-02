@@ -10,6 +10,7 @@ import { Execution, Game } from "../game/Game";
 import { CallWaveExecution } from "../horde/CallWaveExecution";
 import { LootCrateExecution } from "../horde/LootCrateExecution";
 import { settlesOnItsOwn } from "../horde/Settlement";
+import { UpgradeWallsExecution } from "../horde/UpgradeWallsExecution";
 import { AttackExecution } from "./AttackExecution";
 import { BoatRetreatExecution } from "./BoatRetreatExecution";
 import { ConstructionExecution } from "./ConstructionExecution";
@@ -138,6 +139,8 @@ export class Executor {
         return new CallWaveExecution(player);
       case "loot_crate":
         return new LootCrateExecution(player, intent.crate);
+      case "upgrade_walls":
+        return new UpgradeWallsExecution(player, intent.tile);
       default:
         throw new Error(`intent type ${intent} not found`);
     }

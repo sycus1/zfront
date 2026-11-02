@@ -8,8 +8,12 @@ import {
   MenuElementParams,
   rootMenuElement,
   Slot,
+  upgradeWallsElement,
 } from "../../../src/client/hud/layers/RadialMenuElements";
-import { BuildUnitIntentEvent } from "../../../src/client/Transport";
+import {
+  BuildUnitIntentEvent,
+  SendUpgradeWallsIntentEvent,
+} from "../../../src/client/Transport";
 import { GameView, PlayerView } from "../../../src/client/view";
 
 vi.mock("../../../src/client/Utils", () => ({
@@ -671,6 +675,70 @@ describe("RadialMenuElements", () => {
       expect(translateText).toHaveBeenCalledWith(
         "unit_type.hydrogen_bomb_desc",
       );
+    });
+  });
+
+  describe("zfront: Upgrade walls", () => {
+    const withWalls = (
+      tier: number,
+      cells: number,
+      cost: bigint,
+      gold = 10_000n,
+    ) => {
+      mockParams.myPlayer = {
+        ...mockPlayer,
+        gold: () => gold,
+      } as unknown as PlayerView;
+      mockParams.playerActions = {
+        ...mockPlayerActions,
+        districtWalls: { tier, cells, upgradeCost: cost },
+      };
+    };
+
+    it("isn't offered where walls don't follow district borders", () => {
+      const subMenu = rootMenuElement.subMenu!(mockParams);
+      expect(subMenu.find((item) => item.id === "upgrade_walls")).toBe(
+        undefined,
+      );
+    });
+
+    it("is offered on your own district, with what it costs", () => {
+      withWalls(1, 5, 5_000n);
+      const subMenu = rootMenuElement.subMenu!(mockParams);
+      const item = subMenu.find((i) => i.id === "upgrade_walls")!;
+      expect(item).toBeDefined();
+      expect(item.disabled(mockParams)).toBe(false);
+      expect(item.tooltipItems).toEqual([
+        { text: "radial_menu.upgrade_walls_title", className: "title" },
+        { text: "radial_menu.upgrade_walls_desc", className: "description" },
+        { text: "5000 player_panel.gold", className: "cost" },
+      ]);
+      item.action!(mockParams);
+      expect(mockParams.eventBus.emit).toHaveBeenCalledWith(
+        new SendUpgradeWallsIntentEvent(mockTile),
+      );
+      expect(mockParams.closeMenu).toHaveBeenCalled();
+    });
+
+    it("is disabled when you can't pay", () => {
+      withWalls(1, 5, 5_000n, 4_999n);
+      const item = upgradeWallsElement(mockParams)!;
+      expect(item.disabled(mockParams)).toBe(true);
+      expect((item.color as (p: MenuElementParams) => string)(mockParams)).toBe(
+        COLORS.disabled,
+      );
+    });
+
+    it("is disabled once the walls are reinforced, or with none", () => {
+      withWalls(3, 5, 0n);
+      const top = upgradeWallsElement(mockParams)!;
+      expect(top.disabled(mockParams)).toBe(true);
+      expect(top.tooltipItems?.map((t) => t.text)).toEqual([
+        "radial_menu.upgrade_walls_title",
+        "radial_menu.upgrade_walls_max",
+      ]);
+      withWalls(1, 0, 0n);
+      expect(upgradeWallsElement(mockParams)!.disabled(mockParams)).toBe(true);
     });
   });
 });

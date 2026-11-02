@@ -177,6 +177,7 @@ export const DERIVED_FIELDS = new Set<string>([
   "hordeFlow",
   "hordeStructureAt",
   "hordeSpanAt",
+  "hordeBorderAt",
   "hordeTurrets",
   "hordeHqAt",
   "hordeTargetCells",

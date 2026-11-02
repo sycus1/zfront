@@ -236,6 +236,15 @@ export class Config {
     // Nor nukes (and SAMs, which only shoot nukes) inside it: the Missile
     // Silo is a mortar there.
     if (this.horde() && NotInHorde.has(unitType)) return true;
+    // On town maps walls follow district borders instead of being built
+    // (horde/BorderWalls.ts in the engine).
+    if (
+      this.horde() &&
+      unitType === UnitType.Wall &&
+      isTownScale(this._gameConfig.gameMap)
+    ) {
+      return true;
+    }
     return this._gameConfig.disabledUnits?.includes(unitType) ?? false;
   }
   instantBuild(): boolean {

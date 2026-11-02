@@ -37,7 +37,7 @@ import { createGame } from "./game/GameImpl";
 import { humanDisconnects, humanStatsSnapshot } from "./game/HumanStats";
 import { placeName, placeSpawnName } from "./game/NameBoxCalculator";
 import { createNationsForGame } from "./game/NationCreation";
-import { HordeExecution } from "./horde/HordeExecution";
+import { HordeExecution, hordeOf } from "./horde/HordeExecution";
 import { hordeOptionsForMap } from "./horde/TownScale";
 import {
   readSnapshotHeader,
@@ -336,6 +336,10 @@ export class GameRunner {
       buildableUnits: units === null ? [] : player.buildableUnits(tile, units),
       canSendEmojiAllPlayers: player.canSendEmoji(AllPlayers),
     } as PlayerActions;
+
+    const walls =
+      tile !== null ? hordeOf(this.game)?.districtWallsAt(player, tile) : null;
+    if (walls) actions.districtWalls = walls;
 
     if (tile !== null && this.game.hasOwner(tile)) {
       const other = this.game.owner(tile) as Player;

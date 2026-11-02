@@ -17,6 +17,10 @@
  *            and adds an outer ring of turrets.
  *   spans    plays like fort, but with a post every 10 tiles round the
  *            ring, joined by wall spans, instead of a barricade every 2.
+ *            On town maps, where walls follow district borders instead
+ *            (horde BorderWalls.ts), fort and spans both upgrade the walls
+ *            of every district they hold where they would build or
+ *            upgrade the wall ring, the district with the least wall first.
  *   scavenge builds two scavenger depots first, then turrets as above
  *            with a ring of mines (rebuilt as they go off) before the
  *            outer ring.
@@ -78,6 +82,7 @@ import {
   HordeOptions,
 } from "@openfront/engine/horde/HordeExecution";
 import { hordeOptionsForMap } from "@openfront/engine/horde/TownScale";
+import { UpgradeWallsExecution } from "@openfront/engine/horde/UpgradeWallsExecution";
 import { loadMapFiles } from "@openfront/shared/GameMapLoader";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -343,6 +348,39 @@ function heldDistricts(exec: HordeExecution): string {
 /** Ticks before an order that came to nothing is tried again. */
 const RETRY = 50;
 
+/**
+ * Where walls follow district borders, raises the walls of the district
+ * `me` holds with the least wall below `tier` a tier: "ordered" when it
+ * did, "wait" when it can't pay for that yet, "done" when every district
+ * with walls is at `tier`.
+ */
+function upgradeBorderWalls(
+  game: Game,
+  me: Player,
+  exec: HordeExecution,
+  tier: number,
+): "ordered" | "wait" | "done" {
+  const districts = (exec as unknown as { districts?: Districts }).districts;
+  // The horde starts on the first tick.
+  if (districts === undefined) return "wait";
+  const w = game.miniMap().width();
+  let best: { tile: number; cells: number; cost: bigint } | null = null;
+  for (let d = 0; d < districts.map.count; d++) {
+    if (districts.claimedBy(d) !== me.smallID()) continue;
+    const c = districts.cellsOf(d)[0];
+    const tile = game.ref((c % w) * 2, Math.floor(c / w) * 2);
+    const walls = exec.districtWallsAt(me, tile);
+    if (walls === null || walls.cells === 0 || walls.tier >= tier) continue;
+    if (best === null || walls.cells < best.cells) {
+      best = { tile, cells: walls.cells, cost: walls.upgradeCost };
+    }
+  }
+  if (best === null) return "done";
+  if (me.gold() < best.cost) return "wait";
+  game.addExecution(new UpgradeWallsExecution(me, best.tile));
+  return "ordered";
+}
+
 interface Order {
   tick: number;
   /** Where the unit was ordered, after canBuild moved it. */
@@ -359,8 +397,11 @@ function spend(
   ordered: Map<number, Order>,
   /** For "lone": the turret's offset from the HQ, once wave 1 is announced. */
   face: [number, number] | null,
+  exec: HordeExecution,
 ) {
   if (s === "none") return;
+  // Walls follow district borders here: no hand-built ones.
+  const borderWalls = game.config().isUnitDisabled(UnitType.Wall);
   // Steps run in order: each builds at its offsets (level 1), or upgrades
   // what was built there to its level, before the next step starts.
   const T = UnitType.DefensePost;
@@ -417,6 +458,13 @@ function spend(
                 [T, OUTER_RING, 3],
               ];
   for (const [type, offsets, level] of plan) {
+    if (type === W && borderWalls) {
+      // They go up for free; upgrading them is the fort's wall step.
+      if (level === 1) continue;
+      const r = upgradeBorderWalls(game, me, exec, level);
+      if (r === "done") continue;
+      return;
+    }
     for (const [dx, dy] of offsets) {
       const x = hq[0] + dx;
       const y = hq[1] + dy;
@@ -458,7 +506,10 @@ interface WaveRow {
   hqEnd: number;
   killed: number;
   lost: number;
-  /** Count and total levels, as "count/levels"; walls add "+spans". */
+  /**
+   * Count and total levels, as "count/levels"; walls add "+spans". Where
+   * walls follow district borders, walls are "standing/broken" cells.
+   */
   turrets: string;
   walls: string;
   /**
@@ -589,7 +640,7 @@ async function play(
           (exec as unknown as { districts: Districts }).districts,
         );
       }
-      spend(game, me, hqXY, strategy, ordered, face);
+      spend(game, me, hqXY, strategy, ordered, face, exec);
     }
     if (callEarly && exec.stats().wave >= 1 && exec.callableTicks() > 0) {
       exec.callWave(me);
@@ -635,7 +686,9 @@ async function play(
     row.killed += s.killed - lastKilled;
     row.lost += s.structuresDestroyed - lastLost;
     row.turrets = levels(me, UnitType.DefensePost);
-    row.walls = `${levels(me, UnitType.Wall)}+${s.spans}`;
+    row.walls = game.config().isUnitDisabled(UnitType.Wall)
+      ? `${s.borderWalls}/${s.borderWallsBroken}x`
+      : `${levels(me, UnitType.Wall)}+${s.spans}`;
     row.other = `${me.units(UnitType.Depot).length}/${me.units(UnitType.Mine).length}/${levels(me, UnitType.MissileSilo)}`;
     row.mortarKilled += s.mortarKilled - lastMortar;
     lastMortar = s.mortarKilled;

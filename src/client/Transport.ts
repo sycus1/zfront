@@ -42,6 +42,11 @@ export class SendLootCrateIntentEvent implements GameEvent {
   constructor(public readonly crate: number) {}
 }
 
+/** zfront: raise the border walls of the held district `tile` is in. */
+export class SendUpgradeWallsIntentEvent implements GameEvent {
+  constructor(public readonly tile: TileRef) {}
+}
+
 export class PauseGameIntentEvent implements GameEvent {
   constructor(public readonly paused: boolean) {}
 }
@@ -225,6 +230,9 @@ export class Transport {
     );
     this.subscribe(SendLootCrateIntentEvent, (e) =>
       this.sendIntent({ type: "loot_crate", crate: e.crate }),
+    );
+    this.subscribe(SendUpgradeWallsIntentEvent, (e) =>
+      this.sendIntent({ type: "upgrade_walls", tile: e.tile }),
     );
     this.subscribe(SendWinnerEvent, (e) => this.onSendWinnerEvent(e));
     this.subscribe(SendLiveStatsEvent, (e) => this.onSendLiveStatsEvent(e));
