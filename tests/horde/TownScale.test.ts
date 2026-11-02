@@ -10,7 +10,6 @@ import {
 import { GameConfig } from "@openfront/engine-api/Schemas";
 import {
   OUTPOST_CLAIM_RADIUS,
-  TOWN_OUTPOST_CLAIM_RADIUS,
   TOWN_TURRET_RANGE,
 } from "@openfront/engine-lib/configuration/Config";
 import {
@@ -145,6 +144,8 @@ describe("Town scale", () => {
   });
 
   test("previews show the turret range and Outpost claim of the map's scale", () => {
+    // On town maps an Outpost takes its district (districtLand), so the
+    // preview shows no claim circle there.
     const town = config(GameMapType.Sheffield);
     const continent = config(GameMapType.Britannia);
     expect(town.hordeTurretRange()).toBe(2 * TOWN_TURRET_RANGE);
@@ -154,7 +155,8 @@ describe("Town scale", () => {
     expect(continent.hordeTurretRange()).toBe(
       2 * DEFAULT_HORDE_OPTIONS.turretRange,
     );
-    expect(town.outpostClaimRadius()).toBe(TOWN_OUTPOST_CLAIM_RADIUS);
+    expect(TOWN_HORDE_OPTIONS.districtLand).toBe(1);
+    expect(town.outpostClaimRadius()).toBe(0);
     expect(continent.outpostClaimRadius()).toBe(OUTPOST_CLAIM_RADIUS);
   });
 

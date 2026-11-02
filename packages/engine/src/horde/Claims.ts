@@ -60,8 +60,10 @@ export function claimRadius(opts: ClaimOptions, type: UnitType): number {
 
 /**
  * Where an Outpost may go: free or own land, within OUTPOST_REACH of the
- * player's land, not crowding another building, and only while the player
- * holds fewer Outposts than the limit.
+ * player's land (or, when districts are the land, wherever the game's
+ * Outpost site rule allows: a wild district next to one of theirs), not
+ * crowding another building, and only while the player holds fewer
+ * Outposts than the limit.
  */
 export function outpostSpawn(
   game: Game,
@@ -81,6 +83,8 @@ export function outpostSpawn(
     true,
   );
   if (crowded) return false;
+  const rule = game.outpostSiteRule();
+  if (rule !== null) return rule(player, tile) ? tile : false;
   if (owner === player) return tile;
   const map = game.map();
   const me = player.smallID();

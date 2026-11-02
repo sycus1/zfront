@@ -77,10 +77,16 @@ export const TOWN_HORDE_OPTIONS: Partial<HordeOptions> = {
   outpostRadius: TOWN_OUTPOST_CLAIM_RADIUS,
   crateMinDistance: 10,
   crateMaxDistance: 40,
-  // Buffer districts about 150 m across, 64 to a town (Districts.ts). A
-  // crowd of 40 that lingers 10 seconds overruns one.
+  // Buffer districts about 150 m across, 64 to a town (Districts.ts), or
+  // the town's own hand-made ones. A crowd of 40 that lingers 10 seconds
+  // overruns one.
   districtSize: 25,
   districtOverrunCount: 40,
+  // Districts are the land: the game opens on the HQ's district and its
+  // neighbours, nobody settles beyond them, and each Outpost takes a whole
+  // district (costing more each time, see TOWN_OUTPOST_COST_STEP).
+  // startingRadius, settling and outpostRadius only apply with this off.
+  districtLand: 1,
 };
 
 /**

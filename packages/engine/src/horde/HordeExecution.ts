@@ -293,6 +293,7 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   districtOverrunCount: 60,
   districtOverrunTicks: 100,
   districtCorePercent: 60,
+  districtLand: 0,
   mineRadius: 2,
   mineTrigger: 40,
   mineKills: 600,
@@ -591,6 +592,9 @@ export class HordeExecution implements Execution {
       (c) => this.terrainCost[c] !== 0,
       mg.mapDistricts(),
     );
+    mg.setOutpostSiteRule(
+      this.districtLand() ? (p, t) => this.outpostSite(p, t) : null,
+    );
     this.hordeStructureAt = new Map();
     this.hordeTurrets = [];
     this.hordeMortars = [];
@@ -669,7 +673,7 @@ export class HordeExecution implements Execution {
     this.mg!.setOutpostLimit(outpostLimit(this.opts, this.wavesSurvived));
     if (ticks % this.opts.settleInterval === 0) {
       this.claimAll();
-      this.settleAll();
+      if (!this.districtLand()) this.settleAll();
     }
     if (ticks % DISTRICT_INTERVAL === 0) this.updateDistricts();
   }
@@ -682,6 +686,8 @@ export class HordeExecution implements Execution {
   private updateDistricts(): void {
     const mg = this.mg!;
     const overrun: number[] = [];
+    const land = this.districtLand();
+    const before = land ? this.districtHolders() : null;
     const changed = this.districts.update(
       mg,
       DISTRICT_INTERVAL,
@@ -702,6 +708,7 @@ export class HordeExecution implements Execution {
         this.structuresDestroyed++;
       }
     }
+    if (before !== null) this.syncDistrictLand(before);
     const plan = this.nextPlan;
     if (!changed || plan === null) return;
     const blocked = this.nextLandings.some((c) =>
@@ -718,6 +725,105 @@ export class HordeExecution implements Execution {
         this.random,
       );
     }
+  }
+
+  /** Whether districts are the land (HordeOptions.districtLand). */
+  private districtLand(): boolean {
+    return this.opts.districtLand !== 0 && this.districts.enabled();
+  }
+
+  /**
+   * Per district, the smallID with an Outpost or a claim on it, and
+   * whether that claim is held (Core, Held or Threatened): holder * 2 + 1
+   * when held, holder * 2 when only being secured, 0 for Wild.
+   */
+  private districtHolders(): Int32Array {
+    const n = this.districts.map.count;
+    const out = new Int32Array(n);
+    for (let d = 0; d < n; d++) {
+      const h = this.districts.holderOf(d);
+      if (h !== 0) out[d] = h * 2 + (this.districts.claimedBy(d) !== 0 ? 1 : 0);
+    }
+    return out;
+  }
+
+  /**
+   * Hands land over as districts change hands: a player who now holds a
+   * district gets every free tile in it, and one who has lost theirs (an
+   * Outpost lost, or the district overrun) gives up every tile they had in
+   * it, buildings' tiles too. `before` is districtHolders() from before the
+   * update.
+   */
+  private syncDistrictLand(before: Int32Array): void {
+    const mg = this.mg!;
+    const after = this.districtHolders();
+    for (let d = 0; d < after.length; d++) {
+      if (after[d] === before[d]) continue;
+      const was = before[d] >> 1;
+      const now = after[d] >> 1;
+      if (was !== 0 && was !== now) {
+        const p = mg.playerBySmallID(was);
+        if (p.isPlayer()) this.giveUpDistrict(p as Player, d);
+      }
+      if (now !== 0 && (after[d] & 1) === 1) {
+        const p = mg.playerBySmallID(now);
+        if (p.isPlayer()) this.takeDistrict(p as Player, d);
+      }
+    }
+  }
+
+  /** Every tile of district `d`, in cell order. */
+  private forDistrictTiles(d: number, fn: (t: TileRef) => void): void {
+    const map = this.mg!.map();
+    const w = this.width;
+    const mw = map.width();
+    const mh = map.height();
+    for (const c of this.districts.cellsOf(d)) {
+      const cx = c % w;
+      const cy = (c - cx) / w;
+      for (let y = cy * 2; y < Math.min(mh, cy * 2 + 2); y++) {
+        for (let x = cx * 2; x < Math.min(mw, cx * 2 + 2); x++) {
+          fn(map.ref(x, y));
+        }
+      }
+    }
+  }
+
+  /** Gives `p` every free land tile of district `d`. */
+  private takeDistrict(p: Player, d: number): void {
+    const mg = this.mg!;
+    this.forDistrictTiles(d, (t) => {
+      if (!mg.hasOwner(t) && mg.isLand(t) && !mg.isImpassable(t)) {
+        p.conquer(t);
+      }
+    });
+  }
+
+  /** Takes back every tile `p` owns in district `d`. */
+  private giveUpDistrict(p: Player, d: number): void {
+    const map = this.mg!.map();
+    const me = p.smallID();
+    this.forDistrictTiles(d, (t) => {
+      if (map.ownerID(t) === me) p.relinquish(t);
+    });
+  }
+
+  /**
+   * The Outpost site rule when districts are the land: a Wild district
+   * next to one `p` holds, with none of their Outposts in it yet (one
+   * being built doesn't secure it until it's finished).
+   */
+  private outpostSite(p: Player, tile: TileRef): boolean {
+    const cell = this.cellOf(tile);
+    if (!this.districts.outpostSite(p.smallID(), cell)) return false;
+    const d = this.districts.districtOf(cell);
+    return !p
+      .units(UnitType.Outpost)
+      .some(
+        (u) =>
+          u.isActive() &&
+          this.districts.districtOf(this.cellOf(u.tile())) === d,
+      );
   }
 
   private tickCrates(ticks: number): void {
@@ -882,7 +988,9 @@ export class HordeExecution implements Execution {
       nextWaveLandings: Int32Array.from(this.nextLandings),
       hqCell: this.firstHqCell(),
       hqTile: this.firstHqTile(),
-      settleRadius: passiveRadius(this.opts, this.wavesSurvived),
+      settleRadius: this.districtLand()
+        ? 0
+        : passiveRadius(this.opts, this.wavesSurvived),
       turretShots: Int32Array.from(this.hordeTurretShots),
       structureHp: this.encodeStructureHp(),
       mortarShells: this.encodeShells(),
@@ -1048,13 +1156,22 @@ export class HordeExecution implements Execution {
 
   /**
    * What every human starts the horde with: the land within
-   * `startingRadius` of their HQ, `startingGold`, and any starting turrets.
+   * `startingRadius` of their HQ (or, when districts are the land, their
+   * HQ's district and its neighbours), `startingGold`, and any starting
+   * turrets.
    */
   private giveStart(): void {
     const mg = this.mg!;
     for (const p of mg.players()) {
       if (p.type() !== PlayerType.Human || !p.isAlive()) continue;
-      claimStartingLand(mg, p, this.opts.startingRadius);
+      const hq = p.spawnTile();
+      if (this.districtLand() && hq !== undefined) {
+        for (const d of this.districts.homeDistricts(this.cellOf(hq))) {
+          this.takeDistrict(p, d);
+        }
+      } else {
+        claimStartingLand(mg, p, this.opts.startingRadius);
+      }
       if (this.opts.startingGold > 0) p.addGold(BigInt(this.opts.startingGold));
     }
     if (this.opts.startingTurrets > 0) this.buildStartingTurrets();
@@ -1602,10 +1719,24 @@ export class HordeExecution implements Execution {
 
   /**
    * Buildings claim land for each human, in player order, after the land of
-   * any Outpost lost since the last pass has lapsed.
+   * any Outpost lost since the last pass has lapsed. When districts are the
+   * land, an Outpost only holds its own tile here, and the districts hand
+   * over the rest (syncDistrictLand).
    */
   private claimAll(): void {
     const mg = this.mg!;
+    if (this.districtLand()) {
+      for (const p of mg.players()) {
+        if (p.type() !== PlayerType.Human || !p.isAlive()) continue;
+        for (const u of outposts(p)) {
+          const t = u.tile();
+          if (!mg.hasOwner(t) && mg.isLand(t) && !mg.isImpassable(t)) {
+            p.conquer(t);
+          }
+        }
+      }
+      return;
+    }
     const live = new Set<TileRef>();
     const humans = mg
       .players()
@@ -2252,6 +2383,7 @@ const HordeOptionsSchema = z.object({
   districtOverrunCount: zInt(),
   districtOverrunTicks: zInt(),
   districtCorePercent: zInt(),
+  districtLand: zInt(),
   mortarRange: zInt(),
   mortarMinRange: zInt(),
   mortarReload: zInt(),
@@ -2397,7 +2529,7 @@ export function hordeOf(game: Game): HordeExecution | null {
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 19,
+  version: 20,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -2671,6 +2803,12 @@ export const HordeExecutionSnapshot = execSnapshotType({
         districtCorePercent: 0,
       },
       districts: null,
+    }),
+    // 19 -> 20: districts as the land. Old games keep settling and
+    // Outpost claims.
+    19: (d) => ({
+      ...d,
+      options: { ...d.options, districtLand: 0 },
     }),
   },
   cls: () => HordeExecution,

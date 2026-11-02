@@ -75,7 +75,14 @@ import type {
   SnapshotReader,
   SnapshotWriter,
 } from "../snapshot/SnapshotContext";
-import { EngineUnitInfo, Execution, Game, Player, Unit } from "./Game";
+import {
+  EngineUnitInfo,
+  Execution,
+  Game,
+  OutpostSiteRule,
+  Player,
+  Unit,
+} from "./Game";
 import { PlayerImpl } from "./PlayerImpl";
 import { RailNetwork } from "./RailNetwork";
 import {
@@ -854,6 +861,16 @@ export class GameImpl implements Game {
 
   public setOutpostLimit(limit: number): void {
     this._outpostLimit = limit;
+  }
+
+  private _outpostSiteRule: OutpostSiteRule | null = null;
+
+  public outpostSiteRule(): OutpostSiteRule | null {
+    return this._outpostSiteRule;
+  }
+
+  public setOutpostSiteRule(rule: OutpostSiteRule | null): void {
+    this._outpostSiteRule = rule;
   }
 
   public isSpawnImmunityActive(): boolean {
