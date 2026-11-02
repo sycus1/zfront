@@ -64,6 +64,12 @@ const STRUCTURE_ORDER = [
 
 const ATLAS_COLS = STRUCTURE_ORDER.length;
 
+/** zfront: a dormant building in a district, by tile and unit type. */
+export interface DormantBuilding {
+  tile: number;
+  unitType: string;
+}
+
 /**
  * zfront: sprite atlas frames: STRUCTURE_ORDER, then the HQ (which is not a
  * unit; it is drawn at the HQ tile the horde frame gives).
@@ -136,6 +142,10 @@ export class StructurePass {
   private altView = false;
 
   private instanceCount = 0;
+
+  /** The structures last given, and dormant buildings drawn with them. */
+  private units: Map<number, UnitState> = new Map();
+  private dormant: readonly DormantBuilding[] = [];
 
   /** unitType string → atlas column index (0–5) */
   private typeToAtlasCol = new Map<string, number>();
@@ -383,6 +393,30 @@ export class StructurePass {
   }
 
   updateStructures(units: Map<number, UnitState>): void {
+    this.units = units;
+    this.rebuild();
+  }
+
+  /**
+   * zfront: buildings lying dormant in districts (horde
+   * DistrictContents), drawn greyed out like one under construction
+   * until a player captures the district and wakes them.
+   */
+  setDormant(buildings: readonly DormantBuilding[]): void {
+    const same =
+      buildings.length === this.dormant.length &&
+      buildings.every(
+        (b, i) =>
+          b.tile === this.dormant[i].tile &&
+          b.unitType === this.dormant[i].unitType,
+      );
+    if (same) return;
+    this.dormant = buildings;
+    this.rebuild();
+  }
+
+  private rebuild(): void {
+    const units = this.units;
     let count = 0;
 
     for (const unit of units.values()) {
@@ -404,6 +438,21 @@ export class StructurePass {
       this.instanceBuf.float32[off + 5] =
         unit.markedForDeletion !== false ? 1 : 0;
 
+      count++;
+    }
+
+    for (const b of this.dormant) {
+      const atlasIdx = this.typeToAtlasCol.get(b.unitType);
+      if (atlasIdx === undefined) continue;
+      this.instanceBuf.ensureCapacity(count + 1);
+      const off = count * FLOATS_PER_INSTANCE;
+      const x = b.tile % this.mapW;
+      this.instanceBuf.float32[off + 0] = x;
+      this.instanceBuf.float32[off + 1] = (b.tile - x) / this.mapW;
+      this.instanceBuf.float32[off + 2] = 0;
+      this.instanceBuf.float32[off + 3] = 1;
+      this.instanceBuf.float32[off + 4] = atlasIdx;
+      this.instanceBuf.float32[off + 5] = 0;
       count++;
     }
 

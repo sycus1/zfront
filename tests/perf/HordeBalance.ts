@@ -513,14 +513,18 @@ interface WaveRow {
   turrets: string;
   walls: string;
   /**
-   * Scavenger depots, mines and mortars standing, as
-   * "depots/mines/mortars" (mortars as "count/levels").
+   * Scavenger depots, mines, mortars, Cities and Factories standing, as
+   * "depots/mines/mortars/cities/factories" (mortars as "count/levels").
+   * On town maps Cities and Factories (and a strong Silo) are woken in
+   * captured districts (horde DistrictContents.ts).
    */
   other: string;
   /** Shamblers mortar shells killed during the wave. */
   mortarKilled: number;
   /** Tiles the player holds at the end of the wave. */
   tiles: number;
+  /** Population (troops) at the end of the wave. */
+  pop: number;
   /** Mean distance in tiles from the HQ to where the wave landed. */
   landed: number;
   /** Districts held and being secured, and Outposts, "held/securing/outposts". */
@@ -674,6 +678,7 @@ async function play(
         walls: "",
         other: "",
         tiles: 0,
+        pop: 0,
         held: "",
         landed: meanDistance(landings, game.miniMap().width(), hqXY),
         gold: 0,
@@ -689,10 +694,11 @@ async function play(
     row.walls = game.config().isUnitDisabled(UnitType.Wall)
       ? `${s.borderWalls}/${s.borderWallsBroken}x`
       : `${levels(me, UnitType.Wall)}+${s.spans}`;
-    row.other = `${me.units(UnitType.Depot).length}/${me.units(UnitType.Mine).length}/${levels(me, UnitType.MissileSilo)}`;
+    row.other = `${me.units(UnitType.Depot).length}/${me.units(UnitType.Mine).length}/${levels(me, UnitType.MissileSilo)}/${me.units(UnitType.City).length}/${me.units(UnitType.Factory).length}`;
     row.mortarKilled += s.mortarKilled - lastMortar;
     lastMortar = s.mortarKilled;
     row.tiles = me.numTilesOwned();
+    row.pop = Math.round(me.troops());
     if (game.ticks() % 10 === 0) {
       row.held = `${heldDistricts(exec)}/${me.units(UnitType.Outpost).length}`;
     }
@@ -751,9 +757,10 @@ async function main(): Promise<void> {
             "lost",
             "turrets",
             "walls",
-            "depots/mines/mortars",
+            "depots/mines/mortars/cities/factories",
             "by mortar",
             "tiles",
+            "pop",
             "landed",
             "held/sec/outposts",
             "gold",
@@ -772,6 +779,7 @@ async function main(): Promise<void> {
             w.other,
             String(w.mortarKilled),
             String(w.tiles),
+            String(w.pop),
             String(w.landed),
             w.held,
             String(w.gold),

@@ -39,7 +39,7 @@ import { BorderStampPass } from "./passes/BorderStampPass";
 import { CoordinateGridPass } from "./passes/CoordinateGridPass";
 import { CrosshairPass } from "./passes/CrosshairPass";
 import { DefenseCoveragePass } from "./passes/DefenseCoveragePass";
-import { DistrictPass } from "./passes/DistrictPass";
+import { DistrictPass, districtContentMarkers } from "./passes/DistrictPass";
 import { FalloutBloomPass } from "./passes/FalloutBloomPass";
 import { FalloutLightPass } from "./passes/FalloutLightPass";
 import { FxPass } from "./passes/fx-pass";
@@ -742,6 +742,14 @@ export class GPURenderer {
     this.districtPass.update(frame);
     this.barPass.setStructureHealth(frame.structureHp);
     this.structurePass.setHq(frame.hqTile);
+    const contents = districtContentMarkers(frame, this.mapW);
+    this.structurePass.setDormant(
+      contents.flatMap((m) =>
+        m.unitType !== null && !m.awake
+          ? [{ tile: m.tile, unitType: m.unitType }]
+          : [],
+      ),
+    );
     this.settleCircle =
       frame.hqTile >= 0
         ? {
@@ -772,6 +780,35 @@ export class GPURenderer {
               colorG: 0.82,
               colorB: 0.3,
             })),
+            // What each district you could take next holds: its cash
+            // above its site, its survivors below.
+            ...contents.flatMap((m) => {
+              if (!m.near) return [];
+              const labels = [];
+              if (m.cash > 0) {
+                labels.push({
+                  x: m.x,
+                  y: m.y - 5,
+                  text: "+" + renderNumber(m.cash),
+                  colorR: 1,
+                  colorG: 0.82,
+                  colorB: 0.3,
+                });
+              }
+              if (m.survivors > 0) {
+                labels.push({
+                  x: m.x,
+                  y: m.y + 5,
+                  text: translateText("horde_hud.district_survivors", {
+                    count: renderNumber(m.survivors),
+                  }),
+                  colorR: 0.6,
+                  colorG: 0.9,
+                  colorB: 1,
+                });
+              }
+              return labels;
+            }),
           ],
     );
   }

@@ -12,7 +12,9 @@ import { Game, Player } from "../game/Game";
  *
  * - an HQ trickle every tick while their HQ stands, and more for each
  *   scavenger depot they have built (none by default: depots bring supply
- *   drops sooner instead, see Crates.ts),
+ *   drops sooner instead, see Crates.ts) and each Factory (on town maps,
+ *   where Factories are woken in districts, see DistrictContents.ts),
+ * - tax on their population, every tick (town maps),
  * - a bounty for every zombie their turrets kill, more for an elite,
  * - a bonus for clearing a wave (all of it spawned and nearly all of it
  *   dead before the next one starts), which grows with the wave number,
@@ -27,6 +29,16 @@ export interface EconomyOptions {
   hqIncome: number;
   /** Gold per tick for each finished scavenger depot, to its owner. */
   depotIncome: number;
+  /** Gold per tick for each finished Factory, to its owner. */
+  factoryIncome: number;
+  /** Gold per tick for every 100,000 people a human has. */
+  populationTax: number;
+  /**
+   * People per tick each finished City brings a human, up to their cap.
+   * Where people only come from capturing (Config.townPopulation), this
+   * is how a City grows the population.
+   */
+  cityPopulation: number;
   /** Gold per shambler killed, to the turret's owner. */
   killBounty: number;
   /** Gold per elite killed, to the owner of the turret that finished it. */
@@ -42,19 +54,44 @@ export interface EconomyOptions {
   callEarlyGoldPerTick: number;
 }
 
-/** Pays the HQ trickle and depot income to every human still standing. */
+/**
+ * Pays the HQ trickle, depot and Factory income and population tax to
+ * every human still standing, and brings each one the people their
+ * Cities draw in.
+ */
 export function payHqIncome(game: Game, opts: EconomyOptions): void {
   for (const p of game.players()) {
     if (p.type() !== PlayerType.Human || !p.isAlive()) continue;
-    let depots = 0;
-    if (opts.depotIncome > 0) {
-      for (const u of p.units(UnitType.Depot)) {
-        if (!u.isUnderConstruction()) depots++;
-      }
-    }
-    const income = opts.hqIncome + depots * opts.depotIncome;
+    const depots =
+      opts.depotIncome > 0 ? finished(p, UnitType.Depot) * opts.depotIncome : 0;
+    const factories =
+      opts.factoryIncome > 0
+        ? finished(p, UnitType.Factory) * opts.factoryIncome
+        : 0;
+    const tax =
+      opts.populationTax > 0
+        ? Math.floor((p.troops() * opts.populationTax) / 100_000)
+        : 0;
+    const income = opts.hqIncome + depots + factories + tax;
     if (income > 0) p.addGold(BigInt(income));
+    if (opts.cityPopulation > 0) {
+      const room = Math.floor(game.config().maxTroops(p) - p.troops());
+      const people = Math.min(
+        room,
+        finished(p, UnitType.City) * opts.cityPopulation,
+      );
+      if (people > 0) p.addTroops(people);
+    }
   }
+}
+
+/** How many finished units of `type` `p` has. */
+function finished(p: Player, type: UnitType): number {
+  let n = 0;
+  for (const u of p.units(type)) {
+    if (!u.isUnderConstruction()) n++;
+  }
+  return n;
 }
 
 /** Pays `owner` for `shamblers` shamblers and `elites` elites killed. */
