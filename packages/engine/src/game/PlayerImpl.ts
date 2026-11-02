@@ -1106,7 +1106,10 @@ export class PlayerImpl implements Player {
     spawnTile: TileRef,
     params: UnitParams<T>,
   ): Unit {
-    if (this.mg.config().isUnitDisabled(type)) {
+    // zfront: a captured-only building (a City woken in a district) is
+    // disabled for players to build, but the horde still builds it.
+    const config = this.mg.config();
+    if (config.isUnitDisabled(type) && !config.capturedOnly(type)) {
       throw new Error(
         `Attempted to build disabled unit ${type} at tile ${spawnTile} by player ${this.name()}`,
       );

@@ -81,6 +81,7 @@ import { Elites } from "./Elites";
 import { FlowField, ORTHO_STEP, WALL_COST } from "./FlowField";
 import { buildCostField, HordeField } from "./HordeField";
 import { MortarGun, MortarOptions, Mortars, MortarState } from "./Mortars";
+import { RailWreckOptions, RailWrecks, RailWreckState } from "./RailWrecks";
 import {
   claimStartingLand,
   passiveRadius,
@@ -131,7 +132,8 @@ export interface HordeOptions
     MortarOptions,
     DistrictOptions,
     BorderWallOptions,
-    DistrictContentOptions {
+    DistrictContentOptions,
+    RailWreckOptions {
   /** Ticks from the end of the spawn phase to the first wave. */
   firstWaveDelay: number;
   /**
@@ -368,6 +370,10 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   dormantMinRing: 2,
   contentMinCells: 12,
   siloBonusLevels: 2,
+  // The horde wrecking railways through the wild is for town maps.
+  railWreck: 0,
+  railWreckCount: 3,
+  railRepairTicks: 300,
   repairDelay: 50,
   repairInterval: 10,
   repairHp: 100,
@@ -499,6 +505,9 @@ export interface HordeStats {
   /** Cells of district border wall standing, and broken open. */
   borderWalls: number;
   borderWallsBroken: number;
+  /** Railroads the horde has wrecked in all, and ones not yet relaid. */
+  railsWrecked: number;
+  railsBroken: number;
   outcome: HordeOutcome;
   recomputes: number;
   lastRecomputeMs: number;
@@ -531,6 +540,7 @@ export class HordeExecution implements Execution {
   private districts!: Districts;
   private borderWalls!: BorderWalls;
   private contents!: DistrictContents;
+  private railWrecks!: RailWrecks;
 
   private wave = 0;
   private wavesSurvived = 0;
@@ -669,6 +679,7 @@ export class HordeExecution implements Execution {
       (c) => this.terrainCost[c] !== 0,
     );
     this.contents = new DistrictContents(opts, this.districts.map);
+    this.railWrecks = new RailWrecks(opts);
     mg.setOutpostSiteRule(
       this.districtLand() ? (p, t) => this.outpostSite(p, t) : null,
     );
@@ -753,7 +764,26 @@ export class HordeExecution implements Execution {
       this.claimAll();
       if (!this.districtLand()) this.settleAll();
     }
-    if (ticks % DISTRICT_INTERVAL === 0) this.updateDistricts();
+    if (ticks % DISTRICT_INTERVAL === 0) {
+      this.updateDistricts();
+      if (this.railWrecks.enabled() && this.districtLand()) this.updateRails();
+    }
+  }
+
+  /** The horde wrecks track through the wild, and it's relaid once clear. */
+  private updateRails(): void {
+    const density = this.field.density;
+    const elites = new Map<number, number>();
+    for (let k = 0; k < this.elites.count; k++) {
+      const c = this.elites.cell[k];
+      elites.set(c, (elites.get(c) ?? 0) + 1);
+    }
+    this.railWrecks.update(this.mg!, this.ticks, {
+      cellOf: (t) => this.cellOf(t),
+      zombiesAt: (c) => density[c] + (elites.get(c) ?? 0),
+      heldBy: (c, id) =>
+        this.districts.claimedBy(this.districts.districtOf(c)) === id,
+    });
   }
 
   /**
@@ -952,7 +982,9 @@ export class HordeExecution implements Execution {
     if (!p.isPlayer()) return 0;
     const player = p as Player;
     const type = DORMANT_TYPES[kind];
-    if (type === undefined || mg.config().isUnitDisabled(type)) return 0;
+    if (type === undefined) return 0;
+    const config = mg.config();
+    if (config.isUnitDisabled(type) && !config.capturedOnly(type)) return 0;
     // Lend the player the price; buildUnit takes it back.
     const cost = mg.unitInfo(type).cost(mg, player);
     player.addGold(cost);
@@ -1131,6 +1163,8 @@ export class HordeExecution implements Execution {
       spansBroken: this.spans.filter((s) => s.broken).length,
       borderWalls: this.borderWalls?.standingCount() ?? 0,
       borderWallsBroken: this.borderWalls?.brokenCount() ?? 0,
+      railsWrecked: this.railWrecks?.wreckedCount() ?? 0,
+      railsBroken: this.railWrecks?.brokenCount() ?? 0,
       outcome: this.outcome,
       ...this.hordeProfile,
     };
@@ -1404,6 +1438,7 @@ export class HordeExecution implements Execution {
     this.districts.hash(mix);
     if (this.districtWalls()) this.borderWalls.hash(mix);
     this.contents.hash(mix);
+    this.railWrecks.hash(mix);
     return h >>> 0;
   }
 
@@ -2495,6 +2530,7 @@ export class HordeExecution implements Execution {
       districts: this.mg !== null ? this.districts.state() : null,
       borderWalls: this.mg !== null ? this.borderWalls.state() : null,
       contents: this.mg !== null ? this.contents.state() : null,
+      rails: this.mg !== null ? this.railWrecks.state() : null,
     });
   }
 
@@ -2572,6 +2608,7 @@ export class HordeExecution implements Execution {
     if (s.districts !== null) this.districts.restore(s.districts);
     if (s.borderWalls !== null) this.borderWalls.restore(s.borderWalls);
     if (s.contents !== null) this.contents.restore(s.contents);
+    if (s.rails !== null) this.railWrecks.restore(s.rails);
     if (s.flowCells !== null) {
       this.computeFlow(s.flowCells, s.flowWalls, s.flowBait);
     }
@@ -2741,6 +2778,9 @@ const HordeOptionsSchema = z.object({
   dormantMinRing: zInt(),
   contentMinCells: zInt(),
   siloBonusLevels: zInt(),
+  railWreck: zInt(),
+  railWreckCount: zInt(),
+  railRepairTicks: zInt(),
   mortarRange: zInt(),
   mortarMinRange: zInt(),
   mortarReload: zInt(),
@@ -2814,6 +2854,15 @@ const DistrictContentsStateSchema = z.object({
   spent: z.array(zInt()),
 }) satisfies z.ZodType<DistrictContentsState>;
 
+const RailWreckStateSchema = z.object({
+  from: z.array(zInt()),
+  to: z.array(zInt()),
+  clearSince: z.array(zInt()),
+  cellCounts: z.array(zInt()),
+  cells: z.array(zInt()),
+  wrecked: zInt(),
+}) satisfies z.ZodType<RailWreckState>;
+
 const WavePlanSchema = z.object({
   wave: zInt(),
   budget: zInt(),
@@ -2883,6 +2932,8 @@ const HordeStateSchema = z.object({
   borderWalls: BorderWallsStateSchema.nullable(),
   /** Null before init. */
   contents: DistrictContentsStateSchema.nullable(),
+  /** Null before init. */
+  rails: RailWreckStateSchema.nullable(),
 });
 type HordeState = z.infer<typeof HordeStateSchema>;
 
@@ -2912,7 +2963,7 @@ export function hordeOf(game: Game): HordeExecution | null {
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 22,
+  version: 23,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -3227,6 +3278,17 @@ export const HordeExecutionSnapshot = execSnapshotType({
         startingPopulation: 0,
       },
       contents: null,
+    }),
+    // 22 -> 23: the horde wrecks railways. Old games' railways are safe.
+    22: (d) => ({
+      ...d,
+      options: {
+        ...d.options,
+        railWreck: 0,
+        railWreckCount: 0,
+        railRepairTicks: 0,
+      },
+      rails: null,
     }),
   },
   cls: () => HordeExecution,
