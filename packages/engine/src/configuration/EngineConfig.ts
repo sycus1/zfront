@@ -14,6 +14,7 @@ import { NukeType } from "@openfront/engine-api/StatsSchemas";
 import {
   Config,
   TOWN_OUTPOST_COST_STEP,
+  TOWN_TRAIN_GOLD,
 } from "@openfront/engine-lib/configuration/Config";
 import { exp, log, pow2 } from "@openfront/engine-lib/DetMath";
 import { isTownScale } from "@openfront/engine-lib/game/MapScale";
@@ -243,6 +244,11 @@ export class EngineConfig extends Config {
     citiesVisited: number,
     player: PlayerLike,
   ): Gold {
+    // zfront: on town maps a stop pays a flat TOWN_TRAIN_GOLD, scaled to
+    // the town economy (a Factory pays 25 a tick there).
+    if (this.townPopulation()) {
+      return toInt(TOWN_TRAIN_GOLD * this.goldMultiplierFor(player));
+    }
     // No penalty for the first 10 cities.
     citiesVisited = Math.max(0, citiesVisited - 9);
     let baseGold: number;

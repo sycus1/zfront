@@ -99,6 +99,12 @@ export const TOWN_OUTPOST_CLAIM_RADIUS = 20;
  * costs this much more than the last (EngineConfig's Outpost cost).
  */
 export const TOWN_OUTPOST_COST_STEP = 15_000;
+
+/**
+ * zfront: gold a train pays its owner at each City or Port it stops at on a
+ * town map, where trains only run between buildings captured in districts.
+ */
+export const TOWN_TRAIN_GOLD = 1_000;
 /** zfront: horde turret range in coarse cells (2x2 tiles), by map scale. */
 export const HORDE_TURRET_RANGE = 8;
 export const TOWN_TURRET_RANGE = 20;
@@ -217,6 +223,21 @@ export class Config {
     return this.horde() && isTownScale(this._gameConfig.gameMap);
   }
 
+  /**
+   * zfront: whether `unitType` can only be captured, never built by hand:
+   * Cities, Factories and Ports on town maps in horde mode, which wake in
+   * districts a player captures (horde DistrictContents). The horde still
+   * builds them there (PlayerImpl.buildUnit allows it).
+   */
+  capturedOnly(unitType: UnitType): boolean {
+    return (
+      this.townPopulation() &&
+      (unitType === UnitType.City ||
+        unitType === UnitType.Factory ||
+        unitType === UnitType.Port)
+    );
+  }
+
   /** zfront: zombie waves (packages/engine/src/horde). */
   horde(): boolean {
     return this._gameConfig.horde ?? false;
@@ -244,6 +265,8 @@ export class Config {
     // Nor nukes (and SAMs, which only shoot nukes) inside it: the Missile
     // Silo is a mortar there.
     if (this.horde() && NotInHorde.has(unitType)) return true;
+    // Cities, Factories and Ports are captured on town maps, not built.
+    if (this.capturedOnly(unitType)) return true;
     // On town maps walls follow district borders instead of being built
     // (horde/BorderWalls.ts in the engine).
     if (

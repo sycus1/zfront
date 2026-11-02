@@ -109,6 +109,13 @@ export const TOWN_HORDE_OPTIONS: Partial<HordeOptions> = {
   populationTax: 10,
   factoryIncome: 25,
   cityPopulation: 10,
+  // Cities, Factories and Ports are only captured here (Config.capturedOnly),
+  // so trains run only between buildings a player holds, paying
+  // TOWN_TRAIN_GOLD a stop. Three zombies on track through the wild wreck
+  // it, and it's relaid 30 seconds after the horde has gone (RailWrecks.ts).
+  railWreck: 1,
+  railWreckCount: 3,
+  railRepairTicks: 300,
 };
 
 /**

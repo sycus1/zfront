@@ -189,6 +189,24 @@ export class RailNetworkImpl implements RailNetwork {
     this.dirtyClusters.add(cluster);
   }
 
+  wreckRailroad(rail: Railroad): void {
+    rail.delete(this.game);
+    this.railGrid.unregister(rail);
+    const cluster = rail.from.getCluster();
+    if (cluster !== null) this.dirtyClusters.add(cluster);
+  }
+
+  relink(a: TrainStation, b: TrainStation): boolean {
+    if (a.getRailroadTo(b) !== null) return true;
+    if (!this.connect(a, b)) return false;
+    const ca = a.getCluster();
+    const cb = b.getCluster();
+    if (ca !== null && cb !== null && ca !== cb) {
+      this.mergeClusters(new Set([ca, cb]));
+    }
+    return true;
+  }
+
   /**
    * Return the intermediary stations connecting two stations
    */

@@ -523,6 +523,18 @@ _2026-11-02._ Stage 4 of the district plan: districts hold things worth taking (
 
 Balance (`--zone 0`): no change in outcomes from stage 3. `turrets`, `fort`, `mortars` and `districts` win all three towns with the HQ untouched; `none` loses in wave 1 and `lone` in wave 3 (4 on Whitby). The `districts` bot takes districts towards the landings rather than going for buildings, so it woke a City only once (Bath, wave 9). Its population climbs from 100,000 to 340,000-470,000 by wave 10, and its gold ends far higher than in stage 3 (Bath 664,000 against 100,000) because the bot stops spending once its turrets are levelled and tax keeps coming. Pricing captures against that income is stage 6. The harness now shows population (`pop`) and Cities and Factories.
 
+### Rail through the wild
+
+_2026-11-02._ The first half of stage 5 of the district plan (rail and harbours): trains only run between buildings you hold, and the horde wrecks track through the wild. Relief trains and boats at a held station or harbour come next, in their own PR.
+
+- **Captured only.** On town maps Cities, Factories and Ports can't be built by hand any more (`Config.capturedOnly`, so `isUnitDisabled` hides them from the build bar, build menu and radial menu). They only come from dormant buildings woken in captured districts, which the horde still builds (`PlayerImpl.buildUnit` lets a captured-only type through). Since a lost district puts its building back to sleep, its station and track go with it, so trains only ever run between buildings a player holds. This closes the old train-income leak on towns.
+- **Train gold.** A train stop pays a flat `TOWN_TRAIN_GOLD` (1,000) on town maps instead of OpenFront's 10,000 or more, to fit the town economy (a Factory pays 25 a tick).
+- **Wrecking.** Every district update, when `railWreckCount` (3) zombies, an elite counting as one, stand on a cell of a railroad outside its owner's held districts, the horde wrecks the whole railroad (`horde/RailWrecks.ts`, through the new `RailNetwork.wreckRailroad`). Trains can't use it, and the owner is told. Track inside held ground is behind the border walls and safe, so a line between two enclaves is a reason to hold the ground between them.
+- **Relaying.** A wrecked railroad is relaid for free (`RailNetwork.relink`, which lays track as building a station does) once none of its cells has seen the horde for `railRepairTicks` (300, 30 seconds), while both its stations stand. If one is gone, so is the line.
+- Horde snapshot v23: older games' railways are safe from the horde.
+
+Balance: no change. The harness's bots never build Cities or Factories by hand, and rarely capture a Factory and a City near each other, so the `districts` and `turrets` runs on Whitby match stage 4 exactly (both won, HQ untouched, the same times).
+
 ## Prerequisites
 
 - npm 12.1 or later. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`. The machine currently has npm 11.19.
