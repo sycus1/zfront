@@ -496,6 +496,20 @@ _2026-11-01._ Stage 2 of the district plan: on town maps you grow only by taking
 
 The start is bigger than the old 60-tile disc: about 22,000 tiles on Bath and Sheffield and 16,000 on Whitby, against 12,700 and 9,800, roughly what settling reached by wave 5. It no longer grows by itself. With `--zone 0`, `turrets` and `spans` still win all three towns with the HQ untouched. `districts`, which keeps buying Outposts, now holds 3 rather than 4-5 and loses Bath in wave 10 (it won before) while still winning Sheffield and Whitby: the land it buys is gold not spent on turrets. Bath's `fort` (walls first) falls in wave 2 (it won with 2,038 HQ before), and `mortars` and `scavenge` lose a wave or two earlier on Bath and Sheffield; Whitby's `mortars` now wins. The turtle/sprawl balance is stage 6.
 
+### Walls follow borders
+
+_2026-11-02._ Stage 3 of the district plan: on town maps walls aren't built by hand any more. They stand along the border of the land you hold (`districtWalls: 1` in `TownScale.ts`, `horde/BorderWalls.ts`).
+
+- **Where.** A wall stands on every open coarse cell of a held district (Core, Held or Threatened) that has an open neighbour, north, south, east or west, outside the held land. Buildings, water and cliffs already block, so walls only go across the streets and open ground a border crosses. The flow field never lets the horde cut a corner past a wall, so that one line seals the land. Bath starts with 41 cells of wall, Sheffield 61 and Whitby 162 (its open fields).
+- **Moving.** When a district is secured its outer border is walled and the old border, now inside, comes down. When one is lost, its walls go and the line behind it goes back up, whole. A wall that would go up on top of the horde starts broken.
+- **Breaking.** The wall cells of a district that touch, corners included, make one stretch, such as the barrier across one street. The horde breaks a stretch as it breaks a span: one health pool at the district's tier (`wallHp`, `stoneWallHp`, `reinforcedWallHp`), and the whole stretch opens when it runs out. A broken stretch is rebuilt for `spanCostPerCell` (1,000) a cell once the horde is `wallClearRadius` cells clear of it; a damaged one repairs like any structure.
+- **Upgrade walls.** Right-clicking your own land offers "Upgrade walls" for that district (the `upgrade_walls` intent, with `PlayerActions.districtWalls` giving the tier, cells and price). It raises every wall cell along that district's border a tier, for `stoneWallCostPerCell` (1,000) or `reinforcedWallCostPerCell` (2,000) a cell, so a district with one narrow street in is cheap to fortify. A district that is lost drops back to barricades.
+- **Hand walls** are off on town maps (`Config.isUnitDisabled(Wall)`), so the build bar and build menu don't offer them. Britannia keeps them.
+- Mines, noise beacons and depots can't go on a wall cell (`isSpanCell`). A turret or other building can, and stands in for the wall there, as it does on a span.
+- Horde snapshot v21: older games keep the walls their players built.
+
+Balance (`--zone 0`, against stage 2): free border walls make the towns much easier. Every defended strategy (`turrets`, `fort`, `spans`, `scavenge`, `mortars`, `districts`) now wins Bath, Sheffield and Whitby with the HQ untouched. Before, `fort` fell on Bath in wave 2, `mortars` on Bath in 7 and Sheffield in 8, `scavenge` on Bath in 10 and Sheffield in 9, and `districts` on Bath in 10. `none` and `lone` still lose in waves 1 and 3-4. The walls hold the crowds back at the border. Raising `waveGrowthPercent` doesn't bring the losses back evenly: Whitby's defences start falling at +3 points, while Bath's still win untouched at +9. The fort and spans bots upgrade walls instead of building them on towns (`upgradeBorderWalls` in the harness). Retuning the towns is part of stage 6.
+
 ## Prerequisites
 
 - npm 12.1 or later. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`. The machine currently has npm 11.19.

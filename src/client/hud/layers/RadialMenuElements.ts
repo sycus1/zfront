@@ -30,6 +30,7 @@ import { EventBus } from "@openfront/shared/EventBus";
 import {
   BuildUnitIntentEvent,
   SendUpgradeStructureIntentEvent,
+  SendUpgradeWallsIntentEvent,
 } from "../../Transport";
 const boatIcon = assetUrl("images/BoatIconWhite.svg");
 const buildIcon = assetUrl("images/BuildIconWhite.svg");
@@ -40,6 +41,7 @@ const emojiIcon = assetUrl("images/EmojiIconWhite.svg");
 const infoIcon = assetUrl("images/InfoIcon.svg");
 const swordIcon = assetUrl("images/SwordIconWhite.svg");
 const targetIcon = assetUrl("images/TargetIconWhite.svg");
+const wallIcon = assetUrl("images/WallIconWhite.svg");
 const xIcon = assetUrl("images/XIcon.svg");
 
 export interface MenuElementParams {
@@ -600,6 +602,77 @@ export const buildMenuElement: MenuElement = {
   },
 };
 
+/** zfront: the top wall tier, reinforced. */
+const MAX_WALL_TIER = 3;
+
+/**
+ * zfront: whether the player can raise the border walls of the district
+ * under the cursor a tier now.
+ */
+function canUpgradeWalls(params: MenuElementParams): boolean {
+  const walls = params.playerActions.districtWalls;
+  return (
+    walls !== undefined &&
+    walls.tier < MAX_WALL_TIER &&
+    walls.cells > 0 &&
+    params.myPlayer.gold() >= walls.upgradeCost
+  );
+}
+
+/**
+ * zfront: "Upgrade walls", on a district the player holds where walls
+ * follow district borders (town maps): raises every wall along its border
+ * a tier, for a price by how much wall that is. Null anywhere else.
+ */
+export function upgradeWallsElement(
+  params: MenuElementParams,
+): MenuElement | null {
+  const walls = params.playerActions.districtWalls;
+  if (walls === undefined) return null;
+  const description =
+    walls.cells === 0
+      ? translateText("radial_menu.upgrade_walls_none")
+      : walls.tier >= MAX_WALL_TIER
+        ? translateText("radial_menu.upgrade_walls_max", {
+            cells: walls.cells.toString(),
+          })
+        : translateText("radial_menu.upgrade_walls_desc", {
+            cells: walls.cells.toString(),
+            tier: translateText(
+              walls.tier === 1
+                ? "radial_menu.wall_tier_stone"
+                : "radial_menu.wall_tier_reinforced",
+            ),
+          });
+  return {
+    id: "upgrade_walls",
+    name: "upgrade_walls",
+    disabled: (p: MenuElementParams) => !canUpgradeWalls(p),
+    icon: wallIcon,
+    color: (p: MenuElementParams) =>
+      canUpgradeWalls(p) ? COLORS.building : COLORS.disabled,
+    tooltipItems: [
+      {
+        text: translateText("radial_menu.upgrade_walls_title"),
+        className: "title",
+      },
+      { text: description, className: "description" },
+      ...(walls.upgradeCost > 0n
+        ? [
+            {
+              text: `${renderNumber(walls.upgradeCost)} ${translateText("player_panel.gold")}`,
+              className: "cost",
+            },
+          ]
+        : []),
+    ],
+    action: (p: MenuElementParams) => {
+      p.eventBus.emit(new SendUpgradeWallsIntentEvent(p.tile));
+      p.closeMenu();
+    },
+  };
+}
+
 export const boatMenuElement: MenuElement = {
   id: Slot.Boat,
   name: "boat",
@@ -693,7 +766,7 @@ export const rootMenuElement: MenuElement = {
     const menuItems: (MenuElement | null)[] = [
       infoMenuElement,
       ...(isOwnTerritory
-        ? [deleteUnitElement, buildMenuElement]
+        ? [deleteUnitElement, buildMenuElement, upgradeWallsElement(params)]
         : [
             boatMenuElement,
             allyTargetElement,

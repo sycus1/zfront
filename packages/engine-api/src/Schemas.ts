@@ -41,6 +41,7 @@ export type Intent =
   | UpdateGameConfigIntent
   | CallWaveIntent
   | LootCrateIntent
+  | UpgradeWallsIntent
   | ToggleGameStartTimer;
 
 export type AttackIntent = z.infer<typeof AttackIntentSchema>;
@@ -66,6 +67,7 @@ export type KickPlayerIntent = z.infer<typeof KickPlayerIntentSchema>;
 export type TogglePauseIntent = z.infer<typeof TogglePauseIntentSchema>;
 export type CallWaveIntent = z.infer<typeof CallWaveIntentSchema>;
 export type LootCrateIntent = z.infer<typeof LootCrateIntentSchema>;
+export type UpgradeWallsIntent = z.infer<typeof UpgradeWallsIntentSchema>;
 export type UpdateGameConfigIntent = z.infer<
   typeof UpdateGameConfigIntentSchema
 >;
@@ -522,6 +524,12 @@ export const LootCrateIntentSchema = z.object({
   crate: zb.uint(),
 });
 
+// zfront: raise the border walls of the held district `tile` is in a tier.
+export const UpgradeWallsIntentSchema = z.object({
+  type: z.literal("upgrade_walls"),
+  tile: zb.uint(),
+});
+
 export const IntentSchema = z.discriminatedUnion("type", [
   AttackIntentSchema,
   CancelAttackIntentSchema,
@@ -544,6 +552,7 @@ export const IntentSchema = z.discriminatedUnion("type", [
   ToggleGameStartTimerIntentSchema,
   CallWaveIntentSchema,
   LootCrateIntentSchema,
+  UpgradeWallsIntentSchema,
 ]);
 
 // StampedIntent = Intent with server-stamped clientID (used in turns and execution)

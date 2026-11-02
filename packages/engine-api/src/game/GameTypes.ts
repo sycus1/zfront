@@ -370,6 +370,19 @@ export interface PlayerActions {
   buildableUnits: BuildableUnit[];
   canSendEmojiAllPlayers: boolean;
   interaction?: PlayerInteraction;
+  // zfront: the walls along the border of the district under the cursor,
+  // when the player holds it and walls follow district borders.
+  districtWalls?: DistrictWalls;
+}
+
+// zfront: a held district's border walls, for the "Upgrade walls" action.
+export interface DistrictWalls {
+  // 1 barricade, 2 stone, 3 reinforced.
+  tier: number;
+  // Cells of wall along the district's border, standing or broken.
+  cells: number;
+  // Gold to raise them all a tier; 0 when there's no wall or it's reinforced.
+  upgradeCost: Gold;
 }
 
 export interface BuildableUnit {

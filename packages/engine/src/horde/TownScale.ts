@@ -87,6 +87,9 @@ export const TOWN_HORDE_OPTIONS: Partial<HordeOptions> = {
   // district (costing more each time, see TOWN_OUTPOST_COST_STEP).
   // startingRadius, settling and outpostRadius only apply with this off.
   districtLand: 1,
+  // Walls follow the borders of the districts you hold, rather than being
+  // built by hand (BorderWalls.ts); "Upgrade walls" raises a district's.
+  districtWalls: 1,
 };
 
 /**
@@ -99,7 +102,9 @@ export const TOWN_HORDE_OPTIONS: Partial<HordeOptions> = {
  * `npm run balance:horde -- --zone 0 --map <town>` so a lone first turret
  * holds wave 1 and the defended strategies still lose some games late
  * (wave 9 or 10). See "Per-town difficulty" and "Turret health" in
- * docs/zfront/spike-plan.md.
+ * docs/zfront/spike-plan.md. Walls on district borders (districtWalls) have
+ * since made every defended strategy win; retuning is stage 6 of the
+ * district plan ("Walls follow borders" there).
  */
 export const TOWN_MAP_OPTIONS: Partial<
   Record<GameMapType, Partial<HordeOptions>>

@@ -11,7 +11,7 @@
       "mirv": "Huge explosion, only targets selected player",
       "missile_silo": "Lobs shells at the thickest part of the horde in range, on its own. Reaches much further than a turret but can't hit anything close. Upgrade it twice for double the blast",
       "noise_beacon": "Draws the horde for 30 seconds, then rests for a minute, over and over. Build it where your turrets can reach",
-      "outpost": "Claims the land around it once built. On town maps it goes in a district next to yours and takes the whole district once no zombie has been in it for 10 seconds; each one costs more than the last. You get more as you survive waves. Lose it and that land goes wild",
+      "outpost": "Claims the land around it once built. On town maps it goes in a district next to yours and takes the whole district, with walls along its border, once no zombie has been in it for 10 seconds; each one costs more than the last. You get more as you survive waves. Lose it and that land goes wild",
       "port": "Sends trade ships to generate gold",
       "sam_launcher": "Defends against incoming nukes",
       "wall": "Blocks the horde. Zombies go round walls, or break through when there's no other way. Upgrade a barricade to stone, then reinforced. Walls repair for gold when left alone",
@@ -294,7 +294,7 @@
     "crate_looted": "Supply crate looted: +{gold} gold",
     "crate_lost": "The horde got to your supply crate first",
     "district_overrun": "The horde has overrun one of your districts: its Outpost is lost and the district has gone wild",
-    "district_secured": "District secured: no wave can rise there now, and on town maps its ground is yours",
+    "district_secured": "District secured: no wave can rise there now, and on town maps its ground is yours and walled",
     "elite_at_wall": "Elite at the {direction} wall",
     "hydrogen_bomb_detonated": "{name} - hydrogen bomb detonated",
     "hydrogen_bomb_inbound": "{name} - hydrogen bomb inbound",
@@ -874,7 +874,13 @@
   "radial_menu": {
     "delete_unit_description": "Click to delete the nearest unit",
     "delete_unit_title": "Delete Unit",
-    "upgrade_x": "Upgrade x{amount}"
+    "upgrade_walls_desc": "Raise the {cells} cells of wall along this district's border to {tier}",
+    "upgrade_walls_max": "This district's {cells} cells of wall are already reinforced",
+    "upgrade_walls_none": "This district has no border to wall: it's surrounded by your land",
+    "upgrade_walls_title": "Upgrade walls",
+    "upgrade_x": "Upgrade x{amount}",
+    "wall_tier_reinforced": "reinforced",
+    "wall_tier_stone": "stone"
   },
   "relation": {
     "default": "Default",
