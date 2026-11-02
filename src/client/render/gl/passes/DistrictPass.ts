@@ -11,6 +11,9 @@
  * and outline for Held districts, amber stripes while an Outpost secures
  * one, a red pulse while one is being overrun, a light outline round Core
  * districts and faint lines between Wild ones.
+ *
+ * districtContentMarkers reads what the districts hold from the frame,
+ * for the renderer's labels and dormant buildings (StructurePass).
  */
 
 import { HordeFrame } from "@openfront/engine-api/game/GameUpdates";
@@ -19,6 +22,7 @@ import {
   districtMap,
   MapDistrictIds,
 } from "@openfront/engine-lib/game/Districts";
+import { UT_CITY, UT_FACTORY, UT_MISSILE_SILO } from "../../types";
 import districtFragSrc from "../shaders/district/district.frag.glsl?raw";
 import districtVertSrc from "../shaders/district/district.vert.glsl?raw";
 import {
@@ -56,6 +60,60 @@ export function districtCells(
       if (x > 0 && ids[c - 1] !== d) b |= EDGE_W;
       out[c] = b;
     }
+  }
+  return out;
+}
+
+/** Ints per district in HordeFrame.districtContents. */
+export const DISTRICT_CONTENT_STRIDE = 6;
+
+/** The unit type each dormant building kind is drawn as. */
+const DORMANT_UNIT_TYPES: Record<number, string> = {
+  1: UT_CITY,
+  2: UT_FACTORY,
+  3: UT_MISSILE_SILO,
+};
+
+/** What a district holds, from HordeFrame.districtContents. */
+export interface DistrictContentMarker {
+  /** The site's tile, and where that is in tiles. */
+  tile: number;
+  x: number;
+  y: number;
+  cash: number;
+  survivors: number;
+  /** The dormant building's unit type, or null for none. */
+  unitType: string | null;
+  awake: boolean;
+  /** Unheld and next to held ground: a player could take it next. */
+  near: boolean;
+}
+
+/** The frame's district contents. `mapWidth` is in tiles. */
+export function districtContentMarkers(
+  frame: HordeFrame,
+  mapWidth: number,
+): DistrictContentMarker[] {
+  const c = frame.districtContents;
+  const out: DistrictContentMarker[] = [];
+  if (c === undefined) return out;
+  for (
+    let k = 0;
+    k + DISTRICT_CONTENT_STRIDE <= c.length;
+    k += DISTRICT_CONTENT_STRIDE
+  ) {
+    const tile = c[k];
+    const x = tile % mapWidth;
+    out.push({
+      tile,
+      x,
+      y: (tile - x) / mapWidth,
+      cash: c[k + 1],
+      survivors: c[k + 2],
+      unitType: DORMANT_UNIT_TYPES[c[k + 3]] ?? null,
+      awake: c[k + 4] !== 0,
+      near: c[k + 5] !== 0,
+    });
   }
   return out;
 }

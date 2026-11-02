@@ -165,6 +165,11 @@ export class Districts {
     }
   }
 
+  /** Whether district `d` is Core: a player's start, never overrun. */
+  isCore(d: number): boolean {
+    return this.status[d] === DistrictState.Core;
+  }
+
   /** The smallID holding district `d` (Core or Held), or 0. */
   claimedBy(d: number): number {
     return this.isClaimed(d) ? this.holder[d] : 0;

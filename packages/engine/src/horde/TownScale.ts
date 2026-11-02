@@ -90,6 +90,25 @@ export const TOWN_HORDE_OPTIONS: Partial<HordeOptions> = {
   // Walls follow the borders of the districts you hold, rather than being
   // built by hand (BorderWalls.ts); "Upgrade walls" raises a district's.
   districtWalls: 1,
+  // What districts hold (DistrictContents.ts): cash caches, survivors and
+  // dormant buildings, more the further out. People don't grow on their
+  // own here (Config.troopIncreaseRate): they start at 100,000 and come
+  // from survivors, refugees and Cities, and each 100,000 pays 10 gold a
+  // tick in tax, a fifth of the HQ's trickle. A woken Factory pays half
+  // the trickle again.
+  districtContents: 1,
+  cacheGoldPerRing: 5_000,
+  cachePercent: 60,
+  survivorsPerRing: 20_000,
+  contentMaxRing: 4,
+  dormantCities: 2,
+  dormantFactories: 2,
+  dormantSilos: 1,
+  dormantMinRing: 2,
+  startingPopulation: 100_000,
+  populationTax: 10,
+  factoryIncome: 25,
+  cityPopulation: 10,
 };
 
 /**

@@ -13,6 +13,7 @@ import {
   HORDE_TURRET_RANGE,
   OUTPOST_CLAIM_RADIUS,
 } from "@openfront/engine-lib/configuration/Config";
+import { renderNumber } from "@openfront/engine-lib/Format";
 import { hordeDensityByte } from "@openfront/engine-lib/game/HordeCells";
 import {
   HORDE_BLOCKED_MAGNITUDE,
@@ -26,7 +27,10 @@ import {
 } from "@openfront/engine-lib/snapshot/SnapshotType";
 import { simpleHash } from "@openfront/engine-lib/Util";
 import { z } from "zod";
+import { CityExecution } from "../execution/CityExecution";
 import { DefensePostExecution } from "../execution/DefensePostExecution";
+import { FactoryExecution } from "../execution/FactoryExecution";
+import { MissileSiloExecution } from "../execution/MissileSiloExecution";
 import { Execution, Game, Player, Unit } from "../game/Game";
 import { execSnapshotType } from "../snapshot/ExecutionSnapshot";
 import type { ExecRecord, SnapshotReader } from "../snapshot/SnapshotContext";
@@ -52,6 +56,14 @@ import {
   outposts,
 } from "./Claims";
 import { Crate, CrateOptions, Crates, CrateState } from "./Crates";
+import {
+  DistrictContentOptions,
+  DistrictContents,
+  DistrictContentsState,
+  DORMANT_CITY,
+  DORMANT_FACTORY,
+  DORMANT_SILO,
+} from "./DistrictContents";
 import {
   DISTRICT_INTERVAL,
   DistrictOptions,
@@ -118,7 +130,8 @@ export interface HordeOptions
     CrateOptions,
     MortarOptions,
     DistrictOptions,
-    BorderWallOptions {
+    BorderWallOptions,
+    DistrictContentOptions {
   /** Ticks from the end of the spawn phase to the first wave. */
   firstWaveDelay: number;
   /**
@@ -222,6 +235,12 @@ export interface HordeOptions
   /** Gold each human gets when the horde starts, for a first few walls. */
   startingGold: number;
   /**
+   * People each human starts the horde with (0 keeps what they spawned
+   * with). On town maps people don't grow on their own
+   * (Config.troopIncreaseRate), so this is where the population starts.
+   */
+  startingPopulation: number;
+  /**
    * Free land within this many tiles of each human HQ is theirs when the
    * horde starts, so the game opens on a sizeable neighbourhood.
    */
@@ -278,6 +297,9 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   turretFireInterval: 1,
   hqIncome: 50,
   depotIncome: 0,
+  factoryIncome: 0,
+  populationTax: 0,
+  cityPopulation: 0,
   killBounty: 4,
   eliteBounty: 100,
   clearBonusPerWave: 5_000,
@@ -334,6 +356,18 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   districtWalls: 0,
   stoneWallCostPerCell: 1_000,
   reinforcedWallCostPerCell: 2_000,
+  // What districts hold is for town maps (TownScale.ts).
+  districtContents: 0,
+  cacheGoldPerRing: 5_000,
+  cachePercent: 60,
+  survivorsPerRing: 20_000,
+  contentMaxRing: 4,
+  dormantCities: 2,
+  dormantFactories: 2,
+  dormantSilos: 1,
+  dormantMinRing: 2,
+  contentMinCells: 12,
+  siloBonusLevels: 2,
   repairDelay: 50,
   repairInterval: 10,
   repairHp: 100,
@@ -342,6 +376,7 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   wavesToWin: 10,
   startingTurrets: 0,
   startingGold: 30_000,
+  startingPopulation: 0,
   startingRadius: 24,
   flowDebounce: 10,
   flowMaxDelay: 50,
@@ -381,6 +416,20 @@ const CELL_DRAWN_TYPES: ReadonlySet<UnitType> = new Set([
 function hasIcon(u: Unit): boolean {
   return !CELL_DRAWN_TYPES.has(u.type());
 }
+
+/** The unit each dormant building kind (DistrictContents) wakes as. */
+const DORMANT_TYPES: Record<number, UnitType> = {
+  [DORMANT_CITY]: UnitType.City,
+  [DORMANT_FACTORY]: UnitType.Factory,
+  [DORMANT_SILO]: UnitType.MissileSilo,
+};
+
+/** What a player is told when one wakes. */
+const DORMANT_MESSAGES: Record<number, string> = {
+  [DORMANT_CITY]: "events_display.district_city_woke",
+  [DORMANT_FACTORY]: "events_display.district_factory_woke",
+  [DORMANT_SILO]: "events_display.district_silo_woke",
+};
 
 const TARGET_TYPES: readonly UnitType[] = [
   UnitType.City,
@@ -481,6 +530,7 @@ export class HordeExecution implements Execution {
   private mortars!: Mortars;
   private districts!: Districts;
   private borderWalls!: BorderWalls;
+  private contents!: DistrictContents;
 
   private wave = 0;
   private wavesSurvived = 0;
@@ -618,6 +668,7 @@ export class HordeExecution implements Execution {
       this.height,
       (c) => this.terrainCost[c] !== 0,
     );
+    this.contents = new DistrictContents(opts, this.districts.map);
     mg.setOutpostSiteRule(
       this.districtLand() ? (p, t) => this.outpostSite(p, t) : null,
     );
@@ -737,6 +788,7 @@ export class HordeExecution implements Execution {
     }
     if (before !== null) this.syncDistrictLand(before);
     if (changed && this.districtWalls()) this.raiseBorderWalls();
+    if (this.districtContents()) this.updateContents();
     const plan = this.nextPlan;
     if (!changed || plan === null) return;
     const blocked = this.nextLandings.some((c) =>
@@ -808,6 +860,136 @@ export class HordeExecution implements Execution {
     player.removeGold(walls.upgradeCost);
     this.borderWalls.upgrade(this.districts.districtOf(this.cellOf(tile)));
     return true;
+  }
+
+  /** Whether districts hold things (HordeOptions.districtContents). */
+  private districtContents(): boolean {
+    return this.districtLand() && this.contents.enabled();
+  }
+
+  /**
+   * Fills the districts round the first human HQ with cash, survivors and
+   * dormant buildings (DistrictContents.place), from their own PRNG.
+   */
+  private placeContents(): void {
+    if (!this.districtContents()) return;
+    const mg = this.mg!;
+    const hq = mg
+      .players()
+      .find((p) => p.type() === PlayerType.Human && p.spawnTile() !== undefined)
+      ?.spawnTile();
+    if (hq === undefined) return;
+    const map = mg.map();
+    this.contents.place(
+      new PseudoRandom(simpleHash("zfront-contents")),
+      this.districts.homeDistricts(this.cellOf(hq)),
+      (d) => this.districts.cellsOf(d),
+      (c) => this.terrainCost[c] !== 0,
+      (c) => {
+        const x = c % this.width;
+        const y = (c - x) / this.width;
+        for (const [dx, dy] of [
+          [0, 0],
+          [1, 0],
+          [0, 1],
+          [1, 1],
+        ]) {
+          const tx = x * 2 + dx;
+          const ty = y * 2 + dy;
+          if (!map.isValidCoord(tx, ty)) continue;
+          const t = map.ref(tx, ty);
+          if (map.isLand(t) && !map.isImpassable(t)) return t;
+        }
+        return -1;
+      },
+      this.width,
+    );
+  }
+
+  /**
+   * Collects the cash and survivors of newly held districts, wakes their
+   * buildings, and puts those of lost districts back to sleep.
+   */
+  private updateContents(): void {
+    const mg = this.mg!;
+    this.contents.update({
+      heldBy: (d) => {
+        const s = this.districts.claimedBy(d);
+        return s !== 0 && !this.districts.isCore(d) ? s : 0;
+      },
+      standing: (id) => mg.unit(id)?.isActive() ?? false,
+      collect: (_d, holder, cash, survivors) => {
+        const p = mg.playerBySmallID(holder);
+        if (!p.isPlayer()) return;
+        const player = p as Player;
+        if (cash > 0) player.addGold(BigInt(cash));
+        if (survivors > 0) this.addPeople(player, survivors);
+        mg.displayMessage(
+          cash > 0
+            ? "events_display.district_spoils"
+            : "events_display.district_spoils_survivors",
+          MessageType.CAPTURED_ENEMY_UNIT,
+          player.id(),
+          cash > 0 ? BigInt(cash) : undefined,
+          { gold: renderNumber(cash), survivors: renderNumber(survivors) },
+        );
+      },
+      wake: (_d, holder, kind, site) => this.wakeBuilding(holder, kind, site),
+      sleep: (id) => {
+        const u = mg.unit(id);
+        if (u !== undefined && u.isActive()) u.delete(false);
+      },
+    });
+  }
+
+  /**
+   * Builds a district's dormant building for `holder` on `site`, finished
+   * and free. Returns its unit id, or 0 when it can't be built.
+   */
+  private wakeBuilding(holder: number, kind: number, site: TileRef): number {
+    const mg = this.mg!;
+    const p = mg.playerBySmallID(holder);
+    if (!p.isPlayer()) return 0;
+    const player = p as Player;
+    const type = DORMANT_TYPES[kind];
+    if (type === undefined || mg.config().isUnitDisabled(type)) return 0;
+    // Lend the player the price; buildUnit takes it back.
+    const cost = mg.unitInfo(type).cost(mg, player);
+    player.addGold(cost);
+    const u = player.buildUnit(type, site, {});
+    if (type === UnitType.MissileSilo) {
+      const top = mg.config().maxUnitLevel(type);
+      while (u.level() < top) u.increaseLevel();
+      mg.addExecution(new MissileSiloExecution(u));
+    } else if (type === UnitType.City) {
+      mg.addExecution(new CityExecution(u));
+    } else {
+      mg.addExecution(new FactoryExecution(u));
+    }
+    mg.displayMessage(
+      DORMANT_MESSAGES[kind],
+      MessageType.CAPTURED_ENEMY_UNIT,
+      player.id(),
+      undefined,
+      undefined,
+      u.id(),
+    );
+    return u.id();
+  }
+
+  /** Adds `n` people to `p`, up to their population cap. */
+  private addPeople(p: Player, n: number): void {
+    const room = Math.max(0, this.mg!.config().maxTroops(p) - p.troops());
+    const add = Math.min(n, Math.floor(room));
+    if (add > 0) p.addTroops(add);
+  }
+
+  /** Whether district `d` is unheld and next to one a player holds. */
+  private nearHeld(d: number): boolean {
+    if (this.districts.claimedBy(d) !== 0) return false;
+    return this.districts.map.neighbours[d].some(
+      (n) => this.districts.claimedBy(n) !== 0,
+    );
   }
 
   /** Whether districts are the land (HordeOptions.districtLand). */
@@ -1090,6 +1272,7 @@ export class HordeExecution implements Execution {
       crateLife: this.opts.crateLife,
       districtSize: this.districts.map.size,
       districts: this.districts.encode(),
+      districtContents: this.contents.encode((d) => this.nearHeld(d)),
       encodeMs: 0,
       sentAt: 0,
     };
@@ -1220,6 +1403,7 @@ export class HordeExecution implements Execution {
     this.mortars.hash(mix);
     this.districts.hash(mix);
     if (this.districtWalls()) this.borderWalls.hash(mix);
+    this.contents.hash(mix);
     return h >>> 0;
   }
 
@@ -1251,8 +1435,8 @@ export class HordeExecution implements Execution {
   /**
    * What every human starts the horde with: the land within
    * `startingRadius` of their HQ (or, when districts are the land, their
-   * HQ's district and its neighbours), `startingGold`, and any starting
-   * turrets.
+   * HQ's district and its neighbours), `startingGold`, `startingPopulation`
+   * people, and any starting turrets; then fills the districts.
    */
   private giveStart(): void {
     const mg = this.mg!;
@@ -1267,8 +1451,13 @@ export class HordeExecution implements Execution {
         claimStartingLand(mg, p, this.opts.startingRadius);
       }
       if (this.opts.startingGold > 0) p.addGold(BigInt(this.opts.startingGold));
+      const people = this.opts.startingPopulation;
+      if (people > 0 && p.troops() < people) p.addTroops(people - p.troops());
+      if (people > 0 && p.troops() > people)
+        p.removeTroops(p.troops() - people);
     }
     if (this.opts.startingTurrets > 0) this.buildStartingTurrets();
+    this.placeContents();
   }
 
   /**
@@ -2061,7 +2250,12 @@ export class HordeExecution implements Execution {
         cell,
         hq: nearestCell(cell, hqs, this.width),
         owner: u.owner().smallID(),
-        level: u.level(),
+        // A Silo woken in a district fires as if levelled further.
+        level:
+          u.level() +
+          (this.contents.isWoken(u.id(), DORMANT_SILO)
+            ? this.opts.siloBonusLevels
+            : 0),
       });
     }
     // Aim where the horde will have walked by the time the shell lands.
@@ -2300,6 +2494,7 @@ export class HordeExecution implements Execution {
       mortars: this.mg !== null ? this.mortars.state() : null,
       districts: this.mg !== null ? this.districts.state() : null,
       borderWalls: this.mg !== null ? this.borderWalls.state() : null,
+      contents: this.mg !== null ? this.contents.state() : null,
     });
   }
 
@@ -2376,6 +2571,7 @@ export class HordeExecution implements Execution {
     if (s.mortars !== null) this.mortars.restore(s.mortars);
     if (s.districts !== null) this.districts.restore(s.districts);
     if (s.borderWalls !== null) this.borderWalls.restore(s.borderWalls);
+    if (s.contents !== null) this.contents.restore(s.contents);
     if (s.flowCells !== null) {
       this.computeFlow(s.flowCells, s.flowWalls, s.flowBait);
     }
@@ -2468,6 +2664,9 @@ const HordeOptionsSchema = z.object({
   clearedPercent: zInt(),
   callEarlyGoldPerTick: zInt(),
   depotIncome: zInt(),
+  factoryIncome: zInt(),
+  populationTax: zInt(),
+  cityPopulation: zInt(),
   mineRadius: zInt(),
   mineTrigger: zInt(),
   mineKills: zInt(),
@@ -2493,6 +2692,7 @@ const HordeOptionsSchema = z.object({
   wavesToWin: zInt(),
   startingTurrets: zInt(),
   startingGold: zInt(),
+  startingPopulation: zInt(),
   startingRadius: zInt(),
   flowDebounce: zInt(),
   flowMaxDelay: zInt(),
@@ -2530,6 +2730,17 @@ const HordeOptionsSchema = z.object({
   districtWalls: zInt(),
   stoneWallCostPerCell: zInt(),
   reinforcedWallCostPerCell: zInt(),
+  districtContents: zInt(),
+  cacheGoldPerRing: zInt(),
+  cachePercent: zInt(),
+  survivorsPerRing: zInt(),
+  contentMaxRing: zInt(),
+  dormantCities: zInt(),
+  dormantFactories: zInt(),
+  dormantSilos: zInt(),
+  dormantMinRing: zInt(),
+  contentMinCells: zInt(),
+  siloBonusLevels: zInt(),
   mortarRange: zInt(),
   mortarMinRange: zInt(),
   mortarReload: zInt(),
@@ -2590,6 +2801,18 @@ const BorderWallsStateSchema = z.object({
   tiers: z.array(zInt()),
   version: zInt(),
 }) satisfies z.ZodType<BorderWallsState>;
+
+const DistrictContentsStateSchema = z.object({
+  placed: z.boolean(),
+  cash: z.array(zInt()),
+  survivors: z.array(zInt()),
+  kind: z.array(zInt()),
+  site: z.array(zInt()),
+  unit: z.array(zInt()),
+  owner: z.array(zInt()),
+  taken: z.array(zInt()),
+  spent: z.array(zInt()),
+}) satisfies z.ZodType<DistrictContentsState>;
 
 const WavePlanSchema = z.object({
   wave: zInt(),
@@ -2658,6 +2881,8 @@ const HordeStateSchema = z.object({
   districts: DistrictsStateSchema.nullable(),
   /** Null before init. */
   borderWalls: BorderWallsStateSchema.nullable(),
+  /** Null before init. */
+  contents: DistrictContentsStateSchema.nullable(),
 });
 type HordeState = z.infer<typeof HordeStateSchema>;
 
@@ -2687,7 +2912,7 @@ export function hordeOf(game: Game): HordeExecution | null {
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 21,
+  version: 22,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -2979,6 +3204,29 @@ export const HordeExecutionSnapshot = execSnapshotType({
         reinforcedWallCostPerCell: 0,
       },
       borderWalls: null,
+    }),
+    // 21 -> 22: what districts hold. Old games' districts hold nothing.
+    21: (d) => ({
+      ...d,
+      options: {
+        ...d.options,
+        districtContents: 0,
+        cacheGoldPerRing: 0,
+        cachePercent: 0,
+        survivorsPerRing: 0,
+        contentMaxRing: 0,
+        dormantCities: 0,
+        dormantFactories: 0,
+        dormantSilos: 0,
+        dormantMinRing: 0,
+        contentMinCells: 0,
+        siloBonusLevels: 0,
+        factoryIncome: 0,
+        populationTax: 0,
+        cityPopulation: 0,
+        startingPopulation: 0,
+      },
+      contents: null,
     }),
   },
   cls: () => HordeExecution,

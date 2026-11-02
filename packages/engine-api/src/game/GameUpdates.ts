@@ -122,6 +122,15 @@ export interface HordeFrame {
    */
   districtSize: number;
   districts: Uint8Array;
+  /**
+   * What the districts hold (zfront DistrictContents), six ints for each
+   * district with something left in it: the tile its building stands on
+   * and its labels sit at, the cash and survivors still to collect, the
+   * dormant building's kind (0 none, 1 City, 2 Factory, 3 Missile Silo),
+   * 1 if that building is awake (a unit now), and 1 if the district is
+   * unheld and next to held ground, so a player could take it next.
+   */
+  districtContents: Int32Array;
   /** Spike instrumentation: worker encode time and send time (epoch ms). */
   encodeMs: number;
   sentAt: number;

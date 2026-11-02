@@ -209,6 +209,14 @@ export class Config {
     return isTownScale(this._gameConfig.gameMap) ? 0 : OUTPOST_CLAIM_RADIUS;
   }
 
+  /**
+   * zfront: whether people only come from capturing (horde mode on town
+   * maps), rather than growing towards the cap on their own.
+   */
+  townPopulation(): boolean {
+    return this.horde() && isTownScale(this._gameConfig.gameMap);
+  }
+
   /** zfront: zombie waves (packages/engine/src/horde). */
   horde(): boolean {
     return this._gameConfig.horde ?? false;
@@ -437,6 +445,10 @@ export class Config {
   }
 
   troopIncreaseRate(player: PlayerLike): number {
+    // zfront: on town maps a player's people don't grow on their own. They
+    // come from the survivors in districts they capture, refugees after
+    // each wave and Cities (horde DistrictContents and Economy).
+    if (this.townPopulation() && player.type() === PlayerType.Human) return 0;
     const max = this.maxTroops(player);
 
     let toAdd = 10 + pow(player.troops(), 0.73) / 4;
