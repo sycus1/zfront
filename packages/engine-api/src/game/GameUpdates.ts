@@ -126,11 +126,17 @@ export interface HordeFrame {
    * What the districts hold (zfront DistrictContents), six ints for each
    * district with something left in it: the tile its building stands on
    * and its labels sit at, the cash and survivors still to collect, the
-   * dormant building's kind (0 none, 1 City, 2 Factory, 3 Missile Silo),
+   * dormant building's kind (0 none, 1 City, 2 Factory, 3 Missile Silo,
+   * 4 railway station, 5 harbour),
    * 1 if that building is awake (a unit now), and 1 if the district is
    * unheld and next to held ground, so a player could take it next.
    */
   districtContents: Int32Array;
+  /**
+   * The wave after whose clear the next relief train or boat comes in, at
+   * a station or harbour a player holds; 0 when the map has neither.
+   */
+  reliefWave: number;
   /** Spike instrumentation: worker encode time and send time (epoch ms). */
   encodeMs: number;
   sentAt: number;

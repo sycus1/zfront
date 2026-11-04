@@ -39,7 +39,12 @@ import { BorderStampPass } from "./passes/BorderStampPass";
 import { CoordinateGridPass } from "./passes/CoordinateGridPass";
 import { CrosshairPass } from "./passes/CrosshairPass";
 import { DefenseCoveragePass } from "./passes/DefenseCoveragePass";
-import { DistrictPass, districtContentMarkers } from "./passes/DistrictPass";
+import {
+  DistrictPass,
+  districtContentMarkers,
+  RELIEF_HARBOUR,
+  RELIEF_STATION,
+} from "./passes/DistrictPass";
 import { FalloutBloomPass } from "./passes/FalloutBloomPass";
 import { FalloutLightPass } from "./passes/FalloutLightPass";
 import { FxPass } from "./passes/fx-pass";
@@ -782,6 +787,27 @@ export class GPURenderer {
             })),
             // What each district you could take next holds: its cash
             // above its site, its survivors below.
+            // The station and harbour, always: when relief comes next.
+            ...contents.flatMap((m) =>
+              (m.kind === RELIEF_STATION || m.kind === RELIEF_HARBOUR) &&
+              frame.reliefWave > 0
+                ? [
+                    {
+                      x: m.x,
+                      y: m.y + (m.near && m.survivors > 0 ? 13 : 7),
+                      text: translateText(
+                        m.kind === RELIEF_HARBOUR
+                          ? "horde_hud.relief_harbour"
+                          : "horde_hud.relief_station",
+                        { wave: frame.reliefWave },
+                      ),
+                      colorR: 0.75,
+                      colorG: 1,
+                      colorB: 0.7,
+                    },
+                  ]
+                : [],
+            ),
             ...contents.flatMap((m) => {
               if (!m.near) return [];
               const labels = [];

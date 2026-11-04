@@ -66,6 +66,7 @@ function frame(overrides: Partial<HordeFrame> = {}): HordeFrame {
     districtSize: 0,
     districts: new Uint8Array(),
     districtContents: new Int32Array(),
+    reliefWave: 0,
     encodeMs: 0,
     sentAt: 0,
     ...overrides,

@@ -115,6 +115,8 @@ describe("Town scale", () => {
     expect(hordeOptionsForMap(GameMapType.Sheffield)).toEqual({
       ...TOWN_HORDE_OPTIONS,
       waveGrowthPercent: 50,
+      reliefStationX: 370,
+      reliefStationY: 252,
     });
     expect(hordeOptionsForMap(GameMapType.Britannia)).toEqual({});
     // Every town number is a real option.
@@ -128,6 +130,8 @@ describe("Town scale", () => {
       ...TOWN_HORDE_OPTIONS,
       firstWaveSize: 185,
       waveGrowthPercent: 48,
+      reliefStationX: 245,
+      reliefStationY: 331,
     });
     expect(hordeOptionsForMap(GameMapType.Whitby).firstWaveSize).toBe(120);
     expect(hordeOptionsForMap(GameMapType.Whitby).waveGrowthPercent).toBe(49);

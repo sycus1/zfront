@@ -535,6 +535,18 @@ _2026-11-02._ The first half of stage 5 of the district plan (rail and harbours)
 
 Balance: no change. The harness's bots never build Cities or Factories by hand, and rarely capture a Factory and a City near each other, so the `districts` and `turrets` runs on Whitby match stage 4 exactly (both won, HQ untouched, the same times).
 
+### Relief by rail and sea
+
+_2026-11-04._ The second half of stage 5: a town's railway station and harbour bring relief.
+
+- **Where.** Each town names its station, and Whitby its harbour, in `TOWN_MAP_OPTIONS` (`reliefStationX/Y`, `reliefHarbourX/Y`, in tiles). Bath Spa and Sheffield stations sit on the real rail lines (OpenStreetMap, through the realmap roads layer). Whitby's station is just off the map to the north, so its railhead is where the line comes in at the top edge, and its harbour is on the Esk, the shore nearest the real one. The engine snaps a station to the nearest open land tile (within 8) and a harbour to the nearest open sea-shore tile (within 40), so a regenerated map still works.
+- **What.** The district each one stands in holds a dormant building there instead of one drawn by lot (`DistrictContents`, kinds 4 and 5): the station wakes as a Factory, the rail hub whose track reaches the Cities you hold, and the harbour as a Port. Unlike other contents they can sit in the starting districts, and then they're awake from the start. Lost districts put them back to sleep as before.
+- **Relief.** After every `reliefEvery` (4) waves cleared, each awake station and harbour gives its holder `reliefSurvivors` (40,000) people, up to the cap, and `reliefGold` (25,000) gold, with a message (`horde/Relief.ts`, called from `survived`). The map labels each site with the wave the next relief comes after (frame `reliefWave`).
+- **Wrecked.** The horde goes for a station or harbour like any building. One it wrecks misses that relief and is rebuilt for its holder once the wave is cleared (`DistrictContents.repairRelief`), since a starting district may never be lost and retaken.
+- Horde snapshot v24: older games have no station or harbour.
+
+Balance: outcomes unchanged (`districts` and `turrets` win all three towns, HQ untouched). The bots never take Bath's or Sheffield's station district, so no relief comes there. On Whitby the default HQ starts with the harbour; wave 1 wrecks it, it's rebuilt after the clear, and one relief boat comes in, after wave 8, in each run. Bots don't defend it yet, which is a job for stage 6 along with the rest of the retune.
+
 ## Prerequisites
 
 - npm 12.1 or later. Run `npm install --global --ignore-scripts npm@12.1.0`, or prefix commands with `npx -y npm@12.1.0`. The machine currently has npm 11.19.
