@@ -116,6 +116,12 @@ export const TOWN_HORDE_OPTIONS: Partial<HordeOptions> = {
   railWreck: 1,
   railWreckCount: 3,
   railRepairTicks: 300,
+  // A town's railway station and harbour (TOWN_MAP_OPTIONS) are dormant
+  // buildings; held, each brings a relief train or boat after every fourth
+  // wave cleared (Relief.ts).
+  reliefEvery: 4,
+  reliefSurvivors: 40_000,
+  reliefGold: 25_000,
 };
 
 /**
@@ -135,9 +141,29 @@ export const TOWN_HORDE_OPTIONS: Partial<HordeOptions> = {
 export const TOWN_MAP_OPTIONS: Partial<
   Record<GameMapType, Partial<HordeOptions>>
 > = {
-  [GameMapType.Bath]: { firstWaveSize: 185, waveGrowthPercent: 48 },
-  [GameMapType.Sheffield]: { waveGrowthPercent: 50 },
-  [GameMapType.Whitby]: { firstWaveSize: 120, waveGrowthPercent: 49 },
+  // Stations are the real ones, from OpenStreetMap's rail lines (see
+  // scripts/realmap): Bath Spa and Sheffield. Whitby's station is just off
+  // the map to the north, so its railhead is where the line comes in, and
+  // its harbour is on the Esk, the nearest shore to the real one.
+  [GameMapType.Bath]: {
+    firstWaveSize: 185,
+    waveGrowthPercent: 48,
+    reliefStationX: 245,
+    reliefStationY: 331,
+  },
+  [GameMapType.Sheffield]: {
+    waveGrowthPercent: 50,
+    reliefStationX: 370,
+    reliefStationY: 252,
+  },
+  [GameMapType.Whitby]: {
+    firstWaveSize: 120,
+    waveGrowthPercent: 49,
+    reliefStationX: 215,
+    reliefStationY: 4,
+    reliefHarbourX: 205,
+    reliefHarbourY: 130,
+  },
 };
 
 /**

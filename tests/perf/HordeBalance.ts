@@ -542,6 +542,8 @@ interface Result {
   outcome: string;
   /** Seconds from the end of the spawn phase to the end of the game. */
   seconds: number;
+  /** Relief trains and boats that came in. */
+  reliefs: number;
 }
 
 async function play(
@@ -715,6 +717,7 @@ async function play(
     rows: rows.filter((r) => r.wave > 0),
     outcome: exec.stats().outcome,
     seconds: Math.round((game.ticks() - start) / 10),
+    reliefs: exec.stats().reliefs,
   };
 }
 
@@ -745,7 +748,9 @@ async function main(): Promise<void> {
         SPAWNS[name] ?? spawnXY(name)!,
         strategy,
       );
-      console.log(`\n${strategy} @ ${name}: ${r.outcome} after ${r.seconds}s`);
+      console.log(
+        `\n${strategy} @ ${name}: ${r.outcome} after ${r.seconds}s, ${r.reliefs} reliefs`,
+      );
       console.log(
         table(
           [

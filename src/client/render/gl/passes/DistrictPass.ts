@@ -22,7 +22,7 @@ import {
   districtMap,
   MapDistrictIds,
 } from "@openfront/engine-lib/game/Districts";
-import { UT_CITY, UT_FACTORY, UT_MISSILE_SILO } from "../../types";
+import { UT_CITY, UT_FACTORY, UT_MISSILE_SILO, UT_PORT } from "../../types";
 import districtFragSrc from "../shaders/district/district.frag.glsl?raw";
 import districtVertSrc from "../shaders/district/district.vert.glsl?raw";
 import {
@@ -72,7 +72,14 @@ const DORMANT_UNIT_TYPES: Record<number, string> = {
   1: UT_CITY,
   2: UT_FACTORY,
   3: UT_MISSILE_SILO,
+  // A railway station wakes as a Factory, a harbour as a Port.
+  4: UT_FACTORY,
+  5: UT_PORT,
 };
+
+/** Dormant building kinds that bring relief: 4 a station, 5 a harbour. */
+export const RELIEF_STATION = 4;
+export const RELIEF_HARBOUR = 5;
 
 /** What a district holds, from HordeFrame.districtContents. */
 export interface DistrictContentMarker {
@@ -84,6 +91,8 @@ export interface DistrictContentMarker {
   survivors: number;
   /** The dormant building's unit type, or null for none. */
   unitType: string | null;
+  /** Its kind, as in HordeFrame.districtContents (0 none). */
+  kind: number;
   awake: boolean;
   /** Unheld and next to held ground: a player could take it next. */
   near: boolean;
@@ -111,6 +120,7 @@ export function districtContentMarkers(
       cash: c[k + 1],
       survivors: c[k + 2],
       unitType: DORMANT_UNIT_TYPES[c[k + 3]] ?? null,
+      kind: c[k + 3],
       awake: c[k + 4] !== 0,
       near: c[k + 5] !== 0,
     });

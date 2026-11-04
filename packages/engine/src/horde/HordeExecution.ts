@@ -31,6 +31,7 @@ import { CityExecution } from "../execution/CityExecution";
 import { DefensePostExecution } from "../execution/DefensePostExecution";
 import { FactoryExecution } from "../execution/FactoryExecution";
 import { MissileSiloExecution } from "../execution/MissileSiloExecution";
+import { PortExecution } from "../execution/PortExecution";
 import { Execution, Game, Player, Unit } from "../game/Game";
 import { execSnapshotType } from "../snapshot/ExecutionSnapshot";
 import type { ExecRecord, SnapshotReader } from "../snapshot/SnapshotContext";
@@ -62,7 +63,10 @@ import {
   DistrictContentsState,
   DORMANT_CITY,
   DORMANT_FACTORY,
+  DORMANT_HARBOUR,
   DORMANT_SILO,
+  DORMANT_STATION,
+  FixedSite,
 } from "./DistrictContents";
 import {
   DISTRICT_INTERVAL,
@@ -82,6 +86,14 @@ import { FlowField, ORTHO_STEP, WALL_COST } from "./FlowField";
 import { buildCostField, HordeField } from "./HordeField";
 import { MortarGun, MortarOptions, Mortars, MortarState } from "./Mortars";
 import { RailWreckOptions, RailWrecks, RailWreckState } from "./RailWrecks";
+import {
+  nearestTile,
+  nextReliefWave,
+  RELIEF_HARBOUR_REACH,
+  RELIEF_STATION_REACH,
+  reliefAfter,
+  ReliefOptions,
+} from "./Relief";
 import {
   claimStartingLand,
   passiveRadius,
@@ -133,7 +145,8 @@ export interface HordeOptions
     DistrictOptions,
     BorderWallOptions,
     DistrictContentOptions,
-    RailWreckOptions {
+    RailWreckOptions,
+    ReliefOptions {
   /** Ticks from the end of the spawn phase to the first wave. */
   firstWaveDelay: number;
   /**
@@ -374,6 +387,14 @@ export const DEFAULT_HORDE_OPTIONS: HordeOptions = {
   railWreck: 0,
   railWreckCount: 3,
   railRepairTicks: 300,
+  // Relief by rail and sea is for town maps that name a station or harbour.
+  reliefEvery: 0,
+  reliefSurvivors: 40_000,
+  reliefGold: 25_000,
+  reliefStationX: -1,
+  reliefStationY: -1,
+  reliefHarbourX: -1,
+  reliefHarbourY: -1,
   repairDelay: 50,
   repairInterval: 10,
   repairHp: 100,
@@ -428,6 +449,8 @@ const DORMANT_TYPES: Record<number, UnitType> = {
   [DORMANT_CITY]: UnitType.City,
   [DORMANT_FACTORY]: UnitType.Factory,
   [DORMANT_SILO]: UnitType.MissileSilo,
+  [DORMANT_STATION]: UnitType.Factory,
+  [DORMANT_HARBOUR]: UnitType.Port,
 };
 
 /** What a player is told when one wakes. */
@@ -435,6 +458,8 @@ const DORMANT_MESSAGES: Record<number, string> = {
   [DORMANT_CITY]: "events_display.district_city_woke",
   [DORMANT_FACTORY]: "events_display.district_factory_woke",
   [DORMANT_SILO]: "events_display.district_silo_woke",
+  [DORMANT_STATION]: "events_display.district_station_woke",
+  [DORMANT_HARBOUR]: "events_display.district_harbour_woke",
 };
 
 const TARGET_TYPES: readonly UnitType[] = [
@@ -508,6 +533,8 @@ export interface HordeStats {
   /** Railroads the horde has wrecked in all, and ones not yet relaid. */
   railsWrecked: number;
   railsBroken: number;
+  /** Relief trains and boats that have come in. */
+  reliefs: number;
   outcome: HordeOutcome;
   recomputes: number;
   lastRecomputeMs: number;
@@ -590,6 +617,8 @@ export class HordeExecution implements Execution {
   /** HQ health by player smallID. */
   private hqHp = new Map<number, number>();
   private hqsFallen = 0;
+  /** Relief trains and boats that have come in. */
+  private reliefs = 0;
   private outcome: HordeOutcome = "playing";
 
   /** Target cells (structures and HQs) from the latest scan. */
@@ -933,7 +962,59 @@ export class HordeExecution implements Execution {
         return -1;
       },
       this.width,
+      this.reliefSites(),
     );
+  }
+
+  /**
+   * The map's railway station and harbour (Relief.ts): the open land tile
+   * nearest the station's spot, and the open sea-shore tile nearest the
+   * harbour's, each with its district.
+   */
+  private reliefSites(): FixedSite[] {
+    const map = this.mg!.map();
+    const o = this.opts;
+    const open = (x: number, y: number) => {
+      const t = map.ref(x, y);
+      return (
+        map.isLand(t) &&
+        !map.isImpassable(t) &&
+        this.districts.districtOf(this.cellOf(t)) >= 0
+      );
+    };
+    const out: FixedSite[] = [];
+    const add = (
+      kind: number,
+      x: number,
+      y: number,
+      reach: number,
+      ok: (x: number, y: number) => boolean,
+    ) => {
+      if (x < 0 || y < 0) return;
+      const at = nearestTile(x, y, reach, map.width(), map.height(), ok);
+      if (at === null) return;
+      const tile = map.ref(at.x, at.y);
+      out.push({
+        district: this.districts.districtOf(this.cellOf(tile)),
+        kind,
+        tile,
+      });
+    };
+    add(
+      DORMANT_STATION,
+      o.reliefStationX,
+      o.reliefStationY,
+      RELIEF_STATION_REACH,
+      open,
+    );
+    add(
+      DORMANT_HARBOUR,
+      o.reliefHarbourX,
+      o.reliefHarbourY,
+      RELIEF_HARBOUR_REACH,
+      (x, y) => open(x, y) && map.isOceanShore(map.ref(x, y)),
+    );
+    return out;
   }
 
   /**
@@ -947,6 +1028,8 @@ export class HordeExecution implements Execution {
         const s = this.districts.claimedBy(d);
         return s !== 0 && !this.districts.isCore(d) ? s : 0;
       },
+      startOf: (d) =>
+        this.districts.isCore(d) ? this.districts.claimedBy(d) : 0,
       standing: (id) => mg.unit(id)?.isActive() ?? false,
       collect: (_d, holder, cash, survivors) => {
         const p = mg.playerBySmallID(holder);
@@ -995,6 +1078,8 @@ export class HordeExecution implements Execution {
       mg.addExecution(new MissileSiloExecution(u));
     } else if (type === UnitType.City) {
       mg.addExecution(new CityExecution(u));
+    } else if (type === UnitType.Port) {
+      mg.addExecution(new PortExecution(u));
     } else {
       mg.addExecution(new FactoryExecution(u));
     }
@@ -1165,6 +1250,7 @@ export class HordeExecution implements Execution {
       borderWallsBroken: this.borderWalls?.brokenCount() ?? 0,
       railsWrecked: this.railWrecks?.wreckedCount() ?? 0,
       railsBroken: this.railWrecks?.brokenCount() ?? 0,
+      reliefs: this.reliefs,
       outcome: this.outcome,
       ...this.hordeProfile,
     };
@@ -1307,6 +1393,9 @@ export class HordeExecution implements Execution {
       districtSize: this.districts.map.size,
       districts: this.districts.encode(),
       districtContents: this.contents.encode((d) => this.nearHeld(d)),
+      reliefWave: this.contents.hasRelief()
+        ? nextReliefWave(this.opts, this.wavesSurvived)
+        : 0,
       encodeMs: 0,
       sentAt: 0,
     };
@@ -1439,6 +1528,7 @@ export class HordeExecution implements Execution {
     if (this.districtWalls()) this.borderWalls.hash(mix);
     this.contents.hash(mix);
     this.railWrecks.hash(mix);
+    mix(this.reliefs);
     return h >>> 0;
   }
 
@@ -2050,6 +2140,38 @@ export class HordeExecution implements Execution {
     if (wave <= this.wavesSurvived) return;
     this.wavesSurvived = wave;
     welcomeRefugees(this.mg!, this.opts, wave);
+    if (reliefAfter(this.opts, wave)) this.sendRelief();
+    // A wrecked station or harbour misses the relief but is rebuilt.
+    this.contents.repairRelief();
+  }
+
+  /**
+   * A relief train comes in at each awake station, and a boat at each
+   * awake harbour, with people and gold for whoever holds it.
+   */
+  private sendRelief(): void {
+    const mg = this.mg!;
+    for (const r of this.contents.awakeRelief()) {
+      const u = mg.unit(r.unit);
+      if (u === undefined || !u.isActive()) continue;
+      const p = u.owner();
+      if (!p.isPlayer() || !p.isAlive()) continue;
+      const gold = this.opts.reliefGold;
+      const people = this.opts.reliefSurvivors;
+      if (gold > 0) p.addGold(BigInt(gold));
+      if (people > 0) this.addPeople(p, people);
+      this.reliefs++;
+      mg.displayMessage(
+        r.kind === DORMANT_HARBOUR
+          ? "events_display.relief_boat"
+          : "events_display.relief_train",
+        MessageType.CAPTURED_ENEMY_UNIT,
+        p.id(),
+        gold > 0 ? BigInt(gold) : undefined,
+        { gold: renderNumber(gold), survivors: renderNumber(people) },
+        u.id(),
+      );
+    }
   }
 
   /**
@@ -2506,6 +2628,7 @@ export class HordeExecution implements Execution {
       hqIds: [...this.hqHp.keys()],
       hqValues: [...this.hqHp.values()],
       hqsFallen: this.hqsFallen,
+      reliefs: this.reliefs,
       outcome: OUTCOMES.indexOf(this.outcome),
       structureSig: this.hordeStructureSig,
       flowCells: this.flowCells === null ? null : [...this.flowCells],
@@ -2552,6 +2675,7 @@ export class HordeExecution implements Execution {
     this.killed = s.killed;
     this.structuresDestroyed = s.structuresDestroyed;
     this.hqsFallen = s.hqsFallen;
+    this.reliefs = s.reliefs;
     this.outcome = OUTCOMES[s.outcome];
     this.hordeProfile = newProfile();
     this.hordeStructureSig = s.structureSig;
@@ -2781,6 +2905,13 @@ const HordeOptionsSchema = z.object({
   railWreck: zInt(),
   railWreckCount: zInt(),
   railRepairTicks: zInt(),
+  reliefEvery: zInt(),
+  reliefSurvivors: zInt(),
+  reliefGold: zInt(),
+  reliefStationX: zInt(),
+  reliefStationY: zInt(),
+  reliefHarbourX: zInt(),
+  reliefHarbourY: zInt(),
   mortarRange: zInt(),
   mortarMinRange: zInt(),
   mortarReload: zInt(),
@@ -2902,6 +3033,7 @@ const HordeStateSchema = z.object({
   hqIds: z.array(zInt()),
   hqValues: z.array(zInt()),
   hqsFallen: zInt(),
+  reliefs: zInt(),
   /** Index into OUTCOMES. */
   outcome: zInt(),
   structureSig: zInt(),
@@ -2963,7 +3095,7 @@ export function hordeOf(game: Game): HordeExecution | null {
 
 export const HordeExecutionSnapshot = execSnapshotType({
   name: "Horde",
-  version: 23,
+  version: 24,
   schema: HordeStateSchema,
   migrations: {
     // 1 -> 2: win after N waves and the debounced flow field. A version 1
@@ -3289,6 +3421,22 @@ export const HordeExecutionSnapshot = execSnapshotType({
         railRepairTicks: 0,
       },
       rails: null,
+    }),
+    // 23 -> 24: relief by rail and sea. Old games have no station or
+    // harbour.
+    23: (d) => ({
+      ...d,
+      options: {
+        ...d.options,
+        reliefEvery: 0,
+        reliefSurvivors: 0,
+        reliefGold: 0,
+        reliefStationX: -1,
+        reliefStationY: -1,
+        reliefHarbourX: -1,
+        reliefHarbourY: -1,
+      },
+      reliefs: 0,
     }),
   },
   cls: () => HordeExecution,

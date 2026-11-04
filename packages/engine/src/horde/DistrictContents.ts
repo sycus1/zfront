@@ -16,6 +16,12 @@ import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
  * wake for whoever takes the district next. A building the horde wrecks
  * stays dormant until the district is lost and taken again.
  *
+ * A town's railway station and harbour (Relief.ts) are dormant buildings
+ * too, at their own spots rather than drawn by lot, and in whatever ring
+ * they fall, even the HQ's own districts. One the horde wrecks is rebuilt
+ * once the wave is cleared (repairRelief), as its district may never be
+ * lost.
+ *
  * Deterministic: its own PRNG, districts visited in id order, rings by a
  * breadth-first walk in neighbour order.
  */
@@ -50,11 +56,29 @@ export interface DistrictContentOptions {
   siloBonusLevels: number;
 }
 
-/** What a district holds, by kind: 0 none, then City, Factory, Silo. */
+/**
+ * What a district holds, by kind: 0 none, then City, Factory, Silo, and a
+ * railway station (it wakes as a Factory) or harbour (a Port) that brings
+ * relief (Relief.ts).
+ */
 export const DORMANT_NONE = 0;
 export const DORMANT_CITY = 1;
 export const DORMANT_FACTORY = 2;
 export const DORMANT_SILO = 3;
+export const DORMANT_STATION = 4;
+export const DORMANT_HARBOUR = 5;
+
+/** Whether a dormant building of `kind` brings relief. */
+export function bringsRelief(kind: number): boolean {
+  return kind === DORMANT_STATION || kind === DORMANT_HARBOUR;
+}
+
+/** A dormant building at a spot of the map's own: a station or harbour. */
+export interface FixedSite {
+  district: number;
+  kind: number;
+  tile: number;
+}
 
 export interface DistrictContentsState {
   placed: boolean;
@@ -72,6 +96,11 @@ export interface DistrictContentsState {
 export interface ContentsView {
   /** smallID holding district `d` as Held or Threatened, else 0. */
   heldBy(d: number): number;
+  /**
+   * smallID holding district `d` as one of their starting districts, else
+   * 0. Only a station or harbour wakes there; nothing else is put there.
+   */
+  startOf(d: number): number;
   /** Whether unit `id` still stands. */
   standing(id: number): boolean;
   /** Pays `holder` a district's cash and survivors. */
@@ -151,6 +180,7 @@ export class DistrictContents {
    * Fills the districts, once. `home` is the first HQ's districts, `cells`
    * gives a district's coarse cells, `open` whether a cell is walkable and
    * `siteTile` the tile a building on a cell would stand on (-1: none).
+   * `fixed` are the map's own station and harbour.
    */
   place(
     random: PseudoRandom,
@@ -159,6 +189,7 @@ export class DistrictContents {
     open: (cell: number) => boolean,
     siteTile: (cell: number) => number,
     width: number,
+    fixed: readonly FixedSite[] = [],
   ): void {
     if (this.placed || !this.enabled()) return;
     this.placed = true;
@@ -185,6 +216,14 @@ export class DistrictContents {
         100,
       );
       eligible.push(d);
+    }
+    // The station and harbour stand where the map puts them, and the
+    // labels sit there too; the lot goes round them.
+    for (const f of fixed) {
+      if (f.district < 0 || f.district >= this.map.count) continue;
+      if (this.kind[f.district] !== DORMANT_NONE) continue;
+      this.kind[f.district] = f.kind;
+      this.site[f.district] = f.tile;
     }
     // The Silos go furthest out, then Factories, then Cities.
     const order = shuffled(eligible, random);
@@ -263,7 +302,8 @@ export class DistrictContents {
     if (!this.placed) return;
     for (let d = 0; d < this.map.count; d++) {
       if (this.site[d] < 0) continue;
-      const h = view.heldBy(d);
+      let h = view.heldBy(d);
+      if (h === 0 && bringsRelief(this.kind[d])) h = view.startOf(d);
       if (this.unit[d] !== 0) {
         const id = this.unit[d];
         if (!view.standing(id)) {
@@ -297,6 +337,41 @@ export class DistrictContents {
     if (id === 0) return false;
     for (let d = 0; d < this.map.count; d++) {
       if (this.unit[d] === id) return this.kind[d] === kind;
+    }
+    return false;
+  }
+
+  /**
+   * The station and harbour that are awake: their kind and unit id, in
+   * district order.
+   */
+  awakeRelief(): { kind: number; unit: number }[] {
+    const out: { kind: number; unit: number }[] = [];
+    if (!this.placed) return out;
+    for (let d = 0; d < this.map.count; d++) {
+      if (bringsRelief(this.kind[d]) && this.unit[d] !== 0) {
+        out.push({ kind: this.kind[d], unit: this.unit[d] });
+      }
+    }
+    return out;
+  }
+
+  /**
+   * A wave has been cleared: a station or harbour the horde wrecked is
+   * rebuilt, on the next update, for whoever still holds its district.
+   */
+  repairRelief(): void {
+    if (!this.placed) return;
+    for (let d = 0; d < this.map.count; d++) {
+      if (bringsRelief(this.kind[d]) && this.unit[d] === 0) this.spent[d] = 0;
+    }
+  }
+
+  /** Whether the map has a station or harbour. */
+  hasRelief(): boolean {
+    if (!this.placed) return false;
+    for (let d = 0; d < this.map.count; d++) {
+      if (bringsRelief(this.kind[d])) return true;
     }
     return false;
   }
